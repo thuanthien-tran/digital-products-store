@@ -1,0 +1,116 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model ProductGroup {
+  id         String    @id @default(cuid())
+  name       String
+  badgeText  String?
+  badgeColor String?   @default("#6366f1")
+  sortOrder  Int       @default(0)
+  visibility String    @default("public")
+  createdAt  DateTime  @default(now())
+  products   Product[]
+}
+
+model Product {
+  id                  String        @id @default(cuid())
+  shopId              String        @default("main")
+  groupId             String?
+  group               ProductGroup? @relation(fields: [groupId], references: [id])
+  name                String
+  slug                String        @unique
+  description         String
+  images              String        @default("[]") // JSON array of image URLs
+  deliveryType        String        @default("serials") // "serials" | "service"
+  serviceInstructions String?
+  sortOrder           Int           @default(0)
+  visibility          String        @default("public") // "public" | "hidden"
+  statusOverride      String        @default("auto") // "auto" | "in_stock" | "out_of_stock"
+  badgeOverride       String        @default("auto")
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  variants            Variant[]
+  orderItems          OrderItem[]
+}
+
+model Variant {
+  id                  String      @id @default(cuid())
+  productId           String
+  product             Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name                String
+  priceCents          Int         // Price in VND (e.g., 50000 = 50.000đ)
+  compareAtPriceCents Int?        // Original price for strikethrough
+  minQuantity         Int         @default(1)
+  maxQuantity         Int?
+  sortOrder           Int         @default(0)
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+  serials             Serial[]
+  orderItems          OrderItem[]
+}
+
+model Serial {
+  id          String    @id @default(cuid())
+  variantId   String
+  variant     Variant   @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  content     String    // The actual account/key content
+  status      String    @default("available") // "available" | "sold" | "defective"
+  orderItemId String?   @unique
+  orderItem   OrderItem? @relation(fields: [orderItemId], references: [id])
+  createdAt   DateTime  @default(now())
+}
+
+model Order {
+  id          String      @id @default(cuid())
+  code        String      @unique // Payment reference (e.g., AG1234)
+  email       String
+  totalCents  Int
+  status      String      @default("pending") // "pending" | "paid" | "cancelled"
+  note        String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  items       OrderItem[]
+  payment     Payment?
+}
+
+model OrderItem {
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  variantId String
+  variant   Variant  @relation(fields: [variantId], references: [id])
+  quantity  Int      @default(1)
+  priceCents Int
+  serial    Serial?
+  createdAt DateTime @default(now())
+}
+
+model Payment {
+  id              String   @id @default(cuid())
+  orderId         String   @unique
+  order           Order    @relation(fields: [orderId], references: [id])
+  gateway         String?  // "Vietcombank", "Techcombank", etc.
+  transactionId   String?  @unique // SePay transaction ID (deduplication)
+  amount          Int
+  content         String?
+  transactionDate String?
+  createdAt       DateTime @default(now())
+}
+
+model Admin {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+}
