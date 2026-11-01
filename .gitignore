@@ -30,8 +30,11 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# env files
+.env
+.env.*
+.env.local
+!.env.example
 
 # vercel
 .vercel
@@ -39,3 +42,13 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local databases, backups and audit artifacts
+*.db
+*.db-journal
+*.db*bak*
+*.bak
+*.sqlite
+*.sqlite3
+prisma/*.bak*
+.audit/

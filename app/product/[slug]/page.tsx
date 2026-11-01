@@ -1,0 +1,211 @@
+import { notFound } from "next/navigation"
+import Link from "next/link"
+import { prisma } from "@/lib/db"
+import { Header } from "@/components/storefront/Header"
+import { Footer } from "@/components/storefront/Footer"
+import { ZaloWidget } from "@/components/storefront/ZaloWidget"
+import { PurchaseForm } from "@/components/storefront/PurchaseForm"
+import { BrandIcon } from "@/components/storefront/BrandIcons"
+import { ProductDetailImage } from "@/components/storefront/ProductDetailImage"
+import { ChevronLeft } from "lucide-react"
+
+interface Props {
+  params: Promise<{ slug: string }>
+}
+
+function renderFormattedText(text: string) {
+  const parts = text.split(/(\*\*.*?\*\*)/g)
+  return parts.map((part, index) => {
+    if (part.startsWith("**") && part.endsWith("**")) {
+      return (
+        <strong key={index} className="text-foreground font-medium">
+          {part.slice(2, -2)}
+        </strong>
+      )
+    }
+    return part
+  })
+}
+
+async function getProduct(slug: string) {
+  try {
+    const product = await prisma.product.findUnique({
+      where: { slug },
+      include: {
+        group: true,
+        variants: {
+          orderBy: { sortOrder: "asc" },
+          include: {
+            _count: { select: { serials: { where: { status: "available" } } } },
+          },
+        },
+      },
+    })
+
+    if (!product || product.visibility !== "public" || product.editorialStatus !== "published") {
+      return null
+    }
+
+    return product
+  } catch {
+    return null
+  }
+}
+
+export default async function ProductPage({ params }: Props) {
+  const { slug } = await params
+  const product = await getProduct(slug)
+  if (!product) notFound()
+
+  const variantsWithStock = product.variants.map((v) => ({
+    id: v.id,
+    name: v.name,
+    priceCents: v.priceCents,
+    compareAtPriceCents: v.compareAtPriceCents,
+    availableStock:
+      v.provider || product.deliveryType === "fatcat" || product.deliveryType === "dino"
+        ? (v.providerStock ?? 0) + v._count.serials
+        : v._count.serials,
+    minQuantity: v.minQuantity,
+    maxQuantity: v.maxQuantity,
+  }))
+
+  // Parse images
+  let parsedImages: string[] = []
+  try {
+    parsedImages = JSON.parse(product.images || "[]")
+  } catch {
+    parsedImages = []
+  }
+  const primaryImage = parsedImages[0] || null
+
+  // Split description cleanly
+  const rawDesc = product.description || ""
+  const descParagraphs = rawDesc.split("\n").filter((p) => p.trim().length > 0)
+
+  return (
+    <div className="flex min-h-screen flex-col bg-background text-foreground">
+      <Header />
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 sm:px-6 py-8 space-y-6">
+        {/* Breadcrumb */}
+        <nav aria-label="Đường dẫn" className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Link href="/" className="hover:text-foreground transition-colors flex items-center gap-1">
+            <ChevronLeft className="size-3.5" /> Trang chủ
+          </Link>
+          <span>/</span>
+          {product.group && (
+            <>
+              <Link href="/#products" className="hover:text-foreground transition-colors">
+                {product.group.name}
+              </Link>
+              <span>/</span>
+            </>
+          )}
+          <span className="text-foreground font-medium truncate max-w-[220px]">{product.name}</span>
+        </nav>
+
+        {/* 2-column layout */}
+        <div className="grid gap-8 lg:grid-cols-12 items-start">
+          {/* Left Column: Product Information (7 cols) */}
+          <div className="lg:col-span-7 space-y-6">
+            {/* Title & Metadata Container */}
+            <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
+              {/* 16:9 Image Frame spanning the full width of the container */}
+              <ProductDetailImage
+                imageUrl={primaryImage}
+                name={product.name}
+                groupName={product.group?.name}
+              />
+
+              <div className="p-6 space-y-4">
+                <div className="flex items-start gap-4">
+                  <div className="size-11 rounded-xl bg-secondary border border-border flex items-center justify-center text-muted-foreground shrink-0 mt-0.5">
+                    <BrandIcon name={product.name} className="size-5" />
+                  </div>
+                  <div className="space-y-1">
+                    {product.group && (
+                      <span className="text-xs font-semibold text-accent block">
+                        {product.group.name}
+                      </span>
+                    )}
+                    <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground leading-snug">
+                      {product.name}
+                    </h1>
+                    <p className="text-xs text-muted-foreground">
+                      Hình thức bàn giao:{" "}
+                      <span className="text-foreground font-medium">
+                        {product.deliveryType === "serials" ? "Mã tự động hiển thị ngay sau thanh toán" : "Hỗ trợ kích hoạt trực tiếp"}
+                      </span>
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Structured Details: Mô tả, Hướng dẫn & Chính sách */}
+            <div className="rounded-xl border border-border bg-card p-6 space-y-6">
+              {/* Mô tả */}
+              <div className="space-y-3">
+                <h2 className="text-sm font-semibold uppercase tracking-wider text-foreground">
+                  Mô tả &amp; Quyền lợi
+                </h2>
+                <div className="space-y-2 text-sm text-muted-foreground leading-relaxed">
+                  {descParagraphs.map((para, i) => (
+                    <p key={i}>
+                      {renderFormattedText(para)}
+                    </p>
+                  ))}
+                </div>
+              </div>
+
+              {/* Hướng dẫn nhận tài khoản */}
+              {product.serviceInstructions && (
+                <div className="pt-6 border-t border-border/60 space-y-3">
+                  <h2 className="text-sm font-semibold uppercase tracking-wider text-foreground">
+                    Hướng dẫn sau khi nhận mã
+                  </h2>
+                  <div className="p-4 rounded-lg border border-border/80 bg-secondary/30 text-xs text-muted-foreground leading-relaxed whitespace-pre-line font-mono">
+                    {product.serviceInstructions}
+                  </div>
+                </div>
+              )}
+
+              {/* Chính sách bảo hành */}
+              <div className="pt-6 border-t border-border/60 space-y-3">
+                <h2 className="text-sm font-semibold uppercase tracking-wider text-foreground">
+                  Chính sách bảo hành
+                </h2>
+                <ul className="space-y-2 text-xs text-muted-foreground">
+                  <li className="flex items-start gap-2">
+                    <span className="size-1.5 rounded-full bg-accent mt-1.5 shrink-0" />
+                    <span>Hỗ trợ đổi mã mới 1-1 nếu tài khoản phát sinh sự cố trong thời gian bảo hành.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="size-1.5 rounded-full bg-accent mt-1.5 shrink-0" />
+                    <span>Thông tin đơn hàng được bảo mật và lưu trữ trong lịch sử tra cứu.</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column: Checkout Frame (5 cols) */}
+          <div className="lg:col-span-5 lg:sticky lg:top-20">
+            <PurchaseForm
+              product={{
+                id: product.id,
+                name: product.name,
+                deliveryType: product.deliveryType,
+                noticeNotes: product.noticeNotes,
+                warrantyTerms: product.warrantyTerms,
+              }}
+              variants={variantsWithStock}
+            />
+          </div>
+        </div>
+      </main>
+      <Footer />
+      <ZaloWidget />
+    </div>
+  )
+}

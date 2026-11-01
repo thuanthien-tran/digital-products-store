@@ -39,3 +39,14 @@ export function parseImages(imagesJson: string): string[] {
     return []
   }
 }
+
+export function normalizeVietnamese(text: string): string {
+  if (!text) return ''
+  return text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'd')
+    .trim()
+}

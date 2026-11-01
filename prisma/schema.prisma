@@ -22,51 +22,67 @@ model ProductGroup {
 }
 
 model Product {
-  id                  String        @id @default(cuid())
-  shopId              String        @default("main")
+  id                  String         @id @default(cuid())
+  shopId              String         @default("main")
   groupId             String?
-  group               ProductGroup? @relation(fields: [groupId], references: [id])
+  group               ProductGroup?  @relation(fields: [groupId], references: [id])
   name                String
-  slug                String        @unique
+  slug                String         @unique
   description         String
-  images              String        @default("[]") // JSON array of image URLs
-  deliveryType        String        @default("serials") // "serials" | "service"
+  images              String         @default("[]") // JSON array of image URLs
+  deliveryType        String         @default("serials") // "serials" | "service" | "fatcat"
   serviceInstructions String?
-  sortOrder           Int           @default(0)
-  visibility          String        @default("public") // "public" | "hidden"
-  statusOverride      String        @default("auto") // "auto" | "in_stock" | "out_of_stock"
-  badgeOverride       String        @default("auto")
-  createdAt           DateTime      @default(now())
-  updatedAt           DateTime      @updatedAt
+  warrantyTerms       String?
+  usageInstructions   String?
+  noticeNotes         String?
+  sortOrder           Int            @default(0)
+  visibility          String         @default("public") // "public" | "hidden"
+  editorialStatus     String         @default("draft") // "draft" | "published" | "hidden"
+  hasPendingChanges   Boolean        @default(false)
+  draftSnapshot       String?        // JSON of staged changes when product is currently published
+  statusOverride      String         @default("auto") // "auto" | "in_stock" | "out_of_stock"
+  badgeOverride       String         @default("auto")
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
   variants            Variant[]
   orderItems          OrderItem[]
+  sourceProduct       SourceProduct?
 }
 
 model Variant {
-  id                  String      @id @default(cuid())
+  id                  String              @id @default(cuid())
   productId           String
-  product             Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product             Product             @relation(fields: [productId], references: [id], onDelete: Cascade)
   name                String
-  priceCents          Int         // Price in VND (e.g., 50000 = 50.000đ)
-  compareAtPriceCents Int?        // Original price for strikethrough
-  minQuantity         Int         @default(1)
+  priceCents          Int                 // Price in VND (e.g., 50000 = 50.000đ)
+  compareAtPriceCents Int?                // Original price for strikethrough
+  minQuantity         Int                 @default(1)
   maxQuantity         Int?
-  sortOrder           Int         @default(0)
-  createdAt           DateTime    @default(now())
-  updatedAt           DateTime    @updatedAt
+  sortOrder           Int                 @default(0)
+  provider            String?             // "fatcat" | null for internal
+  providerProductId   Int?                // FatCat product ID (e.g. 48, 30, 58)
+  providerPrice       Int?                // Wholesale price from FatCat in VND
+  providerStock       Int?                @default(0) // Available stock at FatCat
+  syncWithProvider    Boolean             @default(false)
+  connectionId        String?
+  connection          ProviderConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+  sourceProductId     String?
+  sourceProduct       SourceProduct?      @relation(fields: [sourceProductId], references: [id], onDelete: SetNull)
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
   serials             Serial[]
   orderItems          OrderItem[]
 }
 
 model Serial {
-  id          String    @id @default(cuid())
+  id          String     @id @default(cuid())
   variantId   String
-  variant     Variant   @relation(fields: [variantId], references: [id], onDelete: Cascade)
-  content     String    // The actual account/key content
-  status      String    @default("available") // "available" | "sold" | "defective"
-  orderItemId String?   @unique
+  variant     Variant    @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  content     String     // The actual account/key content
+  status      String     @default("available") // "available" | "sold" | "defective"
+  orderItemId String?
   orderItem   OrderItem? @relation(fields: [orderItemId], references: [id])
-  createdAt   DateTime  @default(now())
+  createdAt   DateTime   @default(now())
 }
 
 model Order {
@@ -74,38 +90,50 @@ model Order {
   code        String      @unique // Payment reference (e.g., AG1234)
   email       String
   totalCents  Int
-  status      String      @default("pending") // "pending" | "paid" | "cancelled"
+  status      String      @default("pending") // "pending" | "partially_paid" | "paid" | "processing" | "cancelled"
+  accessToken String?     // Secret viewer token (anti-scraping)
+  resellerId  String?     // Tenant identity for reseller isolation
   note        String?
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
   items       OrderItem[]
-  payment     Payment?
+  payments    Payment[]
+
+  @@index([resellerId])
 }
 
 model OrderItem {
-  id        String   @id @default(cuid())
-  orderId   String
-  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productId String
-  product   Product  @relation(fields: [productId], references: [id])
-  variantId String
-  variant   Variant  @relation(fields: [variantId], references: [id])
-  quantity  Int      @default(1)
-  priceCents Int
-  serial    Serial?
-  createdAt DateTime @default(now())
+  id             String   @id @default(cuid())
+  orderId        String
+  order          Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId      String
+  product        Product  @relation(fields: [productId], references: [id])
+  variantId      String
+  variant        Variant  @relation(fields: [variantId], references: [id])
+  quantity       Int      @default(1)
+  priceCents     Int
+  productName    String?
+  variantName    String?
+  connectionId   String?  // Historical connection reference at order time
+  connectionName String?  // Historical name at order time
+  providerCost   Int?     // Wholesale cost recorded at purchase time
+  serials        Serial[]
+  createdAt      DateTime @default(now())
 }
 
 model Payment {
   id              String   @id @default(cuid())
-  orderId         String   @unique
-  order           Order    @relation(fields: [orderId], references: [id])
-  gateway         String?  // "Vietcombank", "Techcombank", etc.
+  orderId         String
+  order           Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  gateway         String?  // "Vietcombank", "MB", "manual_admin", etc.
   transactionId   String?  @unique // SePay transaction ID (deduplication)
   amount          Int
   content         String?
   transactionDate String?
+  idempotencyKey  String?  @unique // Dedicated idempotency key for settlement mutations
   createdAt       DateTime @default(now())
+
+  @@index([orderId, idempotencyKey])
 }
 
 model Admin {
@@ -113,4 +141,110 @@ model Admin {
   username     String   @unique
   passwordHash String
   createdAt    DateTime @default(now())
+}
+
+model ProviderConnection {
+  id              String          @id @default(cuid())
+  name            String          // e.g. "FatCat Store - Kho Chính"
+  provider        String          @default("fatcat") // "fatcat"
+  baseUrl         String          // e.g. "https://api.fatcatstore.click"
+  apiKeyEncrypted String          // Encrypted with AES-256-GCM
+  apiKeyMasked    String          // e.g. "mb_nLFU••••••••"
+  isEnabled       Boolean         @default(true)
+  balanceVnd      Int?            @default(0)
+  balanceUsdt     Float?          @default(0)
+  lastSyncedAt    DateTime?
+  lastSyncStatus  String?         // "success" | "failed" | "warning"
+  lastSyncError   String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  sourceProducts  SourceProduct[]
+  variants        Variant[]
+  syncLogs        SyncLog[]
+}
+
+model SourceProduct {
+  id                      String              @id @default(cuid())
+  connectionId            String?
+  connection              ProviderConnection? @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  provider                String              @default("fatcat") // "fatcat"
+  externalId              String              // String ID to support any provider (numeric or alphanumeric)
+  sourceName              String
+  sourceDescription       String?
+  sourcePrice             Int                 // Wholesale price in VND
+  sourceRegularPrice      Int?                // Regular price if on sale
+  saleQty                 Int?
+  sourceStock             Int                 @default(0)
+  maxQuantity             Int?
+  sourceStatus            String              @default("available") // "available" | "out_of_stock" | "unavailable" | "unknown"
+  contentHash             String?
+  firstDetectedAt         DateTime            @default(now())
+  lastSeenAt              DateTime            @default(now())
+  lastSyncedAt            DateTime            @default(now())
+  rawJson                 String?
+
+  // Store inclusion flag: true when admin clicks "Thêm vào sản phẩm"
+  isAddedToStore          Boolean             @default(false)
+
+  // Editorial Status: "new" (mới về) | "draft" (bản nháp) | "published" (đang bán) | "ignored" (bỏ qua)
+  editorialStatus         String              @default("new")
+  hasChangeAlert          Boolean             @default(false)
+  changeAlertDetails      String?             // JSON diff
+
+  // Admin Custom Content (staged/draft until published)
+  customName              String?
+  customPrice             Int?                // Retail selling price in VND
+  customDescription       String?
+  standardizedDescription String?             // Structured standardized copy
+  warrantyTerms           String?             // Warranty terms
+  usageInstructions       String?             // Delivery / activation instructions
+  noticeNotes             String?             // Precautions / warnings
+  customGroupId           String?
+  customDeliveryType      String?             @default("fatcat")
+  customWarrantyInfo      String?
+  customPurchaseLimit     Int?
+  customImages            String?             @default("[]")
+  version                 Int                 @default(1)
+
+  // Link to published Product & Variant
+  productId               String?             @unique
+  product                 Product?            @relation(fields: [productId], references: [id], onDelete: SetNull)
+  variantId               String?
+  variants                Variant[]
+  publishedAt             DateTime?
+  publishedBy             String?
+
+  createdAt               DateTime            @default(now())
+  updatedAt               DateTime            @updatedAt
+
+  @@unique([connectionId, externalId])
+}
+
+model AdminNotification {
+  id           String    @id @default(cuid())
+  connectionId String?
+  type         String    // "new_product" | "price_change" | "desc_change" | "stock_status" | "discontinued" | "sync_error" | "batch_summary"
+  title        String
+  message      String
+  metadata     String?   // JSON
+  link         String?
+  isRead       Boolean   @default(false)
+  readAt       DateTime?
+  createdAt    DateTime  @default(now())
+}
+
+model SyncLog {
+  id                  String              @id @default(cuid())
+  connectionId        String?
+  connection          ProviderConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+  provider            String              @default("fatcat")
+  startedAt           DateTime            @default(now())
+  finishedAt          DateTime?
+  status              String              // "running" | "success" | "failed" | "warning"
+  newCount            Int                 @default(0)
+  updatedCount        Int                 @default(0)
+  discontinuedCount   Int                 @default(0)
+  totalSourceProducts Int                 @default(0)
+  error               String?
+  createdAt           DateTime            @default(now())
 }

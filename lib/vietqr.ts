@@ -1,6 +1,7 @@
 /**
  * Generate VietQR payment URL for bank transfer
  * Compatible with VietQR standard (Napas247)
+ * Template 'qr_only': Phóng to tối đa mã QR, loại bỏ hoàn toàn phần text thừa dưới chân ảnh
  */
 export function generateVietQRUrl({
   bankCode,
@@ -8,16 +9,19 @@ export function generateVietQRUrl({
   accountName,
   amount,
   description,
+  template = 'qr_only',
 }: {
   bankCode: string
   accountNumber: string
-  accountName: string
+  accountName?: string
   amount: number
   description: string
+  template?: string
 }): string {
   const encodedDescription = encodeURIComponent(description)
-  const encodedAccountName = encodeURIComponent(accountName)
-  return `https://img.vietqr.io/image/${bankCode}-${accountNumber}-compact2.png?amount=${amount}&addInfo=${encodedDescription}&accountName=${encodedAccountName}`
+  const encodedAccountName = accountName ? encodeURIComponent(accountName) : ''
+  const nameParam = encodedAccountName ? `&accountName=${encodedAccountName}` : ''
+  return `https://img.vietqr.io/image/${bankCode}-${accountNumber}-${template}.png?amount=${amount}&addInfo=${encodedDescription}${nameParam}`
 }
 
 /**

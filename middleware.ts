@@ -5,7 +5,36 @@ import { verifyAdminToken } from '@/lib/auth'
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Protect /admin routes (except /admin/login)
+  // 1. Protect Admin API endpoints (Return 401 JSON)
+  if (pathname.startsWith('/api/admin')) {
+    // Exclude public admin login endpoint
+    if (pathname === '/api/admin/auth') {
+      return NextResponse.next()
+    }
+
+    const token =
+      request.cookies.get('admin_token')?.value ||
+      request.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
+
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Unauthorized: Authentication required' },
+        { status: 401 }
+      )
+    }
+
+    const payload = await verifyAdminToken(token)
+    if (!payload) {
+      return NextResponse.json(
+        { error: 'Unauthorized: Invalid or expired token' },
+        { status: 401 }
+      )
+    }
+
+    return NextResponse.next()
+  }
+
+  // 2. Protect Admin UI routes (Redirect to /admin/login)
   if (pathname.startsWith('/admin') && pathname !== '/admin/login') {
     const token = request.cookies.get('admin_token')?.value
 
@@ -25,5 +54,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/admin/:path*'],
+  matcher: ['/admin/:path*', '/api/admin/:path*'],
 }

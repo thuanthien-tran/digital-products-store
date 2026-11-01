@@ -1,0 +1,182 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import Link from "next/link"
+import { usePathname } from "next/navigation"
+import { Menu, X, ShoppingBag, BookOpen, HelpCircle } from "lucide-react"
+
+export function Header() {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [scrolled, setScrolled] = useState(false)
+  const pathname = usePathname()
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 15)
+    }
+    handleScroll()
+    window.addEventListener("scroll", handleScroll, { passive: true })
+    return () => window.removeEventListener("scroll", handleScroll)
+  }, [])
+
+  // Handle hash scrolling when arriving from another page or hash changes
+  useEffect(() => {
+    if (typeof window === "undefined") return
+
+    const scrollToHash = () => {
+      const hash = window.location.hash.slice(1)
+      if (!hash) return
+      const element = document.getElementById(hash)
+      if (element) {
+        requestAnimationFrame(() => {
+          element.scrollIntoView({
+            behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+          })
+        })
+      }
+    }
+
+    scrollToHash()
+    window.addEventListener("hashchange", scrollToHash)
+    return () => window.removeEventListener("hashchange", scrollToHash)
+  }, [pathname])
+
+  const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+    setMobileMenuOpen(false)
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
+
+    if (href.startsWith("/#")) {
+      const targetId = href.replace("/#", "")
+      if (pathname === "/") {
+        e.preventDefault()
+        const element = document.getElementById(targetId)
+        if (element) {
+          element.scrollIntoView({
+            behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+          })
+          window.history.pushState(null, "", `#${targetId}`)
+        }
+      }
+    }
+  }
+
+  const navLinks = [
+    { href: "/#products", label: "Sản phẩm & Gói", icon: ShoppingBag },
+    { href: "/#how", label: "Hướng dẫn mua hàng", icon: BookOpen },
+    { href: "/#faq", label: "Hỗ trợ & FAQ", icon: HelpCircle },
+  ]
+
+  return (
+    <header
+      className={`sticky top-0 z-40 w-full transition-all duration-300 relative ${
+        scrolled
+          ? "border-b border-border/80 bg-background/80 backdrop-blur-xl shadow-lg shadow-black/40"
+          : "border-b border-border/40 bg-background/60 backdrop-blur-md"
+      }`}
+    >
+      {/* Vệt ánh sáng gradient loang tinh tế ở đáy viền Header (Phong cách Vercel/Apple Studio) */}
+      <div
+        className={`pointer-events-none absolute bottom-0 left-1/2 -translate-x-1/2 h-[1px] w-3/5 max-w-4xl bg-gradient-to-r from-transparent via-purple-500/60 to-transparent transition-opacity duration-500 ${
+          scrolled ? "opacity-100" : "opacity-40"
+        }`}
+      />
+
+      <div className="mx-auto flex h-18 sm:h-20 w-full max-w-7xl items-center justify-between px-4 sm:px-8 lg:px-12 relative">
+        {/* [KHỐI TRÁI]: Logo AG Thương Hiệu */}
+        <div className="flex items-center gap-3.5 shrink-0 z-10">
+          <Link href="/" className="flex items-center gap-3 group active-bounce">
+            <span className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-secondary via-card to-secondary border border-border/80 text-xs font-bold text-accent tracking-wider shadow-sm transition-all duration-300 group-hover:scale-105 group-hover:border-accent/50 group-hover:shadow-lg group-hover:shadow-purple-950/30">
+              AG
+            </span>
+            <div className="flex flex-col">
+              <span className="font-heading font-black text-base sm:text-lg tracking-tight text-foreground transition-colors duration-200 group-hover:text-accent">
+                ACCGIARE
+              </span>
+            </div>
+          </Link>
+        </div>
+
+        {/* [KHỐI GIỮA]: Menu Điều Hướng Căn Giữa Tuyệt Đối + Hiệu Ứng Underline Glow */}
+        <nav
+          className="hidden md:flex items-center gap-1 lg:gap-2 absolute left-1/2 -translate-x-1/2 z-10"
+          aria-label="Điều hướng chính"
+        >
+          {navLinks.map((link) => {
+            const isActive = pathname === link.href
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                onClick={(e) => handleNavClick(e, link.href)}
+                className={`group relative px-4 py-2.5 text-xs lg:text-sm font-medium transition-all duration-200 rounded-xl active-bounce ${
+                  isActive
+                    ? "text-foreground font-semibold"
+                    : "text-muted-foreground hover:text-foreground hover:bg-white/[0.04]"
+                }`}
+              >
+                <span>{link.label}</span>
+
+                {/* Đường kẻ phát sáng Neon Underline mở rộng từ tâm khi Hover hoặc Active */}
+                <span
+                  className={`absolute bottom-0.5 left-3 right-3 h-[2px] rounded-full bg-gradient-to-r from-purple-500 via-indigo-400 to-purple-500 transition-all duration-300 ease-out origin-center ${
+                    isActive
+                      ? "scale-x-100 opacity-100 shadow-[0_0_10px_rgba(168,85,247,0.7)]"
+                      : "scale-x-0 opacity-0 group-hover:scale-x-100 group-hover:opacity-100 group-hover:shadow-[0_0_8px_rgba(168,85,247,0.5)]"
+                  }`}
+                />
+              </Link>
+            )
+          })}
+        </nav>
+
+        {/* [KHỐI PHẢI]: Badge Trạng Thái Tự Động 24/7 & Nút Menu Mobile */}
+        <div className="flex items-center gap-3 shrink-0 z-10">
+          {/* Badge Hệ Thống Tự Động Online */}
+          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-950/30 border border-emerald-500/20 text-xs font-medium text-emerald-400 backdrop-blur shadow-sm">
+            <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span>Tự động 24/7</span>
+          </div>
+
+          {/* Nút Hamburger Mobile */}
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="md:hidden flex size-10 items-center justify-center rounded-xl border border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-all active-bounce focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            aria-expanded={mobileMenuOpen}
+            aria-label={mobileMenuOpen ? "Đóng menu" : "Mở menu"}
+          >
+            {mobileMenuOpen ? <X className="size-5" /> : <Menu className="size-5" />}
+          </button>
+        </div>
+      </div>
+
+      {/* Mobile Drawer Menu với hiệu ứng kính mờ và chia khối */}
+      {mobileMenuOpen && (
+        <div className="md:hidden border-b border-border bg-card/95 backdrop-blur-xl px-5 py-5 space-y-2 animate-fade-down shadow-2xl">
+          <div className="flex items-center justify-between pb-3 mb-2 border-b border-border/50 text-xs text-muted-foreground">
+            <span>Danh mục điều hướng</span>
+            <div className="flex items-center gap-1.5 text-emerald-400">
+              <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span>Hệ thống online</span>
+            </div>
+          </div>
+
+          {navLinks.map((link) => {
+            const Icon = link.icon
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                onClick={(e) => handleNavClick(e, link.href)}
+                className="flex items-center gap-3 px-3.5 py-2.5 text-sm font-medium rounded-xl text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+              >
+                <Icon className="size-4 text-accent" strokeWidth={1.75} />
+                <span>{link.label}</span>
+              </Link>
+            )
+          })}
+        </div>
+      )}
+    </header>
+  )
+}
