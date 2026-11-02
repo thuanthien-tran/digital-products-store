@@ -238,18 +238,44 @@ export async function fulfillOrder(
               customer_email: order.email,
             })
 
-            if (buyRes.success && buyRes.credentials && buyRes.credentials.length > 0) {
-              for (const credential of buyRes.credentials) {
+            if (buyRes.success) {
+              const dinoOrder = buyRes.order
+              const dinoCode = dinoOrder?.order_code || dinoOrder?.id || 'N/A'
+              const credentials = buyRes.credentials || []
+
+              if (credentials.length > 0) {
+                for (const credential of credentials) {
+                  await db.serial.create({
+                    data: {
+                      variantId: item.variantId,
+                      orderItemId: item.id,
+                      content: credential,
+                      status: 'sold',
+                    },
+                  })
+                }
+                totalDelivered += alreadyDelivered + localDelivered + credentials.length
+              } else {
+                // Manual fulfillment by Dino (e.g. Youtube Premium invite sent to Gmail)
+                const deliveryNote = `[Dino #${dinoCode}]: Đơn hàng đang được kích hoạt qua Gmail (${order.email}). Đại lý Dino sẽ gửi email/lời mời gia đình vào hộp thư của bạn (vui lòng kiểm tra cả mục Spam).`
                 await db.serial.create({
                   data: {
                     variantId: item.variantId,
                     orderItemId: item.id,
-                    content: credential,
+                    content: deliveryNote,
                     status: 'sold',
                   },
                 })
+                totalDelivered += alreadyDelivered + localDelivered + remainingNeeded
               }
-              totalDelivered += alreadyDelivered + localDelivered + buyRes.credentials.length
+
+              const balanceLeft = typeof dinoOrder?.remaining_balance === 'number' ? `${dinoOrder.remaining_balance.toLocaleString('vi-VN')} đ` : 'N/A'
+              await db.order.update({
+                where: { id: orderId },
+                data: {
+                  note: `[Đã gửi đơn sang Dino API thành công]: Mã đơn Dino: ${dinoCode}. Số dư ví Dino còn lại: ${balanceLeft}. Trạng thái đại lý: ${dinoOrder?.status || 'Chờ xử lý manual'}.`,
+                },
+              })
             } else {
               console.error(`[Fulfillment Dino Error] Đơn ${order.code}: ${buyRes.error}`)
 
