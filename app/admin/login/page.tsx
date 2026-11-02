@@ -56,7 +56,7 @@ export default function AdminLoginPage() {
           <CardHeader className="space-y-1 pb-4">
             <CardTitle className="text-base font-bold">Xác thực hệ thống</CardTitle>
             <CardDescription className="text-xs">
-              Mặc định: <code>admin</code> / <code>admin123</code>
+              Vui lòng nhập tài khoản và mật khẩu quản trị viên để tiếp tục
             </CardDescription>
           </CardHeader>
           <CardContent>

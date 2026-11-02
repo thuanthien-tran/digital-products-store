@@ -1,13 +1,16 @@
 "use client"
 
+import { useState } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { LayoutDashboard, Package, KeyRound, ShoppingBag, LogOut, ArrowLeft, Layers, Globe } from "lucide-react"
 import { NotificationBell } from "@/components/admin/NotificationBell"
+import { ChangePasswordModal } from "@/components/admin/ChangePasswordModal"
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false)
 
   if (pathname === "/admin/login") {
     return <>{children}</>
@@ -63,6 +66,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
 
         <div className="pt-4 border-t border-border space-y-1 mt-6 md:mt-0 text-xs">
+          <button
+            type="button"
+            onClick={() => setIsChangePasswordOpen(true)}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-colors text-left"
+          >
+            <KeyRound className="size-3.5 text-accent" />
+            <span>Đổi mật khẩu</span>
+          </button>
+
           <Link
             href="/"
             className="flex items-center gap-2 px-3 py-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-colors"
@@ -87,11 +99,29 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="max-w-5xl mx-auto space-y-6">
           <div className="flex items-center justify-between pb-2 border-b border-border/50">
             <span className="text-xs text-muted-foreground font-mono">BẢNG ĐIỀU KHIỂN HỆ THỐNG</span>
-            <NotificationBell />
+            <div className="flex items-center gap-2 sm:gap-3">
+              <button
+                type="button"
+                onClick={() => setIsChangePasswordOpen(true)}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-border/80 bg-secondary/50 hover:bg-secondary hover:border-primary/40 text-xs font-medium text-foreground transition-all"
+                title="Đổi mật khẩu tài khoản"
+              >
+                <KeyRound className="size-3.5 text-accent" />
+                <span className="hidden sm:inline">Đổi mật khẩu</span>
+              </button>
+              <NotificationBell />
+            </div>
           </div>
           {children}
         </div>
       </main>
+
+      {/* Change Password Dialog */}
+      <ChangePasswordModal
+        isOpen={isChangePasswordOpen}
+        onClose={() => setIsChangePasswordOpen(false)}
+        currentUsername="thunthin"
+      />
     </div>
   )
 }
