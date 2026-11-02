@@ -11,7 +11,8 @@ import {
   X, 
   Save, 
   Send,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Loader2
 } from "lucide-react"
 import { ProductCard } from "@/components/storefront/ProductCard"
 
@@ -103,6 +104,8 @@ export function ProductManagerClient({ groups }: Props) {
   const [refreshTrigger, setRefreshTrigger] = useState(0)
   const [counts, setCounts] = useState({ all: 0, draft: 0, published: 0, hidden: 0 })
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null)
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [isDeletingBulk, setIsDeletingBulk] = useState(false)
 
   // Editor Modal State
   const [editingProduct, setEditingProduct] = useState<ProductItem | null>(null)
@@ -206,6 +209,10 @@ export function ProductManagerClient({ groups }: Props) {
       ignore = true
     }
   }, [activeTab, search, refreshTrigger])
+
+  useEffect(() => {
+    setSelectedIds([])
+  }, [activeTab, search])
 
   const openEditor = (prod: ProductItem) => {
     setEditingProduct(prod)
@@ -429,12 +436,67 @@ export function ProductManagerClient({ groups }: Props) {
       const data = await res.json().catch(() => ({}))
       if (res.ok) {
         setMessage({ text: data.message || "Đã xóa sản phẩm thành công", type: "success" })
+        setSelectedIds((prev) => prev.filter((id) => id !== productId))
         setRefreshTrigger((prev) => prev + 1)
       } else {
         setMessage({ text: data.error || "Lỗi xóa sản phẩm", type: "error" })
       }
     } catch {
       setMessage({ text: "Lỗi kết nối", type: "error" })
+    }
+  }
+
+  const isAllSelected = products.length > 0 && products.every((p) => selectedIds.includes(p.id))
+  const isSomeSelected = products.some((p) => selectedIds.includes(p.id)) && !isAllSelected
+
+  const handleToggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedIds([])
+    } else {
+      setSelectedIds(products.map((p) => p.id))
+    }
+  }
+
+  const handleToggleSelectOne = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    )
+  }
+
+  const handleDeleteSelected = async () => {
+    if (selectedIds.length === 0) return
+    const count = selectedIds.length
+    if (
+      !confirm(
+        `Bạn có chắc chắn muốn xóa vĩnh viễn ${count} sản phẩm đã chọn? Thao tác này không thể hoàn tác.`
+      )
+    ) {
+      return
+    }
+
+    setIsDeletingBulk(true)
+    setMessage(null)
+    try {
+      const res = await fetch("/api/admin/products", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productIds: selectedIds }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) {
+        setMessage({
+          text: data.message || `Đã xóa thành công ${count} sản phẩm`,
+          type: "success",
+        })
+        setSelectedIds([])
+        setRefreshTrigger((prev) => prev + 1)
+      } else {
+        setMessage({ text: data.error || "Lỗi khi xóa các sản phẩm đã chọn", type: "error" })
+      }
+    } catch {
+      setMessage({ text: "Lỗi kết nối khi xóa các sản phẩm", type: "error" })
+    } finally {
+      setIsDeletingBulk(false)
     }
   }
 
@@ -598,12 +660,62 @@ export function ProductManagerClient({ groups }: Props) {
         </div>
       </div>
 
+      {/* Bulk Action Bar */}
+      {selectedIds.length > 0 && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-destructive/10 border border-destructive/25 text-xs">
+          <div className="flex items-center gap-2.5 text-foreground font-medium">
+            <span className="flex items-center justify-center size-6 rounded-full bg-destructive text-destructive-foreground text-xs font-bold shadow-sm">
+              {selectedIds.length}
+            </span>
+            <span>
+              Đã chọn <strong className="font-bold text-destructive">{selectedIds.length}</strong> sản phẩm
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setSelectedIds([])}
+              className="px-3 py-1.5 rounded-lg border border-border bg-card hover:bg-secondary text-muted-foreground hover:text-foreground text-xs font-medium transition-colors"
+            >
+              Bỏ chọn
+            </button>
+            <button
+              type="button"
+              disabled={isDeletingBulk}
+              onClick={handleDeleteSelected}
+              className="px-3.5 py-1.5 rounded-lg bg-destructive text-destructive-foreground text-xs font-semibold hover:opacity-90 active:scale-95 transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-50 cursor-pointer"
+            >
+              {isDeletingBulk ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <Trash2 className="size-3.5" />
+              )}
+              <span>Xóa tất cả mục đã chọn ({selectedIds.length})</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Products Table */}
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-xs text-left">
             <thead className="bg-secondary/40 text-muted-foreground border-b border-border uppercase font-semibold text-[10px] tracking-wider">
               <tr>
+                <th className="py-3 px-3 w-10 text-center">
+                  <input
+                    type="checkbox"
+                    checked={isAllSelected}
+                    ref={(el) => {
+                      if (el) el.indeterminate = isSomeSelected
+                    }}
+                    onChange={handleToggleSelectAll}
+                    disabled={loading || products.length === 0}
+                    className="size-4 rounded border-border bg-card text-primary focus:ring-1 focus:ring-primary cursor-pointer accent-primary align-middle disabled:opacity-40"
+                    title="Chọn tất cả sản phẩm"
+                  />
+                </th>
                 <th className="py-3 px-4">Sản phẩm</th>
                 <th className="py-3 px-4">Danh mục</th>
                 <th className="py-3 px-4">Giá bán</th>
@@ -615,13 +727,13 @@ export function ProductManagerClient({ groups }: Props) {
             <tbody className="divide-y divide-border">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-muted-foreground">
+                  <td colSpan={7} className="py-12 text-center text-muted-foreground">
                     Đang tải danh sách sản phẩm...
                   </td>
                 </tr>
               ) : products.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-muted-foreground">
+                  <td colSpan={7} className="py-12 text-center text-muted-foreground">
                     Không có sản phẩm nào trong mục này.
                   </td>
                 </tr>
@@ -630,9 +742,26 @@ export function ProductManagerClient({ groups }: Props) {
                   const mainVariant = p.variants[0]
                   const totalStock = p.variants.reduce((sum, v) => sum + v.stock, 0)
                   const hasDraft = p.hasPendingChanges
+                  const isSelected = selectedIds.includes(p.id)
 
                   return (
-                    <tr key={p.id} className="hover:bg-secondary/20 transition-colors">
+                    <tr
+                      key={p.id}
+                      className={`transition-colors ${
+                        isSelected ? "bg-primary/5 hover:bg-primary/10" : "hover:bg-secondary/20"
+                      }`}
+                    >
+                      {/* Checkbox */}
+                      <td className="py-3 px-3 text-center">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => handleToggleSelectOne(p.id)}
+                          className="size-4 rounded border-border bg-card text-primary focus:ring-1 focus:ring-primary cursor-pointer accent-primary align-middle"
+                          title={`Chọn ${p.name}`}
+                        />
+                      </td>
+
                       {/* Product Name & Source Info */}
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-3">

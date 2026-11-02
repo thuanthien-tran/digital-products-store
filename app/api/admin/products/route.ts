@@ -154,48 +154,53 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: "Unauthorized: Admin privileges required" }, { status: 401 })
     }
 
-    const { productId } = await req.json()
-    if (!productId) {
-      return NextResponse.json({ error: "Thiếu productId" }, { status: 400 })
+    const body = await req.json().catch(() => ({}))
+    const rawIds = Array.isArray(body.productIds)
+      ? body.productIds
+      : body.productId
+      ? [body.productId]
+      : []
+    const productIds: string[] = rawIds.filter((id: unknown): id is string => typeof id === "string" && id.trim().length > 0)
+
+    if (productIds.length === 0) {
+      return NextResponse.json({ error: "Thiếu productId hoặc danh sách productIds cần xóa" }, { status: 400 })
     }
 
-    const product = await prisma.product.findUnique({
-      where: { id: productId },
-    })
-
-    if (!product) {
-      return NextResponse.json({ error: "Không tìm thấy sản phẩm cần xóa" }, { status: 404 })
-    }
-
-    await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       // 1. Reset liên kết sourceProduct nếu có
       await tx.sourceProduct.updateMany({
-        where: { productId },
+        where: { productId: { in: productIds } },
         data: { productId: null, variantId: null, isAddedToStore: false, editorialStatus: "draft" },
       })
 
       // 2. Xóa các serial thuộc các biến thể của sản phẩm
       await tx.serial.deleteMany({
-        where: { variant: { productId } },
+        where: { variant: { productId: { in: productIds } } },
       })
 
-      // 3. Xóa các mục orderItem liên kết với sản phẩm này
+      // 3. Xóa các mục orderItem liên kết với các sản phẩm này
       await tx.orderItem.deleteMany({
-        where: { productId },
+        where: { productId: { in: productIds } },
       })
 
-      // 4. Xóa các biến thể của sản phẩm
+      // 4. Xóa các biến thể của các sản phẩm
       await tx.variant.deleteMany({
-        where: { productId },
+        where: { productId: { in: productIds } },
       })
 
-      // 5. Xóa sản phẩm
-      await tx.product.delete({
-        where: { id: productId },
+      // 5. Xóa các sản phẩm
+      const deleteResult = await tx.product.deleteMany({
+        where: { id: { in: productIds } },
       })
+
+      return deleteResult
     })
 
-    return NextResponse.json({ success: true, message: "Đã xóa vĩnh viễn sản phẩm thành công" })
+    return NextResponse.json({
+      success: true,
+      count: result.count,
+      message: `Đã xóa vĩnh viễn ${result.count} sản phẩm thành công`,
+    })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Internal server error"
     return NextResponse.json({ error: message }, { status: 500 })
