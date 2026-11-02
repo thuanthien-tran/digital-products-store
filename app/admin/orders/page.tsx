@@ -1,6 +1,9 @@
 import { prisma } from "@/lib/db"
 import { OrderManagerClient } from "./OrderManagerClient"
 
+export const dynamic = "force-dynamic"
+export const revalidate = 0
+
 export default async function AdminOrdersPage() {
   const orders = await prisma.order.findMany({
     orderBy: { createdAt: "desc" },

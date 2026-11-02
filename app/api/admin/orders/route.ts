@@ -258,3 +258,124 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: message }, { status: status >= 400 && status < 600 ? status : 500 })
   }
 }
+
+export async function GET(req: Request) {
+  try {
+    const auth = await verifyAdminRequest(req)
+    if (!auth.authenticated) {
+      return NextResponse.json({ error: "Unauthorized: Admin privileges required" }, { status: 401 })
+    }
+
+    const { searchParams } = new URL(req.url)
+    const status = searchParams.get("status")
+
+    const whereClause: any = {}
+    if (status && status !== "all") {
+      whereClause.status = status
+    }
+
+    const orders = await prisma.order.findMany({
+      where: whereClause,
+      orderBy: { createdAt: "desc" },
+      include: {
+        items: {
+          include: {
+            product: { select: { name: true } },
+            variant: { select: { name: true } },
+            serials: { select: { content: true } },
+          },
+        },
+        payments: {
+          orderBy: { createdAt: "desc" },
+        },
+      },
+    })
+
+    const formatted = orders.map((o) => {
+      const paidAmount = o.payments.reduce((sum, p) => sum + p.amount, 0)
+      return {
+        id: o.id,
+        code: o.code,
+        email: o.email,
+        totalCents: o.totalCents,
+        paidAmount,
+        status: o.status,
+        createdAt: o.createdAt.toISOString(),
+        paymentGateway: o.payments[0]?.gateway || null,
+        note: o.note,
+        items: o.items.map((i) => {
+          const serialList = i.serials.map((s) => s.content)
+          return {
+            name: `${i.product.name} (${i.variant.name})`,
+            quantity: i.quantity,
+            priceCents: i.priceCents,
+            serials: serialList,
+            serial: serialList.length > 0 ? serialList.join("\n") : null,
+          }
+        }),
+      }
+    })
+
+    return NextResponse.json({ success: true, orders: formatted })
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Error fetching orders"
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
+}
+
+export async function DELETE(req: Request) {
+  try {
+    const auth = await verifyAdminRequest(req)
+    if (!auth.authenticated) {
+      return NextResponse.json({ error: "Unauthorized: Admin privileges required" }, { status: 401 })
+    }
+
+    const body = await req.json().catch(() => ({}))
+    const { orderId, action } = body
+
+    if (action === "clean_test_orders") {
+      const testCodes = [
+        "CAN584092", "PAR584099", "AMB584133", "SEC599506", "CAN599559",
+        "PAR599568", "RSA599584", "RSB599589", "RET599593", "AMB599606"
+      ]
+
+      const deleteRes = await prisma.order.deleteMany({
+        where: {
+          OR: [
+            { code: { in: testCodes } },
+            { code: { startsWith: "CAN" } },
+            { code: { startsWith: "PAR" } },
+            { code: { startsWith: "AMB" } },
+            { code: { startsWith: "SEC" } },
+            { code: { startsWith: "RSA" } },
+            { code: { startsWith: "RSB" } },
+            { code: { startsWith: "RET" } },
+            { email: { contains: "example.com" } },
+            { email: { contains: "audit" } },
+            { email: { contains: "test@" } },
+            { email: { contains: "tester@" } },
+          ],
+        },
+      })
+
+      return NextResponse.json({
+        success: true,
+        deletedCount: deleteRes.count,
+        message: `Đã xóa ${deleteRes.count} đơn hàng test.`,
+      })
+    }
+
+    if (!orderId) {
+      return NextResponse.json({ error: "Thiếu orderId" }, { status: 400 })
+    }
+
+    await prisma.order.delete({
+      where: { id: orderId },
+    })
+
+    return NextResponse.json({ success: true, message: "Đã xóa đơn hàng thành công" })
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Error deleting order"
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
+}

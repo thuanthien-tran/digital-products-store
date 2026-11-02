@@ -6,7 +6,7 @@ import { formatPrice } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/hooks/use-toast"
-import { Search, ExternalLink } from "lucide-react"
+import { Search, ExternalLink, RefreshCw, Trash2 } from "lucide-react"
 
 interface OrderItem {
   id: string
@@ -17,6 +17,7 @@ interface OrderItem {
   status: string
   createdAt: string
   paymentGateway: string | null
+  note?: string | null
   items: Array<{
     name: string
     quantity?: number
@@ -29,8 +30,11 @@ interface OrderItem {
 export function OrderManagerClient({ orders }: { orders: OrderItem[] }) {
   const router = useRouter()
   const { toast } = useToast()
+  const [currentOrders, setCurrentOrders] = useState<OrderItem[]>(orders)
   const [search, setSearch] = useState("")
   const [filterStatus, setFilterStatus] = useState("all")
+  const [refreshing, setRefreshing] = useState(false)
+  const [cleaningTests, setCleaningTests] = useState(false)
 
   // Modal State for Manual Settlement
   const [settleModal, setSettleModal] = useState<{
@@ -67,6 +71,71 @@ export function OrderManagerClient({ orders }: { orders: OrderItem[] }) {
   const isSubmittingRef = useRef(false)
 
   const [fulfillingId, setFulfillingId] = useState<string | null>(null)
+
+  const refreshOrders = async () => {
+    setRefreshing(true)
+    try {
+      const res = await fetch("/api/admin/orders")
+      const json = await res.json()
+      if (res.ok && json.success) {
+        setCurrentOrders(json.orders || [])
+        toast({ title: "Đã đồng bộ", description: `Đã cập nhật danh sách (${json.orders?.length || 0} đơn hàng).` })
+      } else {
+        toast({ title: "Lỗi", description: json.error || "Không thể đồng bộ đơn hàng", variant: "destructive" })
+      }
+    } catch (err: unknown) {
+      toast({ title: "Lỗi mạng", description: err instanceof Error ? err.message : "Lỗi mạng", variant: "destructive" })
+    } finally {
+      setRefreshing(false)
+    }
+  }
+
+  const handleCleanTestOrders = async () => {
+    const confirmed = window.confirm("Xác nhận xóa tất cả các đơn hàng test / đơn mẫu trong hệ thống?")
+    if (!confirmed) return
+
+    setCleaningTests(true)
+    try {
+      const res = await fetch("/api/admin/orders", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "clean_test_orders" }),
+      })
+      const json = await res.json()
+      if (res.ok && json.success) {
+        toast({ title: "Thành công", description: json.message || "Đã xóa các đơn hàng test!" })
+        await refreshOrders()
+      } else {
+        toast({ title: "Lỗi", description: json.error || "Thao tác thất bại", variant: "destructive" })
+      }
+    } catch (err: unknown) {
+      toast({ title: "Lỗi", description: err instanceof Error ? err.message : "Lỗi mạng", variant: "destructive" })
+    } finally {
+      setCleaningTests(false)
+    }
+  }
+
+  const handleDeleteOrder = async (orderId: string, orderCode: string) => {
+    const confirmed = window.confirm(`Xác nhận xóa vĩnh viễn đơn hàng #${orderCode}?`)
+    if (!confirmed) return
+
+    try {
+      const res = await fetch("/api/admin/orders", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId }),
+      })
+      const json = await res.json()
+      if (res.ok && json.success) {
+        toast({ title: "Đã xóa", description: `Đã xóa đơn hàng #${orderCode}` })
+        setCurrentOrders((prev) => prev.filter((o) => o.id !== orderId))
+      } else {
+        toast({ title: "Lỗi", description: json.error || "Không thể xóa đơn", variant: "destructive" })
+      }
+    } catch (err: unknown) {
+      toast({ title: "Lỗi", description: err instanceof Error ? err.message : "Lỗi mạng", variant: "destructive" })
+    }
+  }
 
   const openSettleModal = (order: OrderItem) => {
     const key = `adm-pay-${order.id.slice(-6)}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
@@ -194,7 +263,7 @@ export function OrderManagerClient({ orders }: { orders: OrderItem[] }) {
     }
   }
 
-  const filteredOrders = orders.filter((o) => {
+  const filteredOrders = currentOrders.filter((o) => {
     const matchSearch =
       o.code.toLowerCase().includes(search.toLowerCase()) ||
       o.email.toLowerCase().includes(search.toLowerCase())
@@ -206,14 +275,40 @@ export function OrderManagerClient({ orders }: { orders: OrderItem[] }) {
     <div className="space-y-4">
       {/* Search and Filters */}
       <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-          <Input
-            placeholder="Tìm theo mã đơn hoặc email..."
-            className="pl-10 text-xs"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+        <div className="flex flex-1 items-center gap-2 max-w-md">
+          <div className="relative flex-1">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+            <Input
+              placeholder="Tìm theo mã đơn hoặc email..."
+              className="pl-10 text-xs"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={refreshing}
+            onClick={refreshOrders}
+            className="text-xs flex items-center gap-1.5 cursor-pointer shrink-0"
+            title="Đồng bộ đơn hàng mới nhất từ database"
+          >
+            <RefreshCw className={`size-3.5 ${refreshing ? "animate-spin" : ""}`} />
+            <span>{refreshing ? "Đang đồng bộ..." : "Đồng bộ"}</span>
+          </Button>
+
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={cleaningTests}
+            onClick={handleCleanTestOrders}
+            className="text-xs text-rose-400 border-rose-500/30 hover:bg-rose-500/10 flex items-center gap-1.5 cursor-pointer shrink-0"
+            title="Xóa tất cả các đơn hàng test mẫu"
+          >
+            <Trash2 className="size-3.5" />
+            <span>{cleaningTests ? "Đang xóa..." : "Xóa đơn test"}</span>
+          </Button>
         </div>
 
         <div className="flex items-center gap-2">
@@ -221,7 +316,7 @@ export function OrderManagerClient({ orders }: { orders: OrderItem[] }) {
             <button
               key={st}
               onClick={() => setFilterStatus(st)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold capitalize transition-all ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold capitalize transition-all cursor-pointer ${
                 filterStatus === st
                   ? "bg-primary text-primary-foreground shadow-sm"
                   : "bg-card/60 text-muted-foreground hover:bg-card hover:text-foreground border border-border/60"
@@ -359,6 +454,15 @@ export function OrderManagerClient({ orders }: { orders: OrderItem[] }) {
                     Hủy đơn
                   </Button>
                 )}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 p-2 cursor-pointer"
+                  title="Xóa đơn hàng này"
+                  onClick={() => handleDeleteOrder(order.id, order.code)}
+                >
+                  <Trash2 className="size-3.5" />
+                </Button>
               </div>
             </div>
           ))
