@@ -1,17 +1,48 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { MessageCircle } from "lucide-react"
 import { OfficeCapybara } from "@/components/storefront/OfficeCapybara"
 
 const ZALO_PHONE = process.env.NEXT_PUBLIC_ZALO_PHONE_1 || "0356970964"
-const STORE_NAME = process.env.NEXT_PUBLIC_STORE_NAME || "ACCGIARE"
 
-export function Footer() {
+interface FooterProps {
+  initialSettings?: {
+    siteName: string
+    logoUrl: string | null
+    initials: string
+  }
+}
+
+export function Footer({ initialSettings }: FooterProps) {
   const currentYear = new Date().getFullYear()
   const pathname = usePathname()
   const cleanZaloPhone = ZALO_PHONE.replace(/\D/g, "")
+
+  const [settings, setSettings] = useState(() => initialSettings || {
+    siteName: process.env.NEXT_PUBLIC_STORE_NAME || "ACCGIARE",
+    logoUrl: null,
+    initials: "AG",
+  })
+
+  useEffect(() => {
+    if (!initialSettings) {
+      fetch("/api/site-settings")
+        .then((res) => res.json())
+        .then((data) => {
+          if (data && data.siteName) {
+            setSettings({
+              siteName: data.siteName,
+              logoUrl: data.logoUrl || null,
+              initials: data.initials || "AG",
+            })
+          }
+        })
+        .catch(() => {})
+    }
+  }, [initialSettings])
 
   const handleNavScroll = (e: React.MouseEvent<HTMLAnchorElement>, targetId: string) => {
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
@@ -43,11 +74,20 @@ export function Footer() {
 
             <div className="space-y-1 min-w-0">
               <div className="flex items-center gap-2">
-                <span className="flex size-6 sm:size-6.5 items-center justify-center rounded-md bg-secondary border border-border text-[11px] font-bold text-accent tracking-wider shadow-xs">
-                  AG
+                <span className="flex size-6 sm:size-6.5 items-center justify-center rounded-md bg-secondary border border-border text-[11px] font-bold text-accent tracking-wider shadow-xs overflow-hidden">
+                  {settings.logoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={settings.logoUrl}
+                      alt={settings.siteName}
+                      className="size-full object-contain p-0.5 rounded-sm"
+                    />
+                  ) : (
+                    settings.initials
+                  )}
                 </span>
                 <span className="font-heading font-black text-base sm:text-lg tracking-tight text-foreground">
-                  {STORE_NAME}
+                  {settings.siteName}
                 </span>
               </div>
               <p className="text-xs sm:text-[13px] text-muted-foreground/90 max-w-sm sm:max-w-md leading-relaxed">
@@ -96,7 +136,7 @@ export function Footer() {
 
         {/* HÀNG CUỐI: Đường phân cách mảnh, Bản quyền & Chính sách */}
         <div className="border-t border-border/50 pt-5 sm:pt-6 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4 text-xs text-muted-foreground">
-          <p>© {currentYear} {STORE_NAME}</p>
+          <p>© {currentYear} {settings.siteName}</p>
 
           <div className="flex flex-wrap items-center gap-x-4 sm:gap-x-6 gap-y-2 text-xs">
             <Link

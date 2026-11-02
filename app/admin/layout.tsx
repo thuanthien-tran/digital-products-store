@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { LayoutDashboard, Package, KeyRound, ShoppingBag, LogOut, ArrowLeft, Layers, Globe } from "lucide-react"
+import { LayoutDashboard, Package, KeyRound, ShoppingBag, LogOut, ArrowLeft, Layers, Globe, Settings } from "lucide-react"
 import { NotificationBell } from "@/components/admin/NotificationBell"
 import { ChangePasswordModal } from "@/components/admin/ChangePasswordModal"
 
@@ -29,6 +29,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { href: "/admin/providers", label: "Đại lý & Kết nối", icon: Globe },
     { href: "/admin/serials", label: "Kho Serials", icon: KeyRound },
     { href: "/admin/orders", label: "Đơn hàng", icon: ShoppingBag },
+    { href: "/admin/settings", label: "Cài đặt website", icon: Settings },
   ]
 
   return (

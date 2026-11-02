@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation"
 import { cookies, headers } from "next/headers"
 import { prisma } from "@/lib/db"
+import { getSiteSettings } from "@/lib/settings"
 import { Header } from "@/components/storefront/Header"
 import { Footer } from "@/components/storefront/Footer"
 import { ZaloWidget } from "@/components/storefront/ZaloWidget"
@@ -46,7 +47,10 @@ function maskEmail(email: string): string {
 export default async function OrderPage({ params, searchParams }: Props) {
   const { id } = await params
   const sp = searchParams ? await searchParams : {}
-  const order = await getOrder(id)
+  const [order, settings] = await Promise.all([
+    getOrder(id),
+    getSiteSettings(),
+  ])
   if (!order) notFound()
 
   // 1. Authorization check for viewing serial credentials
@@ -106,7 +110,7 @@ export default async function OrderPage({ params, searchParams }: Props) {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <Header />
+      <Header initialSettings={settings} />
       <main className="mx-auto w-full max-w-lg flex-1 px-4 sm:px-6 py-10">
         <OrderStatus
           orderId={order.id}
@@ -123,7 +127,7 @@ export default async function OrderPage({ params, searchParams }: Props) {
           items={items}
         />
       </main>
-      <Footer />
+      <Footer initialSettings={settings} />
       <ZaloWidget />
     </div>
   )

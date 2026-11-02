@@ -248,3 +248,13 @@ model SyncLog {
   error               String?
   createdAt           DateTime            @default(now())
 }
+
+model SiteSettings {
+  id        String   @id @default("default")
+  shopId    String   @unique @default("main")
+  siteName  String   @default("ACCGIARE")
+  logoUrl   String?
+  version   Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db"
+import { getSiteSettings } from "@/lib/settings"
 import { Header } from "@/components/storefront/Header"
 import { Footer } from "@/components/storefront/Footer"
 import { HeroSection } from "@/components/storefront/HeroSection"
@@ -9,7 +10,7 @@ import { FaqAccordion } from "@/components/storefront/FaqAccordion"
 
 async function getStoreData() {
   try {
-    const [groups, products] = await Promise.all([
+    const [groups, products, settings] = await Promise.all([
       prisma.productGroup.findMany({
         where: { visibility: "public" },
         orderBy: { sortOrder: "asc" },
@@ -32,9 +33,11 @@ async function getStoreData() {
           },
         },
       }),
+      getSiteSettings(),
     ])
 
     return {
+      settings,
       groups: groups.map((g) => ({
         id: g.id,
         name: g.name,
@@ -81,11 +84,11 @@ async function getStoreData() {
 }
 
 export default async function HomePage() {
-  const { groups, products } = await getStoreData()
+  const { groups, products, settings } = await getStoreData()
 
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground selection:bg-primary/20 selection:text-primary">
-      <Header />
+      <Header initialSettings={settings} />
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 sm:px-6 pt-3 sm:pt-5 pb-10 sm:pb-14 space-y-7 sm:space-y-9">
         {/* Top Minimalist Hero Section */}
         <HeroSection />
@@ -197,7 +200,7 @@ export default async function HomePage() {
           </ScrollReveal>
         </section>
       </main>
-      <Footer />
+      <Footer initialSettings={settings} />
       <ZaloWidget />
     </div>
   )

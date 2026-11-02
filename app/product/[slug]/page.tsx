@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import { prisma } from "@/lib/db"
+import { getSiteSettings } from "@/lib/settings"
 import { Header } from "@/components/storefront/Header"
 import { Footer } from "@/components/storefront/Footer"
 import { ZaloWidget } from "@/components/storefront/ZaloWidget"
@@ -54,7 +55,10 @@ async function getProduct(slug: string) {
 
 export default async function ProductPage({ params }: Props) {
   const { slug } = await params
-  const product = await getProduct(slug)
+  const [product, settings] = await Promise.all([
+    getProduct(slug),
+    getSiteSettings(),
+  ])
   if (!product) notFound()
 
   const variantsWithStock = product.variants.map((v) => ({
@@ -85,7 +89,7 @@ export default async function ProductPage({ params }: Props) {
 
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
-      <Header />
+      <Header initialSettings={settings} />
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 sm:px-6 py-8 space-y-6">
         {/* Breadcrumb */}
         <nav aria-label="Đường dẫn" className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -204,7 +208,7 @@ export default async function ProductPage({ params }: Props) {
           </div>
         </div>
       </main>
-      <Footer />
+      <Footer initialSettings={settings} />
       <ZaloWidget />
     </div>
   )

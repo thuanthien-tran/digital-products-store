@@ -5,10 +5,41 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Menu, X, ShoppingBag, BookOpen, HelpCircle, Phone } from "lucide-react"
 
-export function Header() {
+interface HeaderProps {
+  initialSettings?: {
+    siteName: string
+    logoUrl: string | null
+    initials: string
+  }
+}
+
+export function Header({ initialSettings }: HeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const pathname = usePathname()
+
+  const [settings, setSettings] = useState(() => initialSettings || {
+    siteName: process.env.NEXT_PUBLIC_STORE_NAME || "ACCGIARE",
+    logoUrl: null,
+    initials: "AG",
+  })
+
+  useEffect(() => {
+    if (!initialSettings) {
+      fetch("/api/site-settings")
+        .then((res) => res.json())
+        .then((data) => {
+          if (data && data.siteName) {
+            setSettings({
+              siteName: data.siteName,
+              logoUrl: data.logoUrl || null,
+              initials: data.initials || "AG",
+            })
+          }
+        })
+        .catch(() => {})
+    }
+  }, [initialSettings])
 
   useEffect(() => {
     const handleScroll = () => {
@@ -82,15 +113,24 @@ export function Header() {
       />
 
       <div className="mx-auto flex h-18 sm:h-20 w-full max-w-7xl items-center justify-between px-4 sm:px-8 lg:px-12 relative">
-        {/* [KHỐI TRÁI]: Logo AG Thương Hiệu */}
+        {/* [KHỐI TRÁI]: Logo Thương Hiệu Cửa Hàng */}
         <div className="flex items-center gap-3.5 shrink-0 z-10">
           <Link href="/" className="flex items-center gap-3 group active-bounce">
-            <span className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-secondary via-card to-secondary border border-border/80 text-xs font-bold text-accent tracking-wider shadow-sm transition-all duration-300 group-hover:scale-105 group-hover:border-accent/50 group-hover:shadow-lg group-hover:shadow-purple-950/30">
-              AG
+            <span className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-secondary via-card to-secondary border border-border/80 text-xs font-bold text-accent tracking-wider shadow-sm transition-all duration-300 group-hover:scale-105 group-hover:border-accent/50 group-hover:shadow-lg group-hover:shadow-purple-950/30 overflow-hidden">
+              {settings.logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={settings.logoUrl}
+                  alt={settings.siteName}
+                  className="size-full object-contain p-0.5 rounded-lg"
+                />
+              ) : (
+                settings.initials
+              )}
             </span>
             <div className="flex flex-col">
               <span className="font-heading font-black text-base sm:text-lg tracking-tight text-foreground transition-colors duration-200 group-hover:text-accent">
-                ACCGIARE
+                {settings.siteName}
               </span>
             </div>
           </Link>

@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Space_Grotesk, Plus_Jakarta_Sans, Space_Mono } from 'next/font/google'
 import './globals.css'
 import { Toaster } from '@/components/ui/toaster'
+import { getSiteSettings } from '@/lib/settings'
 
 const spaceGrotesk = Space_Grotesk({
   variable: '--font-space-grotesk',
@@ -22,10 +23,13 @@ const spaceMono = Space_Mono({
   display: 'swap',
 })
 
-export const metadata: Metadata = {
-  title: `${process.env.NEXT_PUBLIC_STORE_NAME || 'ACCGIARE'} - Hệ thống phân phối tài khoản tự động`,
-  description: 'Hệ thống phân phối tài khoản, key bản quyền và dịch vụ số tự động 24/7.',
-  icons: { icon: '/logo.png' },
+export async function generateMetadata(): Promise<Metadata> {
+  const settings = await getSiteSettings()
+  return {
+    title: `${settings.siteName} - Hệ thống phân phối tài khoản tự động`,
+    description: 'Hệ thống phân phối tài khoản, key bản quyền và dịch vụ số tự động 24/7.',
+    icons: { icon: settings.logoUrl || '/logo.png' },
+  }
 }
 
 export default function RootLayout({
