@@ -363,7 +363,7 @@ export function ProductManagerClient({ groups }: Props) {
                   name: editForm.name,
                   priceCents: editForm.priceCents,
                   compareAtPriceCents: editForm.compareAtPriceCents || null,
-                  providerPrice: editForm.providerPrice > 0 ? editForm.providerPrice : null,
+                  providerPrice: mainVariant.providerPrice ?? null,
                 },
               ]
             : undefined,
@@ -1023,13 +1023,11 @@ export function ProductManagerClient({ groups }: Props) {
                           )}
                         </div>
                         <input
-                          type="number"
-                          value={editForm.providerPrice || ""}
-                          onChange={(e) => setEditForm({ ...editForm, providerPrice: Number(e.target.value) })}
-                          className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground text-xs font-mono font-medium focus:outline-none focus:ring-1 focus:ring-primary"
-                          step={1000}
-                          min={0}
-                          placeholder="0"
+                          type="text"
+                          readOnly
+                          value={editForm.providerPrice ? `${editForm.providerPrice.toLocaleString("vi-VN")} ₫` : "0 ₫"}
+                          className="w-full p-2.5 rounded-lg border border-border bg-secondary/40 text-muted-foreground text-xs font-mono font-medium focus:outline-none cursor-not-allowed select-none"
+                          title="Giá sỉ từ nhà cung cấp / đại lý (Chỉ xem đối chiếu, không thể chỉnh sửa)"
                         />
                       </div>
 
@@ -1050,7 +1048,7 @@ export function ProductManagerClient({ groups }: Props) {
 
                       <div>
                         <label className="block text-muted-foreground font-medium mb-1">
-                          Giá so sánh gạch ngang (Tùy chọn)
+                          Giá ban đầu
                         </label>
                         <input
                           type="number"
@@ -1072,7 +1070,7 @@ export function ProductManagerClient({ groups }: Props) {
                         </span>
                       ) : (
                         <span className="text-muted-foreground text-[10.5px]">
-                          (Nhập giá so sánh cao hơn giá bán để hiển thị nhãn giảm giá)
+                          (Nhập giá ban đầu cao hơn giá bán để hiển thị nhãn giảm giá)
                         </span>
                       )}
 
