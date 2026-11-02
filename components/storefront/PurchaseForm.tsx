@@ -569,16 +569,22 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
             <>
               <div className="flex items-center justify-between">
                 <span>Giá ban đầu:</span>
-                <span className="line-through text-muted-foreground/60 tabular-nums font-medium">
+                <span className="text-foreground/80 tabular-nums font-medium">
                   {formatPrice(compareTotalPrice)}
                 </span>
               </div>
 
               <div className="flex items-center justify-between text-emerald-400 font-semibold">
-                <span>Tiết kiệm:</span>
+                <span className="flex items-center gap-1.5">
+                  <span>Chiết khấu:</span>
+                  {discountPercent && (
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                      −{discountPercent}%
+                    </span>
+                  )}
+                </span>
                 <span className="tabular-nums">
                   −{formatPrice(savingsAmount)}
-                  {discountPercent && ` (−${discountPercent}%)`}
                 </span>
               </div>
             </>
