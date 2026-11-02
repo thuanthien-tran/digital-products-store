@@ -568,7 +568,7 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
           {hasValidCompare && compareTotalPrice && savingsAmount && savingsAmount > 0 && (
             <>
               <div className="flex items-center justify-between">
-                <span>Giá so sánh (gạch ngang):</span>
+                <span>Giá ban đầu:</span>
                 <span className="line-through text-muted-foreground/60 tabular-nums font-medium">
                   {formatPrice(compareTotalPrice)}
                 </span>
