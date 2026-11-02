@@ -226,12 +226,14 @@ export async function POST(req: Request) {
     if (isProviderBacked) {
       const verifyRes = await verifyVariantLiveStock(variant.id)
       if (!verifyRes.ok) {
-        return NextResponse.json(
-          { success: false, error: verifyRes.error || "Không thể xác minh nguồn hàng từ đại lý" },
-          { status: 400 }
-        )
-      }
-      if (verifyRes.stock < parsedQty) {
+        const cachedStock = (variant.providerStock ?? 0) + variant._count.serials
+        if (cachedStock < parsedQty) {
+          return NextResponse.json(
+            { success: false, error: verifyRes.error || "Không thể xác minh nguồn hàng từ đại lý" },
+            { status: 400 }
+          )
+        }
+      } else if (verifyRes.stock < parsedQty) {
         return NextResponse.json(
           { success: false, error: `Kho đại lý không đủ số lượng yêu cầu (Hiện còn ${verifyRes.stock})` },
           { status: 400 }

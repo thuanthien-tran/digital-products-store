@@ -8,6 +8,9 @@ import { ZaloWidget } from "@/components/storefront/ZaloWidget"
 import { ScrollReveal } from "@/components/ui/ScrollReveal"
 import { FaqAccordion } from "@/components/storefront/FaqAccordion"
 
+export const dynamic = "force-dynamic"
+export const revalidate = 0
+
 async function getStoreData() {
   try {
     const [groups, products, settings] = await Promise.all([

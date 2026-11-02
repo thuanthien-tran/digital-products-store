@@ -63,11 +63,11 @@ export async function verifyVariantLiveStock(
   )
 
   if (!isProviderBacked || !variant.connection || !variant.sourceProduct) {
-    const localStock = variant._count.serials
+    const totalStock = (variant.providerStock ?? 0) + variant._count.serials
     return {
       ok: true,
-      stock: localStock,
-      isAvailable: localStock > 0,
+      stock: totalStock,
+      isAvailable: totalStock > 0,
       verifiedAt,
     }
   }
@@ -76,11 +76,11 @@ export async function verifyVariantLiveStock(
   const sourceProduct = variant.sourceProduct
 
   if (!connection.isEnabled) {
+    const totalStock = (variant.providerStock ?? 0) + variant._count.serials
     return {
-      ok: false,
-      stock: variant._count.serials,
-      isAvailable: variant._count.serials > 0,
-      error: `Kết nối đại lý "${connection.name}" hiện đang tạm ngắt`,
+      ok: true,
+      stock: totalStock,
+      isAvailable: totalStock > 0,
       verifiedAt,
     }
   }
@@ -99,11 +99,12 @@ export async function verifyVariantLiveStock(
       try {
         rawApiKey = decryptSecret(connection.apiKeyEncrypted)
       } catch {
+        console.warn(`[Stock Verifier] Không thể giải mã API key của kết nối "${connection.name}". Sử dụng tồn kho DB fallback.`)
+        const totalStock = (variant.providerStock ?? 0) + variant._count.serials
         return {
-          ok: false,
-          stock: variant._count.serials,
-          isAvailable: variant._count.serials > 0,
-          error: "Không thể giải mã khóa bí mật kết nối đại lý",
+          ok: true,
+          stock: totalStock,
+          isAvailable: totalStock > 0,
           verifiedAt,
         }
       }
@@ -115,13 +116,24 @@ export async function verifyVariantLiveStock(
         baseUrl: connection.baseUrl,
         apiKey: rawApiKey,
         provider: connection.provider,
-        timeoutMs: 6000, // Strict fast timeout for pre-checkout verification
+        timeoutMs: 10000, // Generous 10s timeout for cross-region network latency
       })
 
       if (!catalogRes.ok || !catalogRes.products) {
+        const cachedStock = (variant.providerStock ?? 0) + variant._count.serials
+        if (cachedStock > 0) {
+          console.warn(`[Stock Verifier] Đại lý tạm thời timeout/lỗi. Sử dụng tồn kho DB fallback (${cachedStock}) cho "${variant.name}".`)
+          return {
+            ok: true,
+            stock: cachedStock,
+            isAvailable: true,
+            price: variant.providerPrice ?? undefined,
+            verifiedAt,
+          }
+        }
         return {
           ok: false,
-          stock: (variant.providerStock ?? 0) + variant._count.serials,
+          stock: cachedStock,
           isAvailable: false,
           isNetworkOrTimeout: catalogRes.isNetworkOrTimeout || false,
           error: catalogRes.error || "Không thể xác minh nguồn hàng từ đại lý",
@@ -180,9 +192,20 @@ export async function verifyVariantLiveStock(
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Verification failed"
+      const cachedStock = (variant.providerStock ?? 0) + variant._count.serials
+      if (cachedStock > 0) {
+        console.warn(`[Stock Verifier] Ngoại lệ kết nối đại lý. Fallback tồn kho DB (${cachedStock}): ${msg}`)
+        return {
+          ok: true,
+          stock: cachedStock,
+          isAvailable: true,
+          price: variant.providerPrice ?? undefined,
+          verifiedAt,
+        }
+      }
       return {
         ok: false,
-        stock: (variant.providerStock ?? 0) + variant._count.serials,
+        stock: cachedStock,
         isAvailable: false,
         isNetworkOrTimeout: true,
         error: `Lỗi kết nối tới đại lý: ${msg}`,

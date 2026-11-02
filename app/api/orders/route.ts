@@ -128,25 +128,27 @@ export async function POST(req: Request) {
         const verifyRes = await verifyVariantLiveStock(vId)
 
         if (!verifyRes.ok) {
-          if (verifyRes.isNetworkOrTimeout) {
+          const cachedStock = (variant.providerStock ?? 0) + variant._count.serials
+          if (cachedStock < totalQty) {
+            if (verifyRes.isNetworkOrTimeout) {
+              return NextResponse.json(
+                {
+                  error: "Chưa thể xác minh nguồn hàng từ đại lý. Vui lòng thử lại sau.",
+                  code: "UNVERIFIED_SOURCE",
+                },
+                { status: 503 }
+              )
+            }
             return NextResponse.json(
               {
-                error: "Chưa thể xác minh nguồn hàng từ đại lý. Vui lòng thử lại sau.",
+                error: verifyRes.error || "Không thể xác minh nguồn hàng từ đại lý",
                 code: "UNVERIFIED_SOURCE",
               },
-              { status: 503 }
+              { status: 400 }
             )
           }
-          return NextResponse.json(
-            {
-              error: verifyRes.error || "Không thể xác minh nguồn hàng từ đại lý",
-              code: "UNVERIFIED_SOURCE",
-            },
-            { status: 400 }
-          )
-        }
-
-        if (verifyRes.stock < totalQty) {
+          console.warn(`[Checkout] Phục vụ đơn từ tồn kho DB (${cachedStock}) do đại lý chưa phản hồi.`)
+        } else if (verifyRes.stock < totalQty) {
           if (verifyRes.stock === 0) {
             return NextResponse.json(
               {

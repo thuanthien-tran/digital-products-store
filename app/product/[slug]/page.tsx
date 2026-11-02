@@ -10,6 +10,9 @@ import { BrandIcon } from "@/components/storefront/BrandIcons"
 import { ProductDetailImage } from "@/components/storefront/ProductDetailImage"
 import { ChevronLeft } from "lucide-react"
 
+export const dynamic = "force-dynamic"
+export const revalidate = 0
+
 interface Props {
   params: Promise<{ slug: string }>
 }

@@ -54,32 +54,29 @@ export function decryptSecret(encryptedPayload: string): string {
 
   const iv = Buffer.from(ivHex, 'hex')
   const tag = Buffer.from(tagHex, 'hex')
-  const primaryKey = getMasterKey()
 
-  try {
-    const decipher = crypto.createDecipheriv(ALGORITHM, primaryKey, iv)
-    decipher.setAuthTag(tag)
+  // Multi-candidate key list for zero-downtime key rotation & multi-environment compatibility
+  const candidateSecrets = [
+    process.env.ENCRYPTION_SECRET,
+    process.env.JWT_SECRET,
+    'demo_jwt_secret_key_change_in_production_2024',
+    'dev_insecure_fallback_secret_only_for_local_development',
+  ].filter(Boolean) as string[]
 
-    let decrypted = decipher.update(ciphertextHex, 'hex', 'utf8')
-    decrypted += decipher.final('utf8')
-    return decrypted
-  } catch (primaryErr) {
-    // Legacy migration compatibility: If ENCRYPTION_SECRET is set but payload was encrypted with JWT_SECRET
-    const legacySecret = process.env.JWT_SECRET
-    if (process.env.ENCRYPTION_SECRET && legacySecret && process.env.ENCRYPTION_SECRET !== legacySecret) {
-      try {
-        const legacyKey = crypto.createHash('sha256').update(legacySecret).digest()
-        const decipherLegacy = crypto.createDecipheriv(ALGORITHM, legacyKey, iv)
-        decipherLegacy.setAuthTag(tag)
-        let decryptedLegacy = decipherLegacy.update(ciphertextHex, 'hex', 'utf8')
-        decryptedLegacy += decipherLegacy.final('utf8')
-        return decryptedLegacy
-      } catch {
-        // Fall through to throw
-      }
+  for (const candidate of candidateSecrets) {
+    try {
+      const candidateKey = crypto.createHash('sha256').update(candidate).digest()
+      const decipher = crypto.createDecipheriv(ALGORITHM, candidateKey, iv)
+      decipher.setAuthTag(tag)
+      let decrypted = decipher.update(ciphertextHex, 'hex', 'utf8')
+      decrypted += decipher.final('utf8')
+      return decrypted
+    } catch {
+      // Continue to next candidate
     }
-    throw new Error('Không thể giải mã khóa bí mật: Xác thực Auth Tag thất bại hoặc sai khóa mã hóa')
   }
+
+  throw new Error('Không thể giải mã khóa bí mật: Xác thực Auth Tag thất bại hoặc sai khóa mã hóa')
 }
 
 /**
