@@ -28,7 +28,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: `${settings.siteName} - Hệ thống phân phối tài khoản tự động`,
     description: 'Hệ thống phân phối tài khoản, key bản quyền và dịch vụ số tự động 24/7.',
-    icons: { icon: settings.logoUrl || '/logo.png' },
+    icons: { icon: settings.logoUrl || '/favicon.ico' },
   }
 }
 

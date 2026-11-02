@@ -1,0 +1,13 @@
+# Vercel Deployment Ignore Rules
+# Excludes local test scripts, documentation reports, and test artifacts from production lambdas
+
+.audit/
+reports/
+scripts/
+*.bak*
+prisma/*.bak*
+*.sqlite*
+
+# Local environment files (configured via Vercel dashboard env vars)
+.env*
+!.env.example
