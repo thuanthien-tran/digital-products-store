@@ -55,7 +55,17 @@ export async function fulfillOrder(
       items: {
         include: {
           product: { select: { deliveryType: true } },
-          variant: { select: { provider: true, providerProductId: true, providerStock: true } },
+          variant: {
+            select: {
+              provider: true,
+              providerProductId: true,
+              providerStock: true,
+              connectionId: true,
+              sourceProductId: true,
+              sourceProduct: { select: { externalId: true, provider: true } },
+              connection: { select: { id: true, provider: true, baseUrl: true, apiKeyEncrypted: true, isEnabled: true } },
+            },
+          },
           serials: true,
         },
       },
@@ -83,7 +93,11 @@ export async function fulfillOrder(
 
   for (const item of order.items) {
     const isFatcat = item.variant?.provider === 'fatcat' || item.product.deliveryType === 'fatcat'
-    const isSerialDelivery = item.product.deliveryType === 'serials' || isFatcat
+    const isDino =
+      item.variant?.provider === 'dino' ||
+      item.variant?.connection?.provider === 'dino' ||
+      item.variant?.sourceProduct?.provider === 'dino'
+    const isSerialDelivery = item.product.deliveryType === 'serials' || isFatcat || isDino
     const alreadyDelivered = item.serials.length
     const needed = isSerialDelivery ? Math.max(0, item.quantity - alreadyDelivered) : 0
     totalNeeded += item.quantity
@@ -113,7 +127,7 @@ export async function fulfillOrder(
 
       const remainingNeeded = needed - localDelivered
 
-      // 2. If item is configured with FatCat provider and still needs items, purchase from FatCat API only if live buy is enabled
+      // 2. FatCat live purchase
       const isLiveBuyActive = process.env.ENABLE_FATCAT_LIVE_BUY === 'true'
       if (isFatcat && item.variant?.providerProductId && remainingNeeded > 0) {
         if (!isLiveBuyActive) {
@@ -174,6 +188,105 @@ export async function fulfillOrder(
         } catch (fatcatErr) {
           const msg = fatcatErr instanceof Error ? fatcatErr.message : 'FatCat API Exception'
           console.error(`[Fulfillment FatCat Exception]`, msg)
+          totalDelivered += alreadyDelivered + localDelivered
+        }
+      } else if (isDino && remainingNeeded > 0) {
+        // 3. Dino live purchase
+        const dinoProductId =
+          item.variant?.sourceProduct?.externalId ||
+          (item.variant?.providerProductId ? String(item.variant.providerProductId) : '')
+
+        if (dinoProductId) {
+          try {
+            const { buyDinoProduct, getDinoActiveConnection } = await import('./dino')
+            const { decryptSecret } = await import('./crypto')
+
+            let dinoConfig = null
+            if (item.variant?.connection?.isEnabled && item.variant.connection.apiKeyEncrypted) {
+              try {
+                dinoConfig = {
+                  baseUrl: item.variant.connection.baseUrl.trim().replace(/\/+$/, ''),
+                  apiKey: decryptSecret(item.variant.connection.apiKeyEncrypted),
+                }
+              } catch {
+                // fallback to active connection
+              }
+            }
+
+            if (!dinoConfig) {
+              const activeConn = await getDinoActiveConnection()
+              dinoConfig = activeConn.config
+            }
+
+            if (!dinoConfig) {
+              await db.order.update({
+                where: { id: orderId },
+                data: {
+                  note: '[Kênh giao hàng Dino chưa kết nối]: Chưa tìm thấy cấu hình đại lý Dino Store hợp lệ.',
+                },
+              })
+              totalDelivered += alreadyDelivered + localDelivered
+              continue
+            }
+
+            const partnerRef = `${order.code}-${item.id}`
+            const buyRes = await buyDinoProduct(dinoConfig, {
+              partner_ref: partnerRef,
+              product_id: dinoProductId,
+              quantity: remainingNeeded,
+              email: order.email,
+              customer_email: order.email,
+            })
+
+            if (buyRes.success && buyRes.credentials && buyRes.credentials.length > 0) {
+              for (const credential of buyRes.credentials) {
+                await db.serial.create({
+                  data: {
+                    variantId: item.variantId,
+                    orderItemId: item.id,
+                    content: credential,
+                    status: 'sold',
+                  },
+                })
+              }
+              totalDelivered += alreadyDelivered + localDelivered + buyRes.credentials.length
+            } else {
+              console.error(`[Fulfillment Dino Error] Đơn ${order.code}: ${buyRes.error}`)
+
+              if (buyRes.isOutOfStock) {
+                try {
+                  const { recordSourceStockUpdate } = await import('./inventory-pipeline')
+                  const connId = item.connectionId || item.variant?.connectionId
+                  if (connId) {
+                    await recordSourceStockUpdate({
+                      connectionId: connId,
+                      externalId: dinoProductId,
+                      sourceStock: 0,
+                      reason: 'fulfillment_out_of_stock',
+                    })
+                  }
+                } catch (reverseErr) {
+                  console.error(`[Fulfillment Dino Reverse Sync Error]`, reverseErr)
+                }
+              }
+
+              const isInsuff = buyRes.isInsufficientBalance
+              const noteMsg = isInsuff
+                ? `[NGOẠI LỆ NGUỒN HÀNG DINO]: Số dư ví Dino không đủ (${buyRes.error || 'Thiếu số dư'}). Vào Telegram Bot Dino gõ /napapi [số_tiền] để nạp tiền vào ví chung, sau đó bấm Giao Lại đơn hàng.`
+                : `[NGOẠI LỆ NGUỒN HÀNG DINO]: Đại lý báo "${buyRes.error || 'Mua thất bại'}". Đã nhận thanh toán nhưng chưa giao được. Chờ đối soát hoặc hoàn tiền thủ công.`
+
+              await db.order.update({
+                where: { id: orderId },
+                data: { note: noteMsg },
+              })
+              totalDelivered += alreadyDelivered + localDelivered
+            }
+          } catch (dinoErr) {
+            const msg = dinoErr instanceof Error ? dinoErr.message : 'Dino API Exception'
+            console.error(`[Fulfillment Dino Exception]`, msg)
+            totalDelivered += alreadyDelivered + localDelivered
+          }
+        } else {
           totalDelivered += alreadyDelivered + localDelivered
         }
       } else {

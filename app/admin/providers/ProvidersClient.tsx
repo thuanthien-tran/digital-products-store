@@ -18,6 +18,7 @@ import {
   Bot,
   Sparkles
 } from "lucide-react"
+import { DinoHubModal } from "./DinoHubModal"
 
 interface ProviderConnectionItem {
   id: string
@@ -63,6 +64,8 @@ export function ProvidersClient({ initialConnections }: { initialConnections: Pr
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [dinoModalOpen, setDinoModalOpen] = useState(false)
+  const [selectedDinoConnName, setSelectedDinoConnName] = useState("Dino Store")
   const [editingConn, setEditingConn] = useState<ProviderConnectionItem | null>(null)
   const [formData, setFormData] = useState({
     name: "",
@@ -610,6 +613,20 @@ export function ProvidersClient({ initialConnections }: { initialConnections: Pr
                   <span>{syncingId === c.id ? "Đang đồng bộ..." : "Đồng bộ danh mục"}</span>
                 </button>
               </div>
+
+              {isDino && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedDinoConnName(c.name)
+                    setDinoModalOpen(true)
+                  }}
+                  className="w-full mt-2 py-2 px-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm"
+                >
+                  <Bot className="size-4" />
+                  <span>Trung tâm Dino (Lệnh Bot & API v2)</span>
+                </button>
+              )}
             </div>
           )
         })}
@@ -832,6 +849,13 @@ export function ProvidersClient({ initialConnections }: { initialConnections: Pr
           </div>
         </div>
       )}
+
+      {/* Dino Store API v2 & Bot Hub Modal */}
+      <DinoHubModal
+        isOpen={dinoModalOpen}
+        onClose={() => setDinoModalOpen(false)}
+        connectionName={selectedDinoConnName}
+      />
     </div>
   )
 }
