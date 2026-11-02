@@ -114,6 +114,7 @@ export function ProductManagerClient({ groups }: Props) {
     groupId: "",
     priceCents: 50000,
     compareAtPriceCents: 0,
+    providerPrice: 0,
     imageUrl: "",
     highlights: "",
     benefits: "",
@@ -222,6 +223,7 @@ export function ProductManagerClient({ groups }: Props) {
     let initialGroup = prod.groupId || groups[0]?.id || ""
     let initialPrice = mainVariant?.priceCents || 50000
     let initialCompare = mainVariant?.compareAtPriceCents || 0
+    let initialProviderPrice = mainVariant?.providerPrice || 0
     let initialImage = prod.images[0] || ""
     let initialHighlights = ""
     let initialBenefits = prod.description || ""
@@ -267,6 +269,9 @@ export function ProductManagerClient({ groups }: Props) {
         if (staged.variants && staged.variants[0]) {
           initialPrice = staged.variants[0].priceCents
           initialCompare = staged.variants[0].compareAtPriceCents || 0
+          if (staged.variants[0].providerPrice !== undefined) {
+            initialProviderPrice = staged.variants[0].providerPrice || 0
+          }
         }
         if (staged.warrantyTerms !== undefined) initialWarranty = staged.warrantyTerms
         if (staged.usageInstructions !== undefined) initialInstructions = staged.usageInstructions
@@ -289,6 +294,7 @@ export function ProductManagerClient({ groups }: Props) {
       groupId: initialGroup,
       priceCents: initialPrice,
       compareAtPriceCents: initialCompare,
+      providerPrice: initialProviderPrice,
       imageUrl: initialImage,
       highlights: initialHighlights,
       benefits: initialBenefits,
@@ -357,6 +363,7 @@ export function ProductManagerClient({ groups }: Props) {
                   name: editForm.name,
                   priceCents: editForm.priceCents,
                   compareAtPriceCents: editForm.compareAtPriceCents || null,
+                  providerPrice: editForm.providerPrice > 0 ? editForm.providerPrice : null,
                 },
               ]
             : undefined,
@@ -1003,7 +1010,29 @@ export function ProductManagerClient({ groups }: Props) {
                       Cấu trúc Giá bán &amp; Mức giảm giá
                     </label>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-muted-foreground font-medium">
+                            Giá bên đại lý (VNĐ)
+                          </label>
+                          {editingProduct.variants[0]?.provider && (
+                            <span className="text-[10px] text-primary/80 uppercase font-semibold">
+                              {editingProduct.variants[0].provider}
+                            </span>
+                          )}
+                        </div>
+                        <input
+                          type="number"
+                          value={editForm.providerPrice || ""}
+                          onChange={(e) => setEditForm({ ...editForm, providerPrice: Number(e.target.value) })}
+                          className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground text-xs font-mono font-medium focus:outline-none focus:ring-1 focus:ring-primary"
+                          step={1000}
+                          min={0}
+                          placeholder="0"
+                        />
+                      </div>
+
                       <div>
                         <label className="block text-muted-foreground font-medium mb-1">
                           Giá bán niêm yết (VNĐ) *
@@ -1025,7 +1054,7 @@ export function ProductManagerClient({ groups }: Props) {
                         </label>
                         <input
                           type="number"
-                          value={editForm.compareAtPriceCents}
+                          value={editForm.compareAtPriceCents || ""}
                           onChange={(e) => setEditForm({ ...editForm, compareAtPriceCents: Number(e.target.value) })}
                           className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground text-xs font-mono focus:outline-none focus:ring-1 focus:ring-primary"
                           step={1000}
@@ -1053,18 +1082,25 @@ export function ProductManagerClient({ groups }: Props) {
                         </span>
                       )}
 
-                      {editingProduct.variants[0]?.providerPrice ? (
-                        <span className="text-muted-foreground ml-auto">
-                          Giá sỉ: {formatMoney(editingProduct.variants[0].providerPrice)} · Lãi:{" "}
-                          <strong
-                            className={
-                              editForm.priceCents >= editingProduct.variants[0].providerPrice
-                                ? "text-emerald-400"
-                                : "text-rose-400"
-                            }
-                          >
-                            {formatMoney(editForm.priceCents - editingProduct.variants[0].providerPrice)}
-                          </strong>
+                      {editForm.providerPrice > 0 ? (
+                        <span className="text-muted-foreground ml-auto flex items-center gap-1.5 flex-wrap">
+                          <span>Giá sỉ: <strong className="text-foreground">{formatMoney(editForm.providerPrice)}</strong></span>
+                          <span>·</span>
+                          <span>
+                            Lãi:{" "}
+                            <strong
+                              className={
+                                editForm.priceCents >= editForm.providerPrice
+                                  ? "text-emerald-400 font-bold"
+                                  : "text-rose-400 font-bold"
+                              }
+                            >
+                              {formatMoney(editForm.priceCents - editForm.providerPrice)}
+                              <span className="text-[10px] ml-1 font-normal opacity-85">
+                                ({Math.round(((editForm.priceCents - editForm.providerPrice) / editForm.providerPrice) * 100)}%)
+                              </span>
+                            </strong>
+                          </span>
                         </span>
                       ) : null}
                     </div>
@@ -1078,7 +1114,7 @@ export function ProductManagerClient({ groups }: Props) {
                       </div>
                       <p className="text-[11px]">
                         Giá bán ({formatMoney(editForm.priceCents)}) thấp hơn giá sỉ đại lý (
-                        {formatMoney(editingProduct.variants[0]?.providerPrice || 0)}). Bấm xác nhận lần nữa nếu bạn đồng ý bán chịu lỗ.
+                        {formatMoney(editForm.providerPrice || editingProduct.variants[0]?.providerPrice || 0)}). Bấm xác nhận lần nữa nếu bạn đồng ý bán chịu lỗ.
                       </p>
                     </div>
                   )}

@@ -22,6 +22,7 @@ export interface UpdateProductInput {
     name: string
     priceCents: number
     compareAtPriceCents?: number | null
+    providerPrice?: number | null
     minQuantity?: number
     maxQuantity?: number | null
     connectionId?: string | null
@@ -247,6 +248,7 @@ export async function updateProductDetails(
             name: vInput.name,
             priceCents: Math.max(0, Math.floor(vInput.priceCents)),
             compareAtPriceCents: vInput.compareAtPriceCents ? Math.max(0, Math.floor(vInput.compareAtPriceCents)) : null,
+            providerPrice: vInput.providerPrice !== undefined ? (vInput.providerPrice ? Math.max(0, Math.floor(vInput.providerPrice)) : null) : undefined,
             minQuantity: vInput.minQuantity || 1,
             maxQuantity: vInput.maxQuantity || null,
             connectionId: vInput.connectionId || undefined,
@@ -330,6 +332,7 @@ export async function publishProductToStore(
                 name: sv.name,
                 priceCents: Math.max(0, Math.floor(sv.priceCents)),
                 compareAtPriceCents: sv.compareAtPriceCents ? Math.max(0, Math.floor(sv.compareAtPriceCents)) : null,
+                providerPrice: sv.providerPrice !== undefined ? (sv.providerPrice ? Math.max(0, Math.floor(sv.providerPrice)) : null) : undefined,
               },
             })
           }
