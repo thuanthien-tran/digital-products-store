@@ -66,16 +66,40 @@ export function OrderManagerClient({ orders }: { orders: OrderItem[] }) {
 
   const isSubmittingRef = useRef(false)
 
+  const [fulfillingId, setFulfillingId] = useState<string | null>(null)
+
   const openSettleModal = (order: OrderItem) => {
     const key = `adm-pay-${order.id.slice(-6)}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
     setSettleModal({
       isOpen: true,
       order,
-      amount: "",
-      reason: "",
+      amount: String(order.totalCents),
+      reason: "Đã nhận chuyển khoản ngân hàng",
       idempotencyKey: key,
       isSubmitting: false,
     })
+  }
+
+  const handleTriggerFulfill = async (orderId: string) => {
+    setFulfillingId(orderId)
+    try {
+      const res = await fetch("/api/admin/orders", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId, action: "fulfill" }),
+      })
+      const json = await res.json()
+      if (res.ok && json.success) {
+        toast({ title: "Thành công", description: "Đã giao hàng qua đại lý thành công!" })
+        window.location.reload()
+      } else {
+        toast({ title: "Lỗi giao hàng", description: json.error || "Giao hàng thất bại", variant: "destructive" })
+      }
+    } catch (err: unknown) {
+      toast({ title: "Lỗi", description: err instanceof Error ? err.message : "Lỗi mạng", variant: "destructive" })
+    } finally {
+      setFulfillingId(null)
+    }
   }
 
   const openCancelModal = (order: OrderItem) => {
@@ -312,6 +336,17 @@ export function OrderManagerClient({ orders }: { orders: OrderItem[] }) {
                     onClick={() => openSettleModal(order)}
                   >
                     Duyệt đã TT
+                  </Button>
+                )}
+                {order.status !== "cancelled" && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={fulfillingId === order.id}
+                    className="text-xs text-blue-400 border-blue-500/30 hover:bg-blue-500/10 cursor-pointer"
+                    onClick={() => handleTriggerFulfill(order.id)}
+                  >
+                    {fulfillingId === order.id ? "Đang giao..." : "Giao lại qua đại lý"}
                   </Button>
                 )}
                 {order.status !== "cancelled" && (

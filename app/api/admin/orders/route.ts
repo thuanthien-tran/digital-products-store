@@ -12,10 +12,23 @@ export async function PATCH(req: Request) {
     }
 
     const body = await req.json()
-    const { orderId, status, manualReason, manualAmountReceived, idempotencyKey } = body
+    const { orderId, status, manualReason, manualAmountReceived, idempotencyKey, action } = body
 
-    if (!orderId || !status) {
-      return NextResponse.json({ error: "Thiếu orderId hoặc status" }, { status: 400 })
+    if (!orderId) {
+      return NextResponse.json({ error: "Thiếu orderId" }, { status: 400 })
+    }
+
+    if (action === "fulfill") {
+      const fulfillRes = await fulfillOrder(orderId)
+      const order = await prisma.order.findUnique({
+        where: { id: orderId },
+        include: { payments: true, items: { include: { serials: true } } },
+      })
+      return NextResponse.json({ success: true, order, fulfillment: fulfillRes })
+    }
+
+    if (!status) {
+      return NextResponse.json({ error: "Thiếu status" }, { status: 400 })
     }
 
     const cleanReason = manualReason ? String(manualReason).trim() : ""
@@ -138,13 +151,10 @@ export async function PATCH(req: Request) {
         const totalPaid = updatedPayments.reduce((sum, p) => sum + p.amount, 0)
 
         if (totalPaid >= currentOrder.totalCents) {
-          // Fully paid: fulfill and mark as paid
-          if (currentOrder.status !== "paid" && currentOrder.status !== "completed") {
-            await fulfillOrder(currentOrder.id, tx)
-          }
+          // Fully paid: mark processing so external provider fulfillment can run safely outside transaction
           return tx.order.update({
             where: { id: orderId },
-            data: { status: "paid" },
+            data: { status: "processing" },
             include: { payments: true },
           })
         } else {
@@ -226,6 +236,20 @@ export async function PATCH(req: Request) {
         include: { payments: true },
       })
     })
+
+    // Run fulfillment outside the DB transaction so network delays to Dino/FatCat cannot cause transaction timeout
+    if (updated.status === "processing" && isSettlement) {
+      try {
+        await fulfillOrder(orderId)
+      } catch (fErr) {
+        console.error("[Manual Settle Fulfillment Error]:", fErr)
+      }
+      const finalOrder = await prisma.order.findUnique({
+        where: { id: orderId },
+        include: { payments: true, items: { include: { serials: true } } },
+      })
+      return NextResponse.json({ success: true, order: finalOrder || updated })
+    }
 
     return NextResponse.json({ success: true, order: updated })
   } catch (err: unknown) {

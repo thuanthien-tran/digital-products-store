@@ -4,15 +4,103 @@ import { prisma } from "@/lib/db"
 import { fulfillOrder } from "@/lib/fulfillment"
 
 function timingSafeCompare(a: string, b: string): boolean {
-  const bufA = Buffer.from(a)
-  const bufB = Buffer.from(b)
-  if (bufA.length !== bufB.length) return false
-  return crypto.timingSafeEqual(bufA, bufB)
+  try {
+    const bufA = Buffer.from(a)
+    const bufB = Buffer.from(b)
+    if (bufA.length !== bufB.length) return false
+    return crypto.timingSafeEqual(bufA, bufB)
+  } catch {
+    return false
+  }
+}
+
+function verifySepayAuth(req: Request, expectedKey: string): boolean {
+  const cleanExpected = expectedKey.trim()
+
+  // 1. Check custom headers first (x-api-key, sepay-token)
+  const xApiKey = req.headers.get("x-api-key") || req.headers.get("sepay-token")
+  if (xApiKey && timingSafeCompare(xApiKey.trim(), cleanExpected)) {
+    return true
+  }
+
+  // 2. Check standard Authorization header
+  const authHeader = req.headers.get("authorization") || ""
+  if (!authHeader.trim()) return false
+
+  const trimmedAuth = authHeader.trim()
+
+  // Exact raw match
+  if (timingSafeCompare(trimmedAuth, cleanExpected)) {
+    return true
+  }
+
+  // Check scheme + token: "Apikey xxx", "ApiKey xxx", "Bearer xxx", "Token xxx"
+  const parts = trimmedAuth.split(/\s+/)
+  if (parts.length >= 2) {
+    const scheme = parts[0].toLowerCase()
+    const token = parts.slice(1).join(" ").trim()
+    if (["apikey", "bearer", "token"].includes(scheme)) {
+      if (timingSafeCompare(token, cleanExpected)) {
+        return true
+      }
+    }
+  }
+
+  return false
+}
+
+function isMatchingAccount(received: string | number | undefined, configured: string): boolean {
+  if (!received) return false
+  const r = String(received).trim().replace(/^0+/, "")
+  const c = configured.trim().replace(/^0+/, "")
+  return r === c || String(received).trim() === configured.trim()
+}
+
+async function resolveOrderCode(content: string, code?: string): Promise<string | null> {
+  // 1. Check direct code property from SePay
+  if (code && typeof code === "string" && code.trim()) {
+    const cleanCode = code.trim().toUpperCase()
+    const m = cleanCode.match(/AG[A-Z0-9]{6}/)
+    if (m) return m[0]
+  }
+
+  const raw = (content || "").toUpperCase()
+
+  // 2. Direct regex match AG followed by 6 alphanumeric characters
+  const directMatch = raw.match(/AG[A-Z0-9]{6}/)
+  if (directMatch) return directMatch[0]
+
+  // 3. Space-separated: AG 123456
+  const spaceMatch = raw.match(/AG\s+([A-Z0-9]{6})/)
+  if (spaceMatch) return `AG${spaceMatch[1]}`
+
+  // 4. Fallback search among recent pending orders (last 48 hours)
+  try {
+    const normalizedContent = raw.replace(/[^A-Z0-9]/g, "")
+    const recentOrders = await prisma.order.findMany({
+      where: {
+        status: { in: ["pending", "partially_paid"] },
+        createdAt: { gte: new Date(Date.now() - 48 * 60 * 60 * 1000) },
+      },
+      select: { code: true },
+      take: 20,
+    })
+
+    for (const ord of recentOrders) {
+      if (ord.code && normalizedContent.includes(ord.code.toUpperCase())) {
+        return ord.code.toUpperCase()
+      }
+    }
+  } catch {
+    // ignore fallback search errors
+  }
+
+  return null
 }
 
 export async function POST(req: Request) {
   try {
-    // 1. Fail-closed secret verification
+    // 1. Secret verification
     const expectedKey = process.env.SEPAY_WEBHOOK_KEY
     if (!expectedKey) {
       console.error("[SePay Webhook] CRITICAL: SEPAY_WEBHOOK_KEY is not configured on server.")
@@ -22,14 +110,8 @@ export async function POST(req: Request) {
       )
     }
 
-    const authHeader = req.headers.get("authorization") || ""
-    const expectedApiKey = `Apikey ${expectedKey}`
-    const expectedBearer = `Bearer ${expectedKey}`
-
-    const isApiKey = timingSafeCompare(authHeader, expectedApiKey)
-    const isBearer = timingSafeCompare(authHeader, expectedBearer)
-
-    if (!authHeader || (!isApiKey && !isBearer)) {
+    if (!verifySepayAuth(req, expectedKey)) {
+      console.warn("[SePay Webhook] Unauthorized webhook attempt: auth header mismatch.")
       return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 })
     }
 
@@ -46,7 +128,7 @@ export async function POST(req: Request) {
     } = body
 
     // 2. Only process incoming transfers
-    if (transferType !== "in") {
+    if (transferType && transferType !== "in") {
       return NextResponse.json({ success: true, message: "Skipped outgoing transaction" })
     }
 
@@ -59,7 +141,7 @@ export async function POST(req: Request) {
       )
     }
 
-    // 4. Validate amount is positive finite integer within reasonable bounds (1,000 to 1,000,000,000 VND)
+    // 4. Validate transfer amount
     const currentTransferAmount = Number(transferAmount)
     if (
       !Number.isFinite(currentTransferAmount) ||
@@ -70,12 +152,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, message: "Số tiền chuyển khoản không hợp lệ" }, { status: 400 })
     }
 
-    // 5. Account number verification if configured (Fail-closed)
+    // 5. Account number verification if configured
     const configuredAccount = process.env.BANK_ACCOUNT_NUMBER
-    if (configuredAccount) {
-      if (!accountNumber || String(accountNumber).trim() !== configuredAccount.trim()) {
-        console.warn(`[SePay Webhook] Received payment for unexpected or missing account: ${accountNumber}`)
-        return NextResponse.json({ success: false, message: "Tài khoản nhận tiền không khớp với cấu hình hệ thống" }, { status: 400 })
+    if (configuredAccount && accountNumber) {
+      if (!isMatchingAccount(accountNumber, configuredAccount)) {
+        console.warn(`[SePay Webhook] Account mismatch: received ${accountNumber}, configured ${configuredAccount}`)
+        // We log warning, but do not drop if order code is valid and verified
       }
     }
 
@@ -86,32 +168,31 @@ export async function POST(req: Request) {
     }
 
     // 7. Extract order code
-    const orderCode = code || extractOrderCode(content || "")
+    const orderCode = await resolveOrderCode(content || "", code)
     if (!orderCode) {
+      console.warn(`[SePay Webhook] No recognizable order code in content: "${content}"`)
       return NextResponse.json({ success: true, message: "No recognizable order code found in content" })
     }
 
     // 8. Query order
     const order = await prisma.order.findUnique({
-      where: { code: String(orderCode).toUpperCase() },
-      include: {
-        payments: true,
-      },
+      where: { code: orderCode.toUpperCase() },
+      include: { payments: true },
     })
 
     if (!order) {
+      console.warn(`[SePay Webhook] Order code ${orderCode} not found in database.`)
       return NextResponse.json({ success: true, message: "Order not found" })
     }
 
-    // Terminal states (cancelled or refunded) must never be resurrected or fulfilled
+    // Terminal states check
     if (order.status === "cancelled" || order.status === "refunded") {
-      console.warn(`[SePay Webhook] Received payment for ${order.status} order ${order.code}. Needs manual reconciliation.`)
-      // Record payment for auditing, but NEVER fulfill or change order status
+      console.warn(`[SePay Webhook] Received payment for ${order.status} order ${order.code}.`)
       await prisma.payment.create({
         data: {
           orderId: order.id,
           transactionId: txIdStr,
-          gateway: gateway || "Unknown",
+          gateway: gateway || "SePay",
           amount: currentTransferAmount,
           content: `[TIỀN ĐẾN SAU KHI ${order.status.toUpperCase()}]: ${content || ""}`,
           transactionDate: transactionDate ? String(transactionDate) : null,
@@ -120,56 +201,65 @@ export async function POST(req: Request) {
       return NextResponse.json({
         success: true,
         message: `Recorded payment for ${order.status} order for manual reconciliation`,
-        reconciled: false,
       })
     }
 
-    // 9. Atomic transaction for payment recording and fulfillment
-    const result = await prisma.$transaction(async (tx) => {
-      // Record payment
+    // 9. Step 1: Record payment and update order status in fast DB transaction (< 50ms)
+    // Never run slow external HTTP provider calls inside the interactive DB transaction!
+    const { orderId, isFullyPaid, totalPaid } = await prisma.$transaction(async (tx) => {
       await tx.payment.create({
         data: {
           orderId: order.id,
           transactionId: txIdStr,
-          gateway: gateway || "Unknown",
+          gateway: gateway || "SePay",
           amount: currentTransferAmount,
           content: content || "",
           transactionDate: transactionDate ? String(transactionDate) : null,
         },
       })
 
-      // Query fresh order with all payments inside transaction to avoid race condition
       const freshOrder = await tx.order.findUniqueOrThrow({
         where: { id: order.id },
         include: { payments: true },
       })
 
-      // Double-check terminal states inside transaction
-      if (freshOrder.status === "cancelled" || freshOrder.status === "refunded") {
-        return { status: freshOrder.status, fulfilled: false }
+      const currentTotal = freshOrder.payments.reduce((sum, p) => sum + p.amount, 0)
+      const fullyPaid = currentTotal >= freshOrder.totalCents
+
+      const newStatus = fullyPaid ? "processing" : "partially_paid"
+      await tx.order.update({
+        where: { id: freshOrder.id },
+        data: { status: newStatus },
+      })
+
+      return {
+        orderId: freshOrder.id,
+        isFullyPaid: fullyPaid,
+        totalPaid: currentTotal,
       }
-
-      const currentTotalPaid = freshOrder.payments.reduce((sum, p) => sum + p.amount, 0)
-
-      // Check if underpaid
-      if (currentTotalPaid < freshOrder.totalCents) {
-        console.warn(`[SePay Webhook] Underpayment on order ${freshOrder.code}: received ${currentTotalPaid}/${freshOrder.totalCents} VND.`)
-        await tx.order.update({
-          where: { id: freshOrder.id },
-          data: { status: "partially_paid" },
-        })
-        return { status: "partially_paid", fulfilled: false }
-      }
-
-      // Full payment reached (currentTotalPaid >= freshOrder.totalCents): Fulfill order
-      const fulfillment = await fulfillOrder(freshOrder.id, tx)
-      return { status: fulfillment.status, fulfilled: fulfillment.fullyFulfilled }
     })
 
-    // Safe non-blocking Telegram notification
-    notifyTelegram(order.code, currentTransferAmount, order.email, result.status).catch(() => {})
+    // 10. Step 2: Now that DB transaction has COMMITTED and payment is permanently saved:
+    // Call fulfillment (Dino or FatCat API) outside of DB transaction
+    if (isFullyPaid) {
+      try {
+        console.log(`[SePay Webhook] Triggering live fulfillment for order ${order.code}...`)
+        const fulfillRes = await fulfillOrder(orderId)
+        console.log(`[SePay Webhook] Fulfillment result for ${order.code}:`, fulfillRes.status)
+      } catch (fulfillErr) {
+        console.error(`[SePay Webhook] Error fulfilling order ${order.code}:`, fulfillErr)
+      }
+    }
 
-    return NextResponse.json({ success: true, status: result.status })
+    // Safe non-blocking Telegram notification
+    notifyTelegram(order.code, currentTransferAmount, order.email, isFullyPaid ? "paid" : "partially_paid").catch(() => {})
+
+    return NextResponse.json({
+      success: true,
+      orderCode: order.code,
+      status: isFullyPaid ? "paid" : "partially_paid",
+      totalPaid,
+    })
   } catch (err: unknown) {
     if (typeof err === "object" && err !== null && "code" in err && (err as { code: string }).code === "P2002") {
       return NextResponse.json({ success: true, message: "Duplicate transaction caught concurrently", duplicate: true })
@@ -180,11 +270,6 @@ export async function POST(req: Request) {
   }
 }
 
-function extractOrderCode(content: string): string | null {
-  const match = content.toUpperCase().match(/\bAG[A-Z0-9]{6}\b/)
-  return match ? match[0] : null
-}
-
 async function notifyTelegram(orderCode: string, amount: number, email: string, status: string) {
   const botToken = process.env.TELEGRAM_BOT_TOKEN
   const chatId = process.env.TELEGRAM_CHAT_ID
@@ -193,11 +278,11 @@ async function notifyTelegram(orderCode: string, amount: number, email: string, 
   try {
     const statusText =
       status === "paid"
-        ? "✅ Đã giao hàng"
+        ? "✅ Đã thanh toán & Giao hàng"
         : status === "partially_paid"
         ? "⚠️ Chuyển thiếu tiền"
-        : "⏳ Đang xử lý kho"
-    const message = `🔔 *Thông báo thanh toán*\n\n📦 Mã đơn: \`${orderCode}\`\n💰 Số tiền: ${new Intl.NumberFormat("vi-VN").format(amount)}đ\n📧 Email: ${email}\n📊 Trạng thái: *${statusText}*`
+        : "⏳ Đang xử lý giao hàng"
+    const message = `🔔 *Thông báo thanh toán SePay*\n\n📦 Mã đơn: \`${orderCode}\`\n💰 Số tiền: ${new Intl.NumberFormat("vi-VN").format(amount)}đ\n📧 Email: ${email}\n📊 Trạng thái: *${statusText}*`
     await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

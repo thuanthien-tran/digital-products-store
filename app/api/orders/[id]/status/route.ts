@@ -33,17 +33,48 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     const totalPaid = order.payments.reduce((sum, p) => sum + p.amount, 0)
     const remainingCents = Math.max(0, order.totalCents - totalPaid)
 
+    // Self-healing: if order is fully paid but fulfillment is pending or interrupted, auto-fulfill
+    let currentStatus = order.status
+    let currentItems = order.items
+    if ((order.status === "pending" || order.status === "processing") && totalPaid >= order.totalCents) {
+      try {
+        const { fulfillOrder } = await import("@/lib/fulfillment")
+        const fRes = await fulfillOrder(order.id)
+        if (fRes.status) {
+          currentStatus = fRes.status
+          // Re-fetch fresh serials
+          const refreshed = await prisma.order.findUnique({
+            where: { id: order.id },
+            include: {
+              items: {
+                include: {
+                  product: { select: { name: true, serviceInstructions: true } },
+                  variant: { select: { name: true } },
+                  serials: { select: { content: true } },
+                },
+              },
+            },
+          })
+          if (refreshed) {
+            currentItems = refreshed.items
+          }
+        }
+      } catch (fErr) {
+        console.error("[Auto-Fulfillment on Status Poll Error]:", fErr)
+      }
+    }
+
     const response = NextResponse.json({
       id: order.id,
       code: order.code,
-      status: order.status,
+      status: currentStatus,
       totalCents: order.totalCents,
       totalPaid,
       remainingCents,
-      items: order.items.map((item) => {
+      items: currentItems.map((item) => {
         const serialContents = item.serials.map((s) => s.content)
         // INVARIANT: Reveal serials only if order is paid AND requester is verified owner or admin
-        const isPaid = order.status === "paid"
+        const isPaid = currentStatus === "paid"
         return {
           productName: item.product.name,
           variantName: item.variant.name,
