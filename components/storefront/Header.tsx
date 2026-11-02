@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Menu, X, ShoppingBag, BookOpen, HelpCircle } from "lucide-react"
+import { Menu, X, ShoppingBag, BookOpen, HelpCircle, Phone } from "lucide-react"
 
 export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -129,8 +129,20 @@ export function Header() {
           })}
         </nav>
 
-        {/* [KHỐI PHẢI]: Badge Trạng Thái Tự Động 24/7 & Nút Menu Mobile */}
-        <div className="flex items-center gap-3 shrink-0 z-10">
+        {/* [KHỐI PHẢI]: Hotline Hỗ trợ, Badge Trạng Thái Tự Động 24/7 & Nút Menu Mobile */}
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0 z-10">
+          {/* Hotline / Zalo Support Link */}
+          <a
+            href="https://zalo.me/0356970964"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-secondary/60 hover:bg-secondary border border-border/80 hover:border-teal-500/40 text-xs font-medium text-muted-foreground hover:text-teal-300 transition-all backdrop-blur shadow-sm group"
+            title="Nhắn tin Zalo hỗ trợ: 0356 970 964"
+          >
+            <Phone className="size-3 text-teal-400 group-hover:scale-110 transition-transform" />
+            <span>Hỗ trợ: <strong className="font-mono text-foreground group-hover:text-teal-300 font-semibold">0356 970 964</strong></span>
+          </a>
+
           {/* Badge Hệ Thống Tự Động Online */}
           <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-950/30 border border-emerald-500/20 text-xs font-medium text-emerald-400 backdrop-blur shadow-sm">
             <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
@@ -175,6 +187,22 @@ export function Header() {
               </Link>
             )
           })}
+
+          <div className="pt-2 border-t border-border/40">
+            <a
+              href="https://zalo.me/0356970964"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-between p-3 rounded-xl bg-secondary/50 border border-border/70 text-xs font-medium text-muted-foreground hover:text-foreground"
+            >
+              <div className="flex items-center gap-2">
+                <Phone className="size-3.5 text-teal-400" />
+                <span>Hỗ trợ Zalo:</span>
+                <span className="font-mono font-bold text-foreground">0356 970 964</span>
+              </div>
+              <span className="text-[11px] text-teal-400 font-semibold">Nhắn tin ↗</span>
+            </a>
+          </div>
         </div>
       )}
     </header>
