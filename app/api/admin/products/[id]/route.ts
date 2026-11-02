@@ -107,3 +107,54 @@ export async function POST(req: Request, { params }: Params) {
     return NextResponse.json({ error: msg }, { status: 500 })
   }
 }
+
+export async function DELETE(req: Request, { params }: Params) {
+  try {
+    const auth = await verifyAdminRequest(req)
+    if (!auth.authenticated) {
+      return NextResponse.json({ error: 'Unauthorized: Admin privileges required' }, { status: 401 })
+    }
+
+    const { id } = await params
+    const product = await prisma.product.findUnique({
+      where: { id },
+    })
+
+    if (!product) {
+      return NextResponse.json({ error: 'Không tìm thấy sản phẩm cần xóa' }, { status: 404 })
+    }
+
+    await prisma.$transaction(async (tx) => {
+      // 1. Reset liên kết sourceProduct nếu có
+      await tx.sourceProduct.updateMany({
+        where: { productId: id },
+        data: { productId: null, variantId: null, isAddedToStore: false, editorialStatus: 'draft' },
+      })
+
+      // 2. Xóa các serial thuộc các biến thể của sản phẩm
+      await tx.serial.deleteMany({
+        where: { variant: { productId: id } },
+      })
+
+      // 3. Xóa các mục orderItem liên kết với sản phẩm này
+      await tx.orderItem.deleteMany({
+        where: { productId: id },
+      })
+
+      // 4. Xóa các biến thể của sản phẩm
+      await tx.variant.deleteMany({
+        where: { productId: id },
+      })
+
+      // 5. Xóa sản phẩm
+      await tx.product.delete({
+        where: { id },
+      })
+    })
+
+    return NextResponse.json({ success: true, message: 'Đã xóa vĩnh viễn sản phẩm thành công' })
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Lỗi xóa sản phẩm'
+    return NextResponse.json({ error: msg }, { status: 500 })
+  }
+}

@@ -426,11 +426,12 @@ export function ProductManagerClient({ groups }: Props) {
       const res = await fetch(`/api/admin/products/${productId}`, {
         method: "DELETE",
       })
+      const data = await res.json().catch(() => ({}))
       if (res.ok) {
-        setMessage({ text: "Đã xóa sản phẩm thành công", type: "success" })
+        setMessage({ text: data.message || "Đã xóa sản phẩm thành công", type: "success" })
         setRefreshTrigger((prev) => prev + 1)
       } else {
-        setMessage({ text: "Lỗi xóa sản phẩm", type: "error" })
+        setMessage({ text: data.error || "Lỗi xóa sản phẩm", type: "error" })
       }
     } catch {
       setMessage({ text: "Lỗi kết nối", type: "error" })

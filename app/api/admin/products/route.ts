@@ -159,8 +159,43 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: "Thiếu productId" }, { status: 400 })
     }
 
-    await prisma.product.delete({ where: { id: productId } })
-    return NextResponse.json({ success: true })
+    const product = await prisma.product.findUnique({
+      where: { id: productId },
+    })
+
+    if (!product) {
+      return NextResponse.json({ error: "Không tìm thấy sản phẩm cần xóa" }, { status: 404 })
+    }
+
+    await prisma.$transaction(async (tx) => {
+      // 1. Reset liên kết sourceProduct nếu có
+      await tx.sourceProduct.updateMany({
+        where: { productId },
+        data: { productId: null, variantId: null, isAddedToStore: false, editorialStatus: "draft" },
+      })
+
+      // 2. Xóa các serial thuộc các biến thể của sản phẩm
+      await tx.serial.deleteMany({
+        where: { variant: { productId } },
+      })
+
+      // 3. Xóa các mục orderItem liên kết với sản phẩm này
+      await tx.orderItem.deleteMany({
+        where: { productId },
+      })
+
+      // 4. Xóa các biến thể của sản phẩm
+      await tx.variant.deleteMany({
+        where: { productId },
+      })
+
+      // 5. Xóa sản phẩm
+      await tx.product.delete({
+        where: { id: productId },
+      })
+    })
+
+    return NextResponse.json({ success: true, message: "Đã xóa vĩnh viễn sản phẩm thành công" })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Internal server error"
     return NextResponse.json({ error: message }, { status: 500 })
