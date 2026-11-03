@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { MessageCircle } from "lucide-react"
+import { MessageCircle, Mail, Phone, MapPin, ShieldCheck } from "lucide-react"
 import { OfficeCapybara } from "@/components/storefront/OfficeCapybara"
 
 const ZALO_PHONE = process.env.NEXT_PUBLIC_ZALO_PHONE_1 || "0356970964"
@@ -91,7 +91,7 @@ export function Footer({ initialSettings }: FooterProps) {
                 </span>
               </div>
               <p className="text-xs sm:text-[13px] text-muted-foreground/90 max-w-sm sm:max-w-md leading-relaxed">
-                Tài khoản và phần mềm phục vụ công việc, sáng tạo và học tập.
+                Hệ thống tài khoản và phần mềm công nghệ phục vụ công việc, sáng tạo và học tập.
               </p>
             </div>
           </div>
@@ -134,31 +134,72 @@ export function Footer({ initialSettings }: FooterProps) {
           </div>
         </div>
 
-        {/* HÀNG CUỐI: Đường phân cách mảnh, Bản quyền & Chính sách */}
+        {/* HÀNG THÔNG TIN ĐỊNH DANH PHÁP LÝ & HỖ TRỢ */}
+        <div className="border-t border-border/50 pt-5 sm:pt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs text-muted-foreground">
+          <div className="space-y-1">
+            <p className="font-semibold text-foreground">Đơn vị vận hành</p>
+            <p>{settings.siteName} Digital Services</p>
+            <p className="text-[11px] text-muted-foreground/75">Hệ thống dịch vụ sản phẩm số tự động</p>
+          </div>
+
+          <div className="space-y-1">
+            <p className="font-semibold text-foreground flex items-center gap-1.5">
+              <Phone className="size-3 text-teal-400" />
+              <span>Hotline / Zalo hỗ trợ</span>
+            </p>
+            <p className="text-teal-300 font-mono font-medium">{ZALO_PHONE}</p>
+            <p className="text-[11px] text-muted-foreground/75">Hỗ trợ từ 08:00 - 23:00 hàng ngày</p>
+          </div>
+
+          <div className="space-y-1">
+            <p className="font-semibold text-foreground flex items-center gap-1.5">
+              <Mail className="size-3 text-teal-400" />
+              <span>Thư điện tử (Email)</span>
+            </p>
+            <p className="text-foreground/90">support@capygo.id.vn</p>
+            <p className="text-[11px] text-muted-foreground/75">Tiếp nhận hỗ trợ và bảo vệ dữ liệu</p>
+          </div>
+
+          <div className="space-y-1">
+            <p className="font-semibold text-foreground flex items-center gap-1.5">
+              <MapPin className="size-3 text-teal-400" />
+              <span>Khu vực hoạt động</span>
+            </p>
+            <p>Hồ Chí Minh, Việt Nam</p>
+            <p className="text-[11px] text-emerald-400 flex items-center gap-1">
+              <ShieldCheck className="size-3" />
+              <span>Thanh toán VietQR an toàn</span>
+            </p>
+          </div>
+        </div>
+
+        {/* TUYÊN BỐ MIỄN TRỪ TRÁCH NHIỆM VỀ THƯƠNG HIỆU (DISCLAIMER) */}
+        <div className="p-3 rounded-xl border border-border/40 bg-secondary/20 text-[11px] text-muted-foreground/80 leading-relaxed">
+          <strong>* Tuyên bố miễn trừ trách nhiệm sở hữu trí tuệ:</strong> {settings.siteName} là nền tảng bán lẻ và cung cấp dịch vụ số độc lập. Tất cả hình ảnh, tên gọi và logo của các thương hiệu bên thứ ba (như Canva, YouTube, Netflix, ChatGPT, Spotify, Duolingo, v.v.) thuộc bản quyền sở hữu của các tổ chức chủ quản tương ứng và chỉ được sử dụng cho mục đích mô tả sản phẩm theo nguyên tắc sử dụng hợp lý.
+        </div>
+
+        {/* HÀNG CUỐI: Bản quyền & Liên kết chính sách chuẩn mực */}
         <div className="border-t border-border/50 pt-5 sm:pt-6 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4 text-xs text-muted-foreground">
-          <p>© {currentYear} {settings.siteName}</p>
+          <p>© {currentYear} {settings.siteName}. All rights reserved.</p>
 
           <div className="flex flex-wrap items-center gap-x-4 sm:gap-x-6 gap-y-2 text-xs">
             <Link
-              href="/#faq"
-              onClick={(e) => handleNavScroll(e, "faq")}
+              href="/dieu-khoan-dich-vu"
               className="hover:text-teal-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 rounded transition-colors duration-150"
             >
               Điều khoản dịch vụ
             </Link>
             <Link
-              href="/#faq"
-              onClick={(e) => handleNavScroll(e, "faq")}
+              href="/chinh-sach-bao-hanh"
               className="hover:text-teal-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 rounded transition-colors duration-150"
             >
-              Chính sách bảo hành
+              Chính sách bảo hành &amp; Hoàn tiền
             </Link>
             <Link
-              href="/#faq"
-              onClick={(e) => handleNavScroll(e, "faq")}
+              href="/chinh-sach-bao-mat"
               className="hover:text-teal-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 rounded transition-colors duration-150"
             >
-              Chính sách bảo mật
+              Chính sách bảo vệ dữ liệu cá nhân
             </Link>
           </div>
         </div>

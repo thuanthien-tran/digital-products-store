@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef, useId, useEffect, useCallback } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
 import { formatPrice } from "@/lib/utils"
@@ -81,6 +82,8 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
   const [emailError, setEmailError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [consentAgreed, setConsentAgreed] = useState(false)
+  const [consentError, setConsentError] = useState(false)
 
   const isSubmittingRef = useRef(false)
   const radioRefs = useRef<Map<string, HTMLDivElement>>(new Map())
@@ -239,6 +242,12 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
       return
     }
 
+    if (!consentAgreed) {
+      setConsentError(true)
+      setSubmitError("Vui lòng tích chọn đồng ý với Điều khoản dịch vụ và Chính sách bảo mật trước khi tiếp tục.")
+      return
+    }
+
     // Guard against double submission
     if (isSubmittingRef.current || loading) return
     isSubmittingRef.current = true
@@ -250,6 +259,8 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: email.trim().toLowerCase(),
+          consentAccepted: true,
+          consentTimestamp: new Date().toISOString(),
           items: [
             {
               productId: product.id,
@@ -596,6 +607,49 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
               {formatPrice(totalPrice)}
             </span>
           </div>
+        </div>
+
+        {/* Consent Checkbox theo Luật Bảo vệ dữ liệu cá nhân 91/2025/QH15 & NĐ 356/2025/NĐ-CP */}
+        <div className="pt-0.5">
+          <label className={`flex items-start gap-2.5 p-3 rounded-xl border transition-all duration-150 cursor-pointer select-none ${
+            consentError && !consentAgreed
+              ? "border-red-500/60 bg-red-500/10 text-red-200 shadow-xs"
+              : "border-border/70 bg-secondary/20 hover:border-teal-500/40 hover:bg-secondary/35 text-muted-foreground hover:text-foreground"
+          }`}>
+            <input
+              type="checkbox"
+              checked={consentAgreed}
+              onChange={(e) => {
+                setConsentAgreed(e.target.checked)
+                if (e.target.checked) {
+                  setConsentError(false)
+                  if (submitError?.includes("đồng ý")) setSubmitError(null)
+                }
+              }}
+              className="mt-0.5 size-4 rounded border-border text-teal-600 focus:ring-teal-500 shrink-0 cursor-pointer accent-teal-500"
+            />
+            <span className="text-xs leading-relaxed">
+              Tôi đã đọc và đồng ý với{" "}
+              <Link
+                href="/dieu-khoan-dich-vu"
+                target="_blank"
+                className="text-teal-400 font-semibold underline underline-offset-2 hover:text-teal-300 transition-colors"
+                onClick={(e) => e.stopPropagation()}
+              >
+                Điều khoản dịch vụ
+              </Link>{" "}
+              và{" "}
+              <Link
+                href="/chinh-sach-bao-mat"
+                target="_blank"
+                className="text-teal-400 font-semibold underline underline-offset-2 hover:text-teal-300 transition-colors"
+                onClick={(e) => e.stopPropagation()}
+              >
+                Chính sách bảo mật
+              </Link>{" "}
+              của CapyGo.
+            </span>
+          </label>
         </div>
 
         {/* F. Nút chính & Chặn thanh toán khi hết hàng */}

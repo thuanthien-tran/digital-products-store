@@ -14,7 +14,14 @@ interface OrderItemInput {
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const { email, items } = body
+    const { email, items, consentAccepted } = body
+
+    if (consentAccepted === false) {
+      return NextResponse.json(
+        { error: "Vui lòng đồng ý với Điều khoản dịch vụ và Chính sách bảo mật trước khi tiếp tục" },
+        { status: 400 }
+      )
+    }
 
     const emailValidation = validateEmail(email)
     if (!emailValidation.valid) {
