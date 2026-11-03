@@ -40,15 +40,87 @@ type SortOptionKey = "default" | "price_asc" | "price_desc" | "name_asc" | "name
 const viCollator = new Intl.Collator("vi", { sensitivity: "base", numeric: true })
 
 export function StorefrontCatalog({ groups, products }: StorefrontCatalogProps) {
+  const [catalogProducts, setCatalogProducts] = useState<StorefrontProduct[]>(products)
+  const [catalogGroups, setCatalogGroups] = useState<StorefrontGroup[]>(groups)
   const [selectedGroup, setSelectedGroup] = useState<string>("all")
   const [searchQuery, setSearchQuery] = useState("")
   const [priceRange, setPriceRange] = useState<PriceRangeKey>("all")
   const [sortBy, setSortBy] = useState<SortOptionKey>("default")
   const [liveStockMap, setLiveStockMap] = useState<Record<string, { availableStock: number; isPurchasable: boolean }>>({})
 
-  const allVariantIds = useMemo(() => {
-    return products.flatMap((p) => p.variants.map((v) => v.id))
+  // Sync state if server props change
+  useEffect(() => {
+    setCatalogProducts(products)
   }, [products])
+
+  useEffect(() => {
+    setCatalogGroups(groups)
+  }, [groups])
+
+  // Live Auto-Sync catalog from server API
+  const fetchLiveCatalog = async () => {
+    try {
+      const res = await fetch("/api/store/catalog", { cache: "no-store" })
+      if (!res.ok) return
+      const data = await res.json()
+      if (Array.isArray(data.products)) {
+        setCatalogProducts(data.products)
+      }
+      if (Array.isArray(data.groups)) {
+        setCatalogGroups(data.groups)
+      }
+    } catch {
+      // silent
+    }
+  }
+
+  // Cross-tab and visibility auto-sync listeners
+  useEffect(() => {
+    // 1. BroadcastChannel: Instant cross-tab sync when Admin mutates products
+    let bc: BroadcastChannel | null = null
+    try {
+      bc = new BroadcastChannel("store_catalog_sync")
+      bc.onmessage = () => {
+        void fetchLiveCatalog()
+      }
+    } catch {}
+
+    // 2. Storage event: Cross-tab / cross-window sync fallback
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === "store_catalog_sync") {
+        void fetchLiveCatalog()
+      }
+    }
+    window.addEventListener("storage", handleStorage)
+
+    // 3. Tab visibility & focus: Refresh when user switches back to store tab
+    const handleVisibilityOrFocus = () => {
+      if (typeof document !== "undefined" && !document.hidden) {
+        void fetchLiveCatalog()
+      }
+    }
+    document.addEventListener("visibilitychange", handleVisibilityOrFocus)
+    window.addEventListener("focus", handleVisibilityOrFocus)
+
+    // 4. Background polling every 10 seconds while tab is active
+    const interval = setInterval(() => {
+      if (typeof document !== "undefined" && !document.hidden) {
+        void fetchLiveCatalog()
+      }
+    }, 10000)
+
+    return () => {
+      if (bc) bc.close()
+      window.removeEventListener("storage", handleStorage)
+      document.removeEventListener("visibilitychange", handleVisibilityOrFocus)
+      window.removeEventListener("focus", handleVisibilityOrFocus)
+      clearInterval(interval)
+    }
+  }, [])
+
+  const allVariantIds = useMemo(() => {
+    return catalogProducts.flatMap((p) => p.variants.map((v) => v.id))
+  }, [catalogProducts])
 
   // Periodic lightweight live stock update (paused when tab is hidden)
   useEffect(() => {
@@ -89,8 +161,8 @@ export function StorefrontCatalog({ groups, products }: StorefrontCatalogProps) 
   }, [allVariantIds])
 
   const productsWithLiveStock = useMemo(() => {
-    if (Object.keys(liveStockMap).length === 0) return products
-    return products.map((p) => ({
+    if (Object.keys(liveStockMap).length === 0) return catalogProducts
+    return catalogProducts.map((p) => ({
       ...p,
       variants: p.variants.map((v) => {
         const live = liveStockMap[v.id]
@@ -101,18 +173,18 @@ export function StorefrontCatalog({ groups, products }: StorefrontCatalogProps) 
         }
       }),
     }))
-  }, [products, liveStockMap])
+  }, [catalogProducts, liveStockMap])
 
   // Filter groups to only those with public products
   const activeGroups = useMemo(() => {
-    return groups
+    return catalogGroups
       .filter((g) => productsWithLiveStock.some((p) => p.groupId === g.id))
       .map((g) => ({
         id: g.id,
         name: g.name,
         count: productsWithLiveStock.filter((p) => p.groupId === g.id).length,
       }))
-  }, [groups, productsWithLiveStock])
+  }, [catalogGroups, productsWithLiveStock])
 
   // Helper to compute representative lowest price for each product
   const getProductLowestPrice = (p: StorefrontProduct): number => {

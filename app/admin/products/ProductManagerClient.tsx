@@ -97,6 +97,18 @@ interface Props {
   groups: GroupOption[]
 }
 
+function notifyCatalogChange() {
+  if (typeof window === "undefined") return
+  try {
+    const bc = new BroadcastChannel("store_catalog_sync")
+    bc.postMessage({ type: "CATALOG_MUTATED", timestamp: Date.now() })
+    bc.close()
+  } catch {}
+  try {
+    localStorage.setItem("store_catalog_sync", String(Date.now()))
+  } catch {}
+}
+
 export function ProductManagerClient({ groups }: Props) {
   const [products, setProducts] = useState<ProductItem[]>([])
   const [activeTab, setActiveTab] = useState<"published" | "draft" | "hidden" | "all">("published")
@@ -394,6 +406,7 @@ export function ProductManagerClient({ groups }: Props) {
 
       const data = await res.json()
       if (res.ok) {
+        notifyCatalogChange()
         setMessage({
           text: "Đã cập nhật giá bán và thông tin sản phẩm đồng bộ thành công lên website!",
           type: "success",
@@ -423,6 +436,7 @@ export function ProductManagerClient({ groups }: Props) {
       })
       const data = await res.json()
       if (res.ok) {
+        notifyCatalogChange()
         setMessage({ text: "Đã công bố sản phẩm lên website thành công!", type: "success" })
         setRefreshTrigger((prev) => prev + 1)
       } else {
@@ -443,6 +457,7 @@ export function ProductManagerClient({ groups }: Props) {
       })
       const data = await res.json()
       if (res.ok) {
+        notifyCatalogChange()
         setMessage({ text: "Đã tạm ẩn sản phẩm khỏi website!", type: "success" })
         setRefreshTrigger((prev) => prev + 1)
       } else {
@@ -462,6 +477,7 @@ export function ProductManagerClient({ groups }: Props) {
       })
       const data = await res.json().catch(() => ({}))
       if (res.ok) {
+        notifyCatalogChange()
         setMessage({ text: data.message || "Đã xóa sản phẩm thành công", type: "success" })
         setSelectedIds((prev) => prev.filter((id) => id !== productId))
         setRefreshTrigger((prev) => prev + 1)
@@ -511,6 +527,7 @@ export function ProductManagerClient({ groups }: Props) {
       })
       const data = await res.json().catch(() => ({}))
       if (res.ok) {
+        notifyCatalogChange()
         setMessage({
           text: data.message || `Đã xóa thành công ${count} sản phẩm`,
           type: "success",
@@ -550,6 +567,7 @@ export function ProductManagerClient({ groups }: Props) {
 
       const data = await res.json()
       if (res.ok) {
+        notifyCatalogChange()
         setMessage({ text: "Đã tạo sản phẩm bản nháp thành công! Bạn có thể chỉnh sửa và duyệt đăng bán.", type: "success" })
         setIsAddManualOpen(false)
         setManualForm({

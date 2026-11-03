@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { revalidatePath } from "next/cache"
 import { prisma } from "@/lib/db"
 import { slugify } from "@/lib/utils"
 import { verifyAdminRequest } from "@/lib/auth"
@@ -140,6 +141,11 @@ export async function POST(req: Request) {
       include: { variants: true },
     })
 
+    try {
+      revalidatePath('/', 'layout')
+      revalidatePath('/')
+    } catch {}
+
     return NextResponse.json({ success: true, product })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Internal server error"
@@ -195,6 +201,11 @@ export async function DELETE(req: Request) {
 
       return deleteResult
     })
+
+    try {
+      revalidatePath('/', 'layout')
+      revalidatePath('/')
+    } catch {}
 
     return NextResponse.json({
       success: true,

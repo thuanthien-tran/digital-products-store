@@ -29,6 +29,8 @@ export interface UpdateProductInput {
     sourceProductId?: string | null
   }>
   action?: 'save_draft' | 'publish_now'
+  visibility?: string
+  editorialStatus?: string
   confirmBelowCost?: boolean
 }
 
@@ -199,7 +201,13 @@ export async function updateProductDetails(
   if (input.action === 'publish_now') {
     updatedData.visibility = 'public'
     updatedData.editorialStatus = 'published'
+  } else if (input.action === 'save_draft') {
+    updatedData.visibility = 'hidden'
+    updatedData.editorialStatus = 'draft'
   }
+
+  if (input.visibility !== undefined) updatedData.visibility = input.visibility
+  if (input.editorialStatus !== undefined) updatedData.editorialStatus = input.editorialStatus
 
   const updatedProduct = await prisma.product.update({
     where: { id: productId },

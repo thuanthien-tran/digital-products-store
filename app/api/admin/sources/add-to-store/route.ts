@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { revalidatePath } from 'next/cache'
 import { verifyAdminRequest } from '@/lib/auth'
 import { addSourceProductsToStore } from '@/lib/product-catalog-service'
 
@@ -17,6 +18,10 @@ export async function POST(req: Request) {
     }
 
     const result = await addSourceProductsToStore(sourceProductIds, auth.username)
+    try {
+      revalidatePath('/', 'layout')
+      revalidatePath('/')
+    } catch {}
     return NextResponse.json(result)
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Lỗi thêm sản phẩm vào kho bán'

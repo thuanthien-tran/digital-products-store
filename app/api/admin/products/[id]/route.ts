@@ -75,6 +75,7 @@ export async function PUT(req: Request, { params }: Params) {
 
     const result = await updateProductDetails(id, body, auth.username)
     try {
+      revalidatePath('/', 'layout')
       revalidatePath('/')
       if (result.product?.slug) {
         revalidatePath(`/product/${result.product.slug}`)
@@ -103,6 +104,7 @@ export async function POST(req: Request, { params }: Params) {
         confirmBelowCost: Boolean(body.confirmBelowCost),
       })
       try {
+        revalidatePath('/', 'layout')
         revalidatePath('/')
         if (published.slug) revalidatePath(`/product/${published.slug}`)
       } catch {}
@@ -110,6 +112,7 @@ export async function POST(req: Request, { params }: Params) {
     } else if (action === 'hide') {
       const hidden = await hideProductFromStore(id, auth.username || 'admin')
       try {
+        revalidatePath('/', 'layout')
         revalidatePath('/')
         if (hidden.slug) revalidatePath(`/product/${hidden.slug}`)
       } catch {}
@@ -168,6 +171,7 @@ export async function DELETE(req: Request, { params }: Params) {
     })
 
     try {
+      revalidatePath('/', 'layout')
       revalidatePath('/')
       if (product.slug) revalidatePath(`/product/${product.slug}`)
     } catch {}
