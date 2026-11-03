@@ -2,13 +2,16 @@
 
 import { useEffect, useState } from "react"
 import Image from "next/image"
-import { CheckCircle2, Copy, Check, AlertCircle, AlertTriangle, Loader2 } from "lucide-react"
+import Link from "next/link"
+import { CheckCircle2, Copy, Check, AlertCircle, AlertTriangle, Loader2, Clock, ArrowLeft, RefreshCw } from "lucide-react"
 import { formatPrice } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
+import { Button } from "@/components/ui/button"
 
 interface OrderStatusProps {
   orderId: string
   initialStatus: string
+  createdAt?: string
   orderCode: string
   totalCents: number
   totalPaid?: number
@@ -32,6 +35,7 @@ interface OrderStatusProps {
 export function OrderStatus({
   orderId,
   initialStatus,
+  createdAt,
   orderCode,
   totalCents,
   totalPaid: initialTotalPaid = 0,
@@ -53,6 +57,47 @@ export function OrderStatus({
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
   const [pollingError, setPollingError] = useState(false)
   const [qrLoaded, setQrLoaded] = useState(true)
+  const [verifying, setVerifying] = useState(false)
+
+  // 10-minute (600s) countdown timer
+  const ORDER_TIMEOUT_SECONDS = 10 * 60
+  const calculateRemainingSeconds = () => {
+    if (!createdAt) return ORDER_TIMEOUT_SECONDS
+    const createdTime = new Date(createdAt).getTime()
+    const elapsed = Math.floor((Date.now() - createdTime) / 1000)
+    return Math.max(0, ORDER_TIMEOUT_SECONDS - elapsed)
+  }
+
+  const [secondsLeft, setSecondsLeft] = useState<number>(calculateRemainingSeconds())
+
+  // Countdown tick effect every 1 second
+  useEffect(() => {
+    if (status !== "pending") return
+
+    if (secondsLeft <= 0) {
+      setStatus("cancelled")
+      return
+    }
+
+    const timer = setInterval(() => {
+      setSecondsLeft((prev) => {
+        if (prev <= 1) {
+          setStatus("cancelled")
+          clearInterval(timer)
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+
+    return () => clearInterval(timer)
+  }, [status, secondsLeft])
+
+  const formatCountdown = (totalSec: number) => {
+    const mins = Math.floor(totalSec / 60)
+    const secs = totalSec % 60
+    return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`
+  }
 
   // Polling check order status every 3s until paid or cancelled or refunded
   useEffect(() => {
@@ -94,6 +139,39 @@ export function OrderStatus({
     setCopiedKey(keyName)
     setTimeout(() => setCopiedKey(null), 2000)
     toast({ title: "Đã sao chép", description: text, variant: "default" })
+  }
+
+  const handleManualCheck = async () => {
+    if (verifying) return
+    setVerifying(true)
+    try {
+      const res = await fetch(`/api/orders/${orderId}/verify`, { method: "POST" })
+      const data = await res.json()
+      if (data.status) {
+        setStatus(data.status)
+      }
+      if (data.paid || data.status === "paid") {
+        toast({
+          title: "Thanh toán thành công!",
+          description: "Hệ thống đã nhận diện được giao dịch ngân hàng và tự động duyệt đơn.",
+          variant: "default",
+        })
+      } else {
+        toast({
+          title: "Đang kiểm tra...",
+          description: data.message || "Chưa tìm thấy giao dịch khớp mã. Nếu vừa chuyển, vui lòng đợi vài giây rồi thử lại.",
+          variant: "default",
+        })
+      }
+    } catch {
+      toast({
+        title: "Lỗi kết nối",
+        description: "Không thể kiểm tra ngay bây giờ. Vui lòng thử lại sau.",
+        variant: "destructive",
+      })
+    } finally {
+      setVerifying(false)
+    }
   }
 
   // CASE 1: ĐÃ THANH TOÁN THÀNH CÔNG (Hiển thị Serial/Key)
@@ -187,15 +265,33 @@ export function OrderStatus({
     )
   }
 
-  // CASE 2: ĐƠN ĐÃ HỦY
+  // CASE 2: ĐƠN ĐÃ HỦY (DO QUÁ 10 PHÚT HOẶC ADMIN HỦY)
   if (status === "cancelled") {
     return (
-      <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-6 text-center space-y-3">
-        <AlertCircle className="size-8 text-destructive mx-auto" />
-        <h2 className="text-base font-bold text-foreground">Đơn hàng đã hủy</h2>
-        <p className="text-xs text-muted-foreground">
-          Đơn #{orderCode} đã bị hủy hoặc hết hạn giao dịch. Vui lòng quay lại trang chủ nếu bạn muốn tạo đơn mới.
-        </p>
+      <div className="space-y-6">
+        <div className="rounded-2xl border border-destructive/40 bg-destructive/10 p-6 sm:p-7 text-center space-y-4">
+          <div className="size-12 rounded-full bg-destructive/20 border border-destructive/30 flex items-center justify-center mx-auto text-destructive">
+            <AlertCircle className="size-6" />
+          </div>
+          <div className="space-y-1.5">
+            <h2 className="text-lg font-bold text-foreground">Đơn hàng đã hết hạn thanh toán</h2>
+            <p className="text-xs text-muted-foreground leading-relaxed max-w-sm mx-auto">
+              Đơn hàng <span className="font-mono font-semibold text-foreground">#{orderCode}</span> đã tự động bị hủy do quá thời gian chờ thanh toán 10 phút.
+            </p>
+          </div>
+          <p className="text-[11px] text-amber-300 bg-amber-500/10 border border-amber-500/20 p-3 rounded-xl max-w-md mx-auto leading-relaxed">
+            ⚠️ <strong>Lưu ý:</strong> Vui lòng không quét mã chuyển khoản cho đơn hàng này. Nếu bạn đã lỡ chuyển khoản muộn, vui lòng liên hệ Zalo CSKH để được kích hoạt đơn hoặc hỗ trợ hoàn tiền ngay.
+          </p>
+          <div className="pt-2 flex justify-center gap-3">
+            <Link
+              href="/"
+              className="px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:opacity-90 active:scale-95 transition-all inline-flex items-center gap-1.5"
+            >
+              <ArrowLeft className="size-3.5" />
+              <span>Quay lại trang chủ tạo đơn mới</span>
+            </Link>
+          </div>
+        </div>
       </div>
     )
   }
@@ -254,7 +350,7 @@ export function OrderStatus({
   const qrTransferAmount = isPartiallyPaid && remainingCents > 0 ? remainingCents : totalCents
   const currentQrUrl =
     isPartiallyPaid && remainingCents > 0
-      ? `https://qr.sepay.vn/img?acc=${accountNumber}&bank=${bankName}&amount=${qrTransferAmount}&des=${orderCode}&template=compact`
+      ? `https://qr.sepay.vn/img?bank=${bankName}&acc=${accountNumber}&amount=${qrTransferAmount}&des=${orderCode}&template=qr_only`
       : qrUrl
 
   return (
@@ -277,17 +373,40 @@ export function OrderStatus({
           </p>
         </div>
       ) : (
-        <div className="rounded-xl border border-border bg-card p-4 flex items-center justify-between gap-3 text-xs">
-          <div className="flex items-center gap-2.5">
-            <Loader2 className="size-4 text-accent animate-spin shrink-0" />
-            <div>
-              <span className="font-semibold text-foreground block">Đang chờ nhận chuyển khoản</span>
-              <span className="text-muted-foreground text-[11px]">Hệ thống kiểm tra giao dịch tự động</span>
+        <div className="space-y-2.5">
+          <div className="rounded-xl border border-border bg-card p-4 flex items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2.5">
+              <Loader2 className="size-4 text-accent animate-spin shrink-0" />
+              <div>
+                <span className="font-semibold text-foreground block">Đang chờ nhận chuyển khoản</span>
+                <span className="text-muted-foreground text-[11px]">Hệ thống kiểm tra giao dịch tự động</span>
+              </div>
+            </div>
+            <span className="text-[11px] font-mono px-2 py-0.5 rounded border border-border bg-secondary text-muted-foreground">
+              Đơn #{orderCode}
+            </span>
+          </div>
+
+          {/* Countdown timer: 10 minutes auto-cancel */}
+          <div className={`rounded-xl border p-3 flex items-center justify-between text-xs transition-colors ${
+            secondsLeft <= 120
+              ? "border-rose-500/40 bg-rose-500/10 text-rose-300"
+              : "border-amber-500/30 bg-amber-500/10 text-amber-300"
+          }`}>
+            <div className="flex items-center gap-2 font-medium">
+              <Clock className={`size-4 ${secondsLeft <= 120 ? "text-rose-400 animate-pulse" : "text-amber-400"}`} />
+              <span>Thời hạn giữ đơn &amp; thanh toán:</span>
+            </div>
+            <div className="flex items-center gap-1.5 font-mono text-xs font-bold">
+              <span className={`px-2 py-0.5 rounded-md border font-mono text-sm tracking-wider font-black ${
+                secondsLeft <= 120
+                  ? "bg-rose-500/20 border-rose-500/40 text-rose-300 animate-pulse"
+                  : "bg-amber-500/20 border-amber-500/30 text-amber-300"
+              }`}>
+                {formatCountdown(secondsLeft)}
+              </span>
             </div>
           </div>
-          <span className="text-[11px] font-mono px-2 py-0.5 rounded border border-border bg-secondary text-muted-foreground">
-            Đơn #{orderCode}
-          </span>
         </div>
       )}
 
@@ -376,6 +495,22 @@ export function OrderStatus({
         <div className="p-3 rounded-md border border-border bg-secondary/30 text-xs text-muted-foreground leading-relaxed">
           <strong className="text-foreground font-semibold">Lưu ý quan trọng:</strong> Vui lòng điền đúng mã nội dung{" "}
           <span className="font-mono font-bold text-accent">{orderCode}</span> để hệ thống nhận diện giao dịch tự động.
+        </div>
+
+        {/* Manual Verification Button */}
+        <div className="pt-2 space-y-2">
+          <Button
+            type="button"
+            disabled={verifying}
+            onClick={handleManualCheck}
+            className="w-full py-5 rounded-xl bg-primary text-primary-foreground font-semibold flex items-center justify-center gap-2 shadow-lg shadow-primary/20 active:scale-[0.99] transition-all cursor-pointer"
+          >
+            <RefreshCw className={`size-4 ${verifying ? "animate-spin" : ""}`} />
+            <span>{verifying ? "Đang đối soát giao dịch SePay..." : "Tôi đã chuyển tiền (Kiểm tra ngay)"}</span>
+          </Button>
+          <p className="text-[11px] text-center text-muted-foreground">
+            Hệ thống đang tự động quét biến động số dư SePay mỗi 3 giây. Nếu bạn vừa chuyển xong, bấm nút trên để kích hoạt kiểm tra ngay lập tức.
+          </p>
         </div>
       </div>
     </div>

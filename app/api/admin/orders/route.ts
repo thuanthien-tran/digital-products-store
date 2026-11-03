@@ -172,6 +172,12 @@ export async function PATCH(req: Request) {
 
       // CASE 2: Cancelling an order
       if (status === "cancelled") {
+        if (currentOrder.status === "paid") {
+          const err: any = new Error("Đơn hàng đã thanh toán thành công và đã bàn giao tài khoản cho khách. Theo chuẩn thương mại điện tử, đơn đã hoàn tất không thể hủy.")
+          err.status = 400
+          throw err
+        }
+
         if (currentOrder.status === "cancelled") {
           return currentOrder // Idempotent no-op
         }
@@ -303,6 +309,14 @@ export async function GET(req: Request) {
         createdAt: o.createdAt.toISOString(),
         paymentGateway: o.payments[0]?.gateway || null,
         note: o.note,
+        payments: o.payments.map((p) => ({
+          id: p.id,
+          amount: p.amount,
+          gateway: p.gateway,
+          transactionId: p.transactionId,
+          createdAt: p.createdAt.toISOString(),
+          content: p.content,
+        })),
         items: o.items.map((i) => {
           const serialList = i.serials.map((s) => s.content)
           return {
@@ -367,6 +381,21 @@ export async function DELETE(req: Request) {
 
     if (!orderId) {
       return NextResponse.json({ error: "Thiếu orderId" }, { status: 400 })
+    }
+
+    const orderToDelete = await prisma.order.findUnique({
+      where: { id: orderId },
+    })
+
+    if (!orderToDelete) {
+      return NextResponse.json({ error: "Không tìm thấy đơn hàng cần xóa" }, { status: 404 })
+    }
+
+    if (orderToDelete.status === "paid") {
+      return NextResponse.json(
+        { error: "Đơn hàng đã thanh toán thành công được bảo vệ vĩnh viễn cho mục đích kế toán và kiểm toán, không thể xóa." },
+        { status: 400 }
+      )
     }
 
     await prisma.order.delete({

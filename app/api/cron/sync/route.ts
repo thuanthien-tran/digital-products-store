@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import crypto from "crypto"
 import { runScheduledBackgroundSync } from "@/lib/scheduler"
 import { verifyAdminRequest } from "@/lib/auth"
+import { cancelAllExpiredPendingOrders } from "@/lib/order-expiry"
 
 export const dynamic = "force-dynamic"
 export const maxDuration = 60
@@ -104,7 +105,13 @@ async function handleSync(req: Request, method: "GET" | "POST") {
       minCooldownSeconds: cooldown,
     })
 
-    return NextResponse.json(summary)
+    // Auto-clean expired pending orders older than 10 minutes
+    const expiredCount = await cancelAllExpiredPendingOrders()
+
+    return NextResponse.json({
+      ...summary,
+      expiredOrdersCancelled: expiredCount,
+    })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Cron execution failed"
     return NextResponse.json({ error: msg }, { status: 500 })

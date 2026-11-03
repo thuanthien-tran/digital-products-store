@@ -7,10 +7,10 @@ export type OrderStatus = (typeof VALID_ORDER_STATUSES)[number]
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {
   pending: ['partially_paid', 'processing', 'paid', 'cancelled'],
   partially_paid: ['processing', 'paid', 'cancelled'],
-  processing: ['paid', 'cancelled'],
-  paid: ['cancelled', 'refunded'],
-  cancelled: [], // Terminal state
-  refunded: [],  // Terminal state
+  processing: ['paid', 'refunded'],
+  paid: ['refunded'], // Đơn đã thanh toán là bất biến (Immutable), không thể hủy, chỉ có thể hoàn tiền nếu phát sinh sự cố
+  cancelled: [], // Terminal state - Không thể thao tác
+  refunded: [],  // Terminal state - Không thể thao tác
 }
 
 /**

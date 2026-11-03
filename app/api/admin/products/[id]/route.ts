@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/db'
 import { verifyAdminRequest } from '@/lib/auth'
 import { updateProductDetails, publishProductToStore, hideProductFromStore } from '@/lib/product-catalog-service'
@@ -73,6 +74,12 @@ export async function PUT(req: Request, { params }: Params) {
     const body = await req.json()
 
     const result = await updateProductDetails(id, body, auth.username)
+    try {
+      revalidatePath('/')
+      if (result.product?.slug) {
+        revalidatePath(`/product/${result.product.slug}`)
+      }
+    } catch {}
     return NextResponse.json(result)
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Lỗi cập nhật sản phẩm'
@@ -95,9 +102,17 @@ export async function POST(req: Request, { params }: Params) {
       const published = await publishProductToStore(id, auth.username || 'admin', {
         confirmBelowCost: Boolean(body.confirmBelowCost),
       })
+      try {
+        revalidatePath('/')
+        if (published.slug) revalidatePath(`/product/${published.slug}`)
+      } catch {}
       return NextResponse.json({ success: true, product: published })
     } else if (action === 'hide') {
       const hidden = await hideProductFromStore(id, auth.username || 'admin')
+      try {
+        revalidatePath('/')
+        if (hidden.slug) revalidatePath(`/product/${hidden.slug}`)
+      } catch {}
       return NextResponse.json({ success: true, product: hidden })
     } else {
       return NextResponse.json({ error: `Hành động "${action}" không hợp lệ` }, { status: 400 })
@@ -151,6 +166,11 @@ export async function DELETE(req: Request, { params }: Params) {
         where: { id },
       })
     })
+
+    try {
+      revalidatePath('/')
+      if (product.slug) revalidatePath(`/product/${product.slug}`)
+    } catch {}
 
     return NextResponse.json({ success: true, message: 'Đã xóa vĩnh viễn sản phẩm thành công' })
   } catch (err: unknown) {

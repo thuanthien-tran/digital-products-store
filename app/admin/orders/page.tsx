@@ -40,6 +40,15 @@ export default async function AdminOrdersPage() {
             status: o.status,
             createdAt: o.createdAt.toISOString(),
             paymentGateway: o.payments[0]?.gateway || null,
+            note: o.note,
+            payments: o.payments.map((p) => ({
+              id: p.id,
+              amount: p.amount,
+              gateway: p.gateway,
+              transactionId: p.transactionId,
+              createdAt: p.createdAt.toISOString(),
+              content: p.content,
+            })),
             items: o.items.map((i) => {
               const serialList = i.serials.map((s) => s.content)
               return {

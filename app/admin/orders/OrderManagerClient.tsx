@@ -6,9 +6,30 @@ import { formatPrice } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/hooks/use-toast"
-import { Search, ExternalLink, RefreshCw, Trash2 } from "lucide-react"
+import { 
+  Search, 
+  ExternalLink, 
+  RefreshCw, 
+  Trash2, 
+  ShieldCheck, 
+  Clock, 
+  AlertCircle, 
+  FileText, 
+  Lock, 
+  X, 
+  CheckCircle2 
+} from "lucide-react"
 
-interface OrderItem {
+export interface PaymentItem {
+  id: string
+  amount: number
+  gateway: string | null
+  transactionId?: string | null
+  createdAt: string
+  content?: string | null
+}
+
+export interface OrderItem {
   id: string
   code: string
   email: string
@@ -18,6 +39,7 @@ interface OrderItem {
   createdAt: string
   paymentGateway: string | null
   note?: string | null
+  payments?: PaymentItem[]
   items: Array<{
     name: string
     quantity?: number
@@ -67,6 +89,9 @@ export function OrderManagerClient({ orders }: { orders: OrderItem[] }) {
     reason: "",
     isSubmitting: false,
   })
+
+  // Modal State for Order History & Audit
+  const [historyOrder, setHistoryOrder] = useState<OrderItem | null>(null)
 
   const isSubmittingRef = useRef(false)
 
@@ -422,47 +447,75 @@ export function OrderManagerClient({ orders }: { orders: OrderItem[] }) {
               </div>
 
               {/* Actions */}
-              <div className="flex items-center justify-end gap-2 pt-1">
-                {order.status !== "paid" && (
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-border/40">
+                {/* Status-specific advisory note */}
+                {order.status === "paid" ? (
+                  <div className="flex items-center gap-1.5 text-[11px] font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-lg">
+                    <Lock className="size-3.5 text-emerald-400 shrink-0" />
+                    <span>Đã thanh toán · Khóa thao tác</span>
+                  </div>
+                ) : order.status === "cancelled" ? (
+                  <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground bg-muted/40 border border-border/50 px-2.5 py-1 rounded-lg">
+                    <AlertCircle className="size-3.5 text-muted-foreground shrink-0" />
+                    <span>Đơn đã hủy · Lưu vết lịch sử</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5 text-[11px] font-medium text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-lg">
+                    <Clock className="size-3.5 text-amber-400 shrink-0" />
+                    <span>Chờ nhận thanh toán</span>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-2 ml-auto">
+                  {/* Nút Xem Lịch Sử & Chi Tiết (Luôn có cho tất cả các đơn) */}
                   <Button
                     size="sm"
                     variant="outline"
-                    className="text-xs text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10 cursor-pointer"
-                    onClick={() => openSettleModal(order)}
+                    className="text-xs text-foreground border-border hover:bg-secondary cursor-pointer flex items-center gap-1.5 h-8 px-2.5"
+                    onClick={() => setHistoryOrder(order)}
+                    title="Xem chi tiết lịch sử giao dịch và đối soát"
                   >
-                    Duyệt đã TT
+                    <FileText className="size-3.5 text-primary" />
+                    <span>Lịch sử đơn</span>
                   </Button>
-                )}
-                {order.status !== "cancelled" && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={fulfillingId === order.id}
-                    className="text-xs text-blue-400 border-blue-500/30 hover:bg-blue-500/10 cursor-pointer"
-                    onClick={() => handleTriggerFulfill(order.id)}
-                  >
-                    {fulfillingId === order.id ? "Đang giao..." : "Giao lại qua đại lý"}
-                  </Button>
-                )}
-                {order.status !== "cancelled" && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="text-xs text-destructive hover:bg-destructive/10 cursor-pointer"
-                    onClick={() => openCancelModal(order)}
-                  >
-                    Hủy đơn
-                  </Button>
-                )}
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 p-2 cursor-pointer"
-                  title="Xóa đơn hàng này"
-                  onClick={() => handleDeleteOrder(order.id, order.code)}
-                >
-                  <Trash2 className="size-3.5" />
-                </Button>
+
+                  {/* Nút Duyệt đã TT: CHỈ HIỂN THỊ KHI CHƯA THANH TOÁN */}
+                  {(order.status === "pending" || order.status === "partially_paid") && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-xs text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10 cursor-pointer h-8 px-2.5 font-semibold"
+                      onClick={() => openSettleModal(order)}
+                    >
+                      Duyệt đã TT
+                    </Button>
+                  )}
+
+                  {/* Nút Hủy đơn: CHỈ HIỂN THỊ KHI CHƯA THANH TOÁN (Tuyệt đối không hủy đơn đã TT) */}
+                  {(order.status === "pending" || order.status === "partially_paid") && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-xs text-destructive hover:bg-destructive/10 cursor-pointer h-8 px-2.5"
+                      onClick={() => openCancelModal(order)}
+                    >
+                      Hủy đơn
+                    </Button>
+                  )}
+
+                  {/* Nút Xóa đơn: CHỈ CHO PHÉP XÓA ĐƠN CHƯA PAID (Đơn paid bị khóa vĩnh viễn) */}
+                  {order.status !== "paid" && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 p-2 cursor-pointer h-8 w-8"
+                      title="Xóa đơn hàng này"
+                      onClick={() => handleDeleteOrder(order.id, order.code)}
+                    >
+                      <Trash2 className="size-3.5" />
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
           ))
@@ -628,6 +681,181 @@ export function OrderManagerClient({ orders }: { orders: OrderItem[] }) {
                 </Button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Order History & Audit Trail Modal */}
+      {historyOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl border border-border bg-card p-6 shadow-2xl space-y-5">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-border/60 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="size-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
+                  <FileText className="size-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-foreground flex items-center gap-2">
+                    <span>Lịch Sử Đơn Hàng #{historyOrder.code}</span>
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                        historyOrder.status === "paid"
+                          ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
+                          : historyOrder.status === "pending"
+                          ? "bg-amber-500/15 text-amber-400 border border-amber-500/30"
+                          : "bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      {historyOrder.status === "paid"
+                        ? "Đã thanh toán"
+                        : historyOrder.status === "pending"
+                        ? "Chờ thanh toán"
+                        : "Đã hủy"}
+                    </span>
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    Tạo lúc: {new Date(historyOrder.createdAt).toLocaleString("vi-VN")} · Khách: {historyOrder.email}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setHistoryOrder(null)}
+                className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            {/* Immutability Audit Banner for Paid Orders */}
+            {historyOrder.status === "paid" && (
+              <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 flex items-start gap-3 text-xs">
+                <ShieldCheck className="size-4 text-emerald-400 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <span className="font-bold text-emerald-300 block">Bảo vệ tính toàn vẹn kiểm toán (Audit Trail)</span>
+                  <p className="text-muted-foreground leading-relaxed text-[11.5px]">
+                    Đơn hàng đã được xác nhận thanh toán đủ và tài khoản đã được bàn giao đến khách hàng. Theo tiêu chuẩn quản lý thương mại điện tử, đơn hàng này đã chốt sổ và bị <strong>vô hiệu hóa mọi thao tác chỉnh sửa hoặc hủy đơn</strong> nhằm bảo đảm an toàn kế toán và dòng tiền.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Payment Transactions History */}
+            <div className="space-y-2">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+                <span>Nhật ký thanh toán ({historyOrder.payments?.length || 0} giao dịch)</span>
+                <span className="text-primary font-mono font-bold text-sm">
+                  Tổng nhận: {formatPrice(historyOrder.paidAmount || (historyOrder.status === "paid" ? historyOrder.totalCents : 0))} / {formatPrice(historyOrder.totalCents)}
+                </span>
+              </h4>
+
+              {historyOrder.payments && historyOrder.payments.length > 0 ? (
+                <div className="space-y-2">
+                  {historyOrder.payments.map((p, pIdx) => (
+                    <div
+                      key={p.id || pIdx}
+                      className="p-3 rounded-xl border border-border/70 bg-background/60 text-xs space-y-1 font-mono"
+                    >
+                      <div className="flex items-center justify-between font-bold">
+                        <span className="text-emerald-400">+{formatPrice(p.amount)}</span>
+                        <span className="text-muted-foreground text-[11px] font-normal">
+                          {new Date(p.createdAt).toLocaleString("vi-VN")}
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-muted-foreground flex flex-wrap gap-2">
+                        <span>Cổng: <strong className="text-foreground">{p.gateway}</strong></span>
+                        {p.transactionId && <span>Mã GD: <strong className="text-foreground">{p.transactionId}</strong></span>}
+                      </div>
+                      {p.content && (
+                        <div className="text-[11px] text-muted-foreground/90 break-all bg-secondary/40 p-1.5 rounded">
+                          Nội dung: {p.content}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-3 rounded-xl border border-border/50 bg-background/40 text-xs text-muted-foreground text-center">
+                  {historyOrder.status === "paid"
+                    ? "Đơn đã ghi nhận thanh toán đầy đủ."
+                    : "Chưa ghi nhận biến động giao dịch nào."}
+                </div>
+              )}
+            </div>
+
+            {/* Delivered Items & Credentials */}
+            <div className="space-y-2">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                Sản phẩm &amp; Tài khoản bàn giao
+              </h4>
+              <div className="space-y-2.5">
+                {historyOrder.items.map((it, idx) => {
+                  const serialList =
+                    it.serials && it.serials.length > 0
+                      ? it.serials
+                      : it.serial
+                      ? it.serial.split("\n").filter(Boolean)
+                      : []
+
+                  return (
+                    <div key={idx} className="p-3.5 rounded-xl border border-border/80 bg-background/50 space-y-2 text-xs">
+                      <div className="flex items-center justify-between font-bold text-foreground">
+                        <span>{it.name} {it.quantity && it.quantity > 1 ? `x${it.quantity}` : ""}</span>
+                        <span className="text-primary font-mono">{formatPrice(it.priceCents)}</span>
+                      </div>
+
+                      {serialList.length > 0 ? (
+                        <div className="space-y-1.5 pt-1">
+                          <span className="text-[11px] text-muted-foreground font-semibold block">Tài khoản / Key đã xuất:</span>
+                          {serialList.map((s, sIdx) => (
+                            <div
+                              key={sIdx}
+                              className="font-mono text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 p-2 rounded-lg break-all select-all flex items-center justify-between"
+                            >
+                              <span>{s}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-amber-400 text-[11px] italic">Chưa bàn giao tài khoản</span>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* System Note */}
+            {historyOrder.note && (
+              <div className="space-y-1">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Ghi chú hệ thống</h4>
+                <div className="p-2.5 rounded-lg border border-border bg-secondary/30 text-xs text-muted-foreground font-mono">
+                  {historyOrder.note}
+                </div>
+              </div>
+            )}
+
+            {/* Footer */}
+            <div className="flex items-center justify-between pt-3 border-t border-border/60 text-xs">
+              <a
+                href={`/order/${historyOrder.id}`}
+                target="_blank"
+                rel="noreferrer"
+                className="text-primary hover:underline flex items-center gap-1 font-semibold"
+              >
+                Mở trang khách đối soát <ExternalLink className="size-3" />
+              </a>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setHistoryOrder(null)}
+              >
+                Đóng
+              </Button>
+            </div>
           </div>
         </div>
       )}

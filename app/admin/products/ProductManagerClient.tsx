@@ -12,7 +12,8 @@ import {
   Save, 
   Send,
   Image as ImageIcon,
-  Loader2
+  Loader2,
+  RefreshCw
 } from "lucide-react"
 import { ProductCard } from "@/components/storefront/ProductCard"
 
@@ -136,6 +137,27 @@ export function ProductManagerClient({ groups }: Props) {
     imageUrl: "",
     warrantyTerms: "Bảo hành 1 đổi 1 trong thời gian sử dụng.",
   })
+
+  const [isSyncing, setIsSyncing] = useState(false)
+
+  const handleSyncProviders = async () => {
+    setIsSyncing(true)
+    setMessage(null)
+    try {
+      const res = await fetch("/api/admin/sync", { method: "POST" })
+      const data = await res.json()
+      if (res.ok) {
+        setMessage({ text: data.message || "Đã đồng bộ tồn kho và giá từ đại lý thành công!", type: "success" })
+        setRefreshTrigger((prev) => prev + 1)
+      } else {
+        setMessage({ text: data.error || "Lỗi đồng bộ đại lý", type: "error" })
+      }
+    } catch {
+      setMessage({ text: "Lỗi kết nối khi đồng bộ đại lý", type: "error" })
+    } finally {
+      setIsSyncing(false)
+    }
+  }
 
   useEffect(() => {
     let ignore = false
@@ -373,9 +395,7 @@ export function ProductManagerClient({ groups }: Props) {
       const data = await res.json()
       if (res.ok) {
         setMessage({
-          text: actionType === "publish_now"
-            ? "Đã cập nhật và công bố sản phẩm lên website thành công!"
-            : "Đã lưu bản nháp an toàn (chưa ảnh hưởng đến bản đang bán trực tiếp)!",
+          text: "Đã cập nhật giá bán và thông tin sản phẩm đồng bộ thành công lên website!",
           type: "success",
         })
         setEditingProduct(null)
@@ -656,6 +676,16 @@ export function ProductManagerClient({ groups }: Props) {
               className="pl-8 pr-3 py-1.5 rounded-lg border border-border bg-card text-xs focus:outline-none focus:ring-1 focus:ring-primary w-48 sm:w-64"
             />
           </div>
+
+          <button
+            onClick={handleSyncProviders}
+            disabled={isSyncing}
+            className="px-3 py-1.5 rounded-lg border border-border bg-card hover:bg-secondary text-foreground text-xs font-semibold hover:border-primary/50 transition-all flex items-center gap-1.5 shrink-0 disabled:opacity-50"
+            title="Đồng bộ ngay tồn kho và giá sỉ mới nhất từ Dino & FatCat"
+          >
+            <RefreshCw className={`size-3.5 text-primary ${isSyncing ? "animate-spin" : ""}`} />
+            <span>{isSyncing ? "Đang đồng bộ..." : "Đồng bộ đại lý"}</span>
+          </button>
 
           <button
             onClick={() => setIsAddManualOpen(true)}
@@ -1251,27 +1281,15 @@ export function ProductManagerClient({ groups }: Props) {
 
                 <button
                   type="button"
-                  onClick={() => handleSaveProduct("save_draft")}
-                  disabled={saving}
-                  className="px-3.5 py-1.5 rounded-lg border border-border bg-card hover:bg-secondary text-foreground text-xs font-semibold flex items-center gap-1.5 disabled:opacity-50"
-                >
-                  <Save className="size-3.5" />
-                  <span>{saving ? "Đang lưu..." : "Lưu bản nháp"}</span>
-                </button>
-
-                <button
-                  type="button"
                   onClick={() => handleSaveProduct("publish_now")}
                   disabled={saving}
                   className="px-4 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-bold flex items-center gap-1.5 hover:opacity-90 active:scale-95 transition-all disabled:opacity-50"
                 >
-                  <Send className="size-3.5" />
+                  <Save className="size-3.5" />
                   <span>
                     {saving
-                      ? "Đang xử lý..."
-                      : editingProduct.editorialStatus === "published"
-                      ? "Cập nhật bản đang bán"
-                      : "Đăng bán ngay"}
+                      ? "Đang lưu..."
+                      : "Lưu & Cập nhật giá lên web ngay"}
                   </span>
                 </button>
               </div>

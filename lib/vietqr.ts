@@ -19,9 +19,8 @@ export function generateVietQRUrl({
   template?: string
 }): string {
   const encodedDescription = encodeURIComponent(description)
-  const encodedAccountName = accountName ? encodeURIComponent(accountName) : ''
-  const nameParam = encodedAccountName ? `&accountName=${encodedAccountName}` : ''
-  return `https://img.vietqr.io/image/${bankCode}-${accountNumber}-${template}.png?amount=${amount}&addInfo=${encodedDescription}${nameParam}`
+  // Use SePay's official high-performance VietQR renderer (returns direct PNG, 100% Napas247 standard)
+  return `https://qr.sepay.vn/img?bank=${bankCode}&acc=${accountNumber}&template=${template}&amount=${amount}&des=${encodedDescription}`
 }
 
 /**

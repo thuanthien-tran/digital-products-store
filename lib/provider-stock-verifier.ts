@@ -18,6 +18,10 @@ export interface LiveVerificationResult {
 // to the same provider for the same product. Key: `${connectionId}:${externalId}`
 const inFlightVerifications = new Map<string, Promise<LiveVerificationResult>>()
 
+// Short-term in-memory catalog cache to avoid hitting provider APIs on every single click
+const cachedCatalogs = new Map<string, { timestamp: number; products: any[] }>()
+const CATALOG_CACHE_TTL_MS = 60 * 1000 // 60 seconds
+
 /**
  * Live pre-checkout / on-demand verification of a provider-backed variant.
  * 
@@ -111,38 +115,57 @@ export async function verifyVariantLiveStock(
 
       const adapter = getProviderAdapter(connection.provider)
 
-      // Fetch live catalog from adapter
-      const catalogRes = await adapter.fetchCatalog({
-        baseUrl: connection.baseUrl,
-        apiKey: rawApiKey,
-        provider: connection.provider,
-        timeoutMs: 10000, // Generous 10s timeout for cross-region network latency
-      })
+      // Check short-term in-memory cache first
+      let productsList: any[] | null = null
+      const cached = cachedCatalogs.get(connection.id)
+      const now = Date.now()
 
-      if (!catalogRes.ok || !catalogRes.products) {
-        const cachedStock = (variant.providerStock ?? 0) + variant._count.serials
-        if (cachedStock > 0) {
-          console.warn(`[Stock Verifier] Đại lý tạm thời timeout/lỗi. Sử dụng tồn kho DB fallback (${cachedStock}) cho "${variant.name}".`)
+      if (cached && now - cached.timestamp < CATALOG_CACHE_TTL_MS) {
+        productsList = cached.products
+      } else {
+        // Fetch live catalog from adapter
+        const catalogRes = await adapter.fetchCatalog({
+          baseUrl: connection.baseUrl,
+          apiKey: rawApiKey,
+          provider: connection.provider,
+          timeoutMs: 10000, // Generous 10s timeout for cross-region network latency
+        })
+
+        if (catalogRes.ok && catalogRes.products) {
+          productsList = catalogRes.products
+          cachedCatalogs.set(connection.id, { timestamp: now, products: catalogRes.products })
+        } else {
+          // Fallback to database stock record when provider connection fails or times out
+          const dbStock = Math.max(
+            variant.providerStock ?? 0,
+            sourceProduct.sourceStock ?? 0
+          ) + variant._count.serials
+
+          const isStockPositive = dbStock > 0 || sourceProduct.sourceStatus === "available"
+          if (isStockPositive) {
+            console.warn(`[Stock Verifier] Đại lý tạm thời không phản hồi. Fallback sử dụng tồn kho DB (${dbStock}) cho "${variant.name}".`)
+            return {
+              ok: true,
+              stock: Math.max(dbStock, 1),
+              isAvailable: true,
+              price: variant.providerPrice ?? undefined,
+              verifiedAt,
+            }
+          }
+
           return {
-            ok: true,
-            stock: cachedStock,
-            isAvailable: true,
-            price: variant.providerPrice ?? undefined,
+            ok: false,
+            stock: dbStock,
+            isAvailable: false,
+            isNetworkOrTimeout: catalogRes.isNetworkOrTimeout || false,
+            error: catalogRes.error || "Không thể xác minh nguồn hàng từ đại lý",
             verifiedAt,
           }
         }
-        return {
-          ok: false,
-          stock: cachedStock,
-          isAvailable: false,
-          isNetworkOrTimeout: catalogRes.isNetworkOrTimeout || false,
-          error: catalogRes.error || "Không thể xác minh nguồn hàng từ đại lý",
-          verifiedAt,
-        }
       }
 
-      const matched = catalogRes.products.find(
-        (p) => String(p.externalId) === String(sourceProduct.externalId)
+      const matched = productsList.find(
+        (p: any) => String(p.externalId) === String(sourceProduct.externalId)
       )
 
       if (!matched) {

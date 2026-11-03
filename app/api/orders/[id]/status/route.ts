@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { verifyOrderAccess } from "@/lib/order-auth"
+import { cancelIfExpired, ORDER_EXPIRY_MS } from "@/lib/order-expiry"
+import { reconcileOrderWithSepay } from "@/lib/sepay"
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -23,6 +25,52 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       return NextResponse.json({ error: "Không tìm thấy đơn hàng" }, { status: 404 })
     }
 
+    let totalPaid = order.payments.reduce((sum, p) => sum + p.amount, 0)
+    let remainingCents = Math.max(0, order.totalCents - totalPaid)
+
+    // 10-minute payment timeout check: auto-cancel unpaid pending order
+    let currentStatus = order.status
+    let isExpired = false
+    if (order.status === "pending" && totalPaid === 0) {
+      isExpired = await cancelIfExpired(order.id, order.createdAt, order.status, totalPaid)
+      if (isExpired) {
+        currentStatus = "cancelled"
+      }
+    }
+
+    // Active Proactive SePay Reconciliation:
+    // If order is still pending or partially_paid, query SePay API directly to auto-confirm payment
+    let currentItems = order.items
+    if (!isExpired && (currentStatus === "pending" || currentStatus === "partially_paid")) {
+      try {
+        const reconcileRes = await reconcileOrderWithSepay(order.id)
+        if (reconcileRes.matched) {
+          currentStatus = reconcileRes.orderStatus
+          // Refresh order and items from DB
+          const refreshed = await prisma.order.findUnique({
+            where: { id: order.id },
+            include: {
+              payments: true,
+              items: {
+                include: {
+                  product: { select: { name: true, serviceInstructions: true } },
+                  variant: { select: { name: true } },
+                  serials: { select: { content: true } },
+                },
+              },
+            },
+          })
+          if (refreshed) {
+            currentItems = refreshed.items
+            totalPaid = refreshed.payments.reduce((sum, p) => sum + p.amount, 0)
+            remainingCents = Math.max(0, refreshed.totalCents - totalPaid)
+          }
+        }
+      } catch (recErr) {
+        // Fallback silently if SePay API is momentarily unreachable
+      }
+    }
+
     // Determine if requester has verified authorization to read serial credentials
     const authResult = await verifyOrderAccess(req, {
       orderId: order.id,
@@ -30,13 +78,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     })
     const hasOrderAccess = authResult.authorized
 
-    const totalPaid = order.payments.reduce((sum, p) => sum + p.amount, 0)
-    const remainingCents = Math.max(0, order.totalCents - totalPaid)
-
     // Self-healing: if order is fully paid but fulfillment is pending or interrupted, auto-fulfill
-    let currentStatus = order.status
-    let currentItems = order.items
-    if ((order.status === "pending" || order.status === "processing") && totalPaid >= order.totalCents) {
+    if (!isExpired && (currentStatus === "pending" || currentStatus === "processing") && totalPaid >= order.totalCents) {
       try {
         const { fulfillOrder } = await import("@/lib/fulfillment")
         const fRes = await fulfillOrder(order.id)
@@ -64,10 +107,15 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       }
     }
 
+    const expiresAt = new Date(new Date(order.createdAt).getTime() + ORDER_EXPIRY_MS).toISOString()
+
     const response = NextResponse.json({
       id: order.id,
       code: order.code,
       status: currentStatus,
+      createdAt: order.createdAt.toISOString(),
+      expiresAt,
+      isExpired,
       totalCents: order.totalCents,
       totalPaid,
       remainingCents,

@@ -128,12 +128,22 @@ export async function POST(req: Request) {
         const verifyRes = await verifyVariantLiveStock(vId)
 
         if (!verifyRes.ok) {
-          const cachedStock = (variant.providerStock ?? 0) + variant._count.serials
-          if (cachedStock < totalQty) {
+          const cachedStock = Math.max(
+            variant.providerStock ?? 0,
+            variant.sourceProduct?.sourceStock ?? 0
+          ) + variant._count.serials
+
+          const isStoreActive =
+            cachedStock >= totalQty ||
+            variant.sourceProduct?.sourceStatus === "available" ||
+            variant.product.statusOverride === "in_stock" ||
+            variant.product.visibility === "public"
+
+          if (!isStoreActive) {
             if (verifyRes.isNetworkOrTimeout) {
               return NextResponse.json(
                 {
-                  error: "Chưa thể xác minh nguồn hàng từ đại lý. Vui lòng thử lại sau.",
+                  error: "Chưa thể kết nối tới kho đại lý lúc này. Vui lòng thử lại sau giây lát.",
                   code: "UNVERIFIED_SOURCE",
                 },
                 { status: 503 }
@@ -147,7 +157,7 @@ export async function POST(req: Request) {
               { status: 400 }
             )
           }
-          console.warn(`[Checkout] Phục vụ đơn từ tồn kho DB (${cachedStock}) do đại lý chưa phản hồi.`)
+          console.warn(`[Checkout] Phục vụ đơn từ cấu hình DB (Tồn: ${cachedStock}) do đại lý tạm thời chưa phản hồi.`)
         } else if (verifyRes.stock < totalQty) {
           if (verifyRes.stock === 0) {
             return NextResponse.json(

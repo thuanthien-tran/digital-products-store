@@ -179,38 +179,7 @@ export async function updateProductDetails(
     throw new Error('Sản phẩm không tồn tại')
   }
 
-  const isLive = product.editorialStatus === 'published' && product.visibility === 'public'
-
-  if (isLive && input.action !== 'publish_now') {
-    // Save draft changes as staged snapshot
-    const stagedSnapshot = JSON.stringify({
-      name: input.name,
-      groupId: input.groupId,
-      description: input.description,
-      warrantyTerms: input.warrantyTerms,
-      usageInstructions: input.usageInstructions,
-      noticeNotes: input.noticeNotes,
-      images: input.images,
-      variants: input.variants,
-      stagedAt: new Date().toISOString(),
-    })
-
-    await prisma.product.update({
-      where: { id: productId },
-      data: {
-        hasPendingChanges: true,
-        draftSnapshot: stagedSnapshot,
-      },
-    })
-
-    return {
-      success: true,
-      staged: true,
-      message: 'Đã lưu bản nháp! Các thay đổi đang ở trạng thái chờ duyệt và chưa ảnh hưởng đến bản đang bán trực tiếp trên web.',
-    }
-  }
-
-  // Direct live update
+  // Direct live update: Applied immediately to database and live storefront
   const updatedData: Record<string, unknown> = {
     hasPendingChanges: false,
     draftSnapshot: null,

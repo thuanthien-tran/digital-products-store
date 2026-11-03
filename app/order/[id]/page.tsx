@@ -8,6 +8,7 @@ import { ZaloWidget } from "@/components/storefront/ZaloWidget"
 import { OrderStatus } from "@/components/storefront/OrderStatus"
 import { generateVietQRUrl } from "@/lib/vietqr"
 import { verifyAdminToken } from "@/lib/auth"
+import { cancelIfExpired } from "@/lib/order-expiry"
 
 export const dynamic = "force-dynamic"
 export const revalidate = 0
@@ -83,7 +84,17 @@ export default async function OrderPage({ params, searchParams }: Props) {
 
   const totalPaid = order.payments.reduce((sum, p) => sum + p.amount, 0)
   const remainingCents = Math.max(0, order.totalCents - totalPaid)
-  const qrAmount = order.status === "partially_paid" && remainingCents > 0 ? remainingCents : order.totalCents
+
+  // 10-minute payment timeout check on initial render
+  let initialStatus = order.status
+  if (order.status === "pending" && totalPaid === 0) {
+    const isExpired = await cancelIfExpired(order.id, order.createdAt, order.status, totalPaid)
+    if (isExpired) {
+      initialStatus = "cancelled"
+    }
+  }
+
+  const qrAmount = initialStatus === "partially_paid" && remainingCents > 0 ? remainingCents : order.totalCents
 
   const qrUrl = generateVietQRUrl({
     bankCode,
@@ -114,7 +125,8 @@ export default async function OrderPage({ params, searchParams }: Props) {
       <main className="mx-auto w-full max-w-lg flex-1 px-4 sm:px-6 py-10">
         <OrderStatus
           orderId={order.id}
-          initialStatus={order.status}
+          initialStatus={initialStatus}
+          createdAt={order.createdAt.toISOString()}
           orderCode={order.code}
           totalCents={order.totalCents}
           totalPaid={totalPaid}

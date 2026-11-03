@@ -171,6 +171,27 @@ export function SourcesClient({ initialConnections }: SourcesClientProps) {
     }
   }
 
+  const [isSyncing, setIsSyncing] = useState(false)
+
+  const handleSyncProviders = async () => {
+    setIsSyncing(true)
+    setMessage(null)
+    try {
+      const res = await fetch("/api/admin/sync", { method: "POST" })
+      const data = await res.json()
+      if (res.ok) {
+        setMessage({ text: data.message || "Đã đồng bộ nguồn hàng từ đại lý thành công!", type: "success" })
+        setRefreshTrigger((prev) => prev + 1)
+      } else {
+        setMessage({ text: data.error || "Lỗi đồng bộ đại lý", type: "error" })
+      }
+    } catch {
+      setMessage({ text: "Lỗi kết nối khi đồng bộ đại lý", type: "error" })
+    } finally {
+      setIsSyncing(false)
+    }
+  }
+
   const formatMoney = (amount: number) => {
     return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(amount)
   }
@@ -243,6 +264,16 @@ export function SourcesClient({ initialConnections }: SourcesClientProps) {
               className="pl-8 pr-3 py-2 rounded-lg border border-border bg-card text-foreground text-xs placeholder:text-muted-foreground w-40 sm:w-48 focus:outline-none focus:ring-1 focus:ring-primary"
             />
           </div>
+
+          <button
+            onClick={handleSyncProviders}
+            disabled={isSyncing}
+            className="px-3 py-2 rounded-lg border border-border bg-card hover:bg-secondary text-foreground text-xs font-semibold hover:border-primary/50 transition-all flex items-center gap-1.5 shrink-0 disabled:opacity-50"
+            title="Kéo danh mục và tồn kho mới nhất từ tất cả đại lý"
+          >
+            <RefreshCw className={`size-3.5 text-primary ${isSyncing ? "animate-spin" : ""}`} />
+            <span>{isSyncing ? "Đang đồng bộ..." : "Đồng bộ đại lý"}</span>
+          </button>
         </div>
       </div>
 
