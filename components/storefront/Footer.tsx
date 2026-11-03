@@ -74,13 +74,13 @@ export function Footer({ initialSettings }: FooterProps) {
 
             <div className="space-y-1 min-w-0">
               <div className="flex items-center gap-2">
-                <span className="flex size-6 sm:size-6.5 items-center justify-center rounded-md bg-secondary border border-border text-[11px] font-bold text-accent tracking-wider shadow-xs overflow-hidden">
+                <span className="flex size-7 sm:size-8 items-center justify-center rounded-lg bg-secondary border border-border text-xs font-bold text-accent tracking-wider shadow-xs overflow-hidden">
                   {settings.logoUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={settings.logoUrl}
                       alt={settings.siteName}
-                      className="size-full object-contain p-0.5 rounded-sm"
+                      className="size-full object-cover rounded-lg"
                     />
                   ) : (
                     settings.initials

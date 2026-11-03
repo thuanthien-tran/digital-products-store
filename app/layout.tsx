@@ -25,20 +25,35 @@ const spaceMono = Space_Mono({
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getSiteSettings()
+  const pageTitle = settings.siteTitle?.trim() || `${settings.siteName} - Hệ thống phân phối tài khoản tự động`
+  const faviconUrl = settings.logoUrl || '/favicon.ico'
+
   return {
-    title: `${settings.siteName} - Hệ thống phân phối tài khoản tự động`,
+    title: pageTitle,
     description: 'Hệ thống phân phối tài khoản, key bản quyền và dịch vụ số tự động 24/7.',
-    icons: { icon: settings.logoUrl || '/favicon.ico' },
+    icons: {
+      icon: [{ url: faviconUrl }],
+      shortcut: [faviconUrl],
+      apple: [faviconUrl],
+    },
   }
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const settings = await getSiteSettings()
+  const faviconUrl = settings.logoUrl || '/favicon.ico'
+
   return (
     <html lang="vi" className="dark">
+      <head>
+        <link rel="icon" href={faviconUrl} />
+        <link rel="shortcut icon" href={faviconUrl} />
+        <link rel="apple-touch-icon" href={faviconUrl} />
+      </head>
       <body
         className={`${spaceGrotesk.variable} ${plusJakartaSans.variable} ${spaceMono.variable} font-sans antialiased bg-background text-foreground min-h-screen`}
       >

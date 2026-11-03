@@ -29,13 +29,27 @@ export async function PUT(req: NextRequest) {
 
   try {
     const body = await req.json()
-    const { siteName, logoUrl, version } = body
+    const { siteName, siteTitle, logoUrl, version } = body
 
     if (typeof siteName !== "string") {
       return NextResponse.json({ error: "Tên website không hợp lệ." }, { status: 400 })
     }
 
     const trimmedName = siteName.trim()
+    let trimmedTitle: string | null | undefined = undefined
+    if (siteTitle !== undefined) {
+      if (typeof siteTitle === "string") {
+        trimmedTitle = siteTitle.trim() || null
+        if (trimmedTitle && /[<>]/.test(trimmedTitle)) {
+          return NextResponse.json(
+            { error: "Tiêu đề website không được chứa ký tự đặc biệt như dấu < hoặc >." },
+            { status: 400 }
+          )
+        }
+      } else if (siteTitle === null) {
+        trimmedTitle = null
+      }
+    }
 
     if (trimmedName.length < MIN_NAME_LENGTH || trimmedName.length > MAX_NAME_LENGTH) {
       return NextResponse.json(
@@ -73,6 +87,7 @@ export async function PUT(req: NextRequest) {
 
     const updated = await updateSiteSettings({
       siteName: trimmedName,
+      siteTitle: trimmedTitle,
       logoUrl: cleanLogoUrl,
       expectedVersion: typeof version === "number" ? version : undefined,
     })

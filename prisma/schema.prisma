@@ -253,6 +253,7 @@ model SiteSettings {
   id        String   @id @default("default")
   shopId    String   @unique @default("main")
   siteName  String   @default("ACCGIARE")
+  siteTitle String?
   logoUrl   String?
   version   Int      @default(1)
   createdAt DateTime @default(now())

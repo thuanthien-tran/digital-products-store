@@ -115,14 +115,14 @@ export function Header({ initialSettings }: HeaderProps) {
       <div className="mx-auto flex h-18 sm:h-20 w-full max-w-7xl items-center justify-between px-4 sm:px-8 lg:px-12 relative">
         {/* [KHỐI TRÁI]: Logo Thương Hiệu Cửa Hàng */}
         <div className="flex items-center gap-3.5 shrink-0 z-10">
-          <Link href="/" className="flex items-center gap-3 group active-bounce">
-            <span className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-secondary via-card to-secondary border border-border/80 text-xs font-bold text-accent tracking-wider shadow-sm transition-all duration-300 group-hover:scale-105 group-hover:border-accent/50 group-hover:shadow-lg group-hover:shadow-purple-950/30 overflow-hidden">
+          <Link href="/" className="flex items-center gap-3.5 group active-bounce">
+            <span className="flex size-11 sm:size-12 items-center justify-center rounded-2xl bg-gradient-to-br from-secondary via-card to-secondary border border-border/80 text-sm font-bold text-accent tracking-wider shadow-md transition-all duration-300 group-hover:scale-105 group-hover:border-accent/60 group-hover:shadow-xl group-hover:shadow-purple-950/40 overflow-hidden">
               {settings.logoUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={settings.logoUrl}
                   alt={settings.siteName}
-                  className="size-full object-contain p-0.5 rounded-lg"
+                  className="size-full object-cover rounded-2xl"
                 />
               ) : (
                 settings.initials

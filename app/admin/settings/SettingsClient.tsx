@@ -20,6 +20,7 @@ import {
 
 interface InitialSettings {
   siteName: string
+  siteTitle?: string | null
   logoUrl: string | null
   version: number
   updatedAt: string | null
@@ -55,6 +56,7 @@ export function SettingsClient({ initialData }: { initialData: InitialSettings }
 
   // Working state
   const [siteName, setSiteName] = useState(initialData.siteName)
+  const [siteTitle, setSiteTitle] = useState(initialData.siteTitle || "")
   const [logoUrl, setLogoUrl] = useState<string | null>(initialData.logoUrl)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [localPreviewUrl, setLocalPreviewUrl] = useState<string | null>(null)
@@ -91,6 +93,7 @@ export function SettingsClient({ initialData }: { initialData: InitialSettings }
   // Dirty detection
   const isDirty =
     trimmedName !== savedData.siteName ||
+    siteTitle.trim() !== (savedData.siteTitle || "").trim() ||
     selectedFile !== null ||
     isRemovingLogo !== (savedData.logoUrl === null && isRemovingLogo) ||
     (isRemovingLogo && savedData.logoUrl !== null) ||
@@ -150,6 +153,7 @@ export function SettingsClient({ initialData }: { initialData: InitialSettings }
   const handleReset = () => {
     handleDiscardPickedFile()
     setSiteName(savedData.siteName)
+    setSiteTitle(savedData.siteTitle || "")
     setLogoUrl(savedData.logoUrl)
     setIsRemovingLogo(false)
     setFeedback(null)
@@ -188,6 +192,7 @@ export function SettingsClient({ initialData }: { initialData: InitialSettings }
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           siteName: trimmedName,
+          siteTitle: siteTitle.trim() || null,
           logoUrl: finalLogoUrl,
           version: savedData.version,
         }),
@@ -201,6 +206,7 @@ export function SettingsClient({ initialData }: { initialData: InitialSettings }
       const updated = saveData.data
       const newSavedState: InitialSettings = {
         siteName: updated.siteName,
+        siteTitle: updated.siteTitle || null,
         logoUrl: updated.logoUrl,
         version: updated.version,
         updatedAt: updated.updatedAt || new Date().toISOString(),
@@ -213,6 +219,7 @@ export function SettingsClient({ initialData }: { initialData: InitialSettings }
 
       setSavedData(newSavedState)
       setSiteName(newSavedState.siteName)
+      setSiteTitle(newSavedState.siteTitle || "")
       setLogoUrl(newSavedState.logoUrl)
       setSelectedFile(null)
       setLocalPreviewUrl(null)
@@ -328,15 +335,41 @@ export function SettingsClient({ initialData }: { initialData: InitialSettings }
               )}
               <p className="text-[11px] text-muted-foreground leading-relaxed flex items-center gap-1.5 mt-1.5">
                 <Info className="size-3.5 text-accent shrink-0" />
-                Tên này xuất hiện ở Header, Footer, bản quyền trang và thanh tiêu đề trình duyệt.
+                Tên này xuất hiện ở Header, Footer, và bản quyền trang.
               </p>
             </div>
 
-            {/* Field B: Avatar/Logo Website */}
+            {/* Field B: Tiêu đề website (Tab trình duyệt & SEO) */}
+            <div className="space-y-2 pt-2 border-t border-border/50">
+              <div className="flex items-center justify-between">
+                <label htmlFor="siteTitleInput" className="block text-xs font-semibold text-foreground">
+                  Tiêu đề website (Thanh tab trình duyệt &amp; SEO)
+                </label>
+                <span className="text-[11px] text-muted-foreground font-mono">{siteTitle.length}/120</span>
+              </div>
+              <input
+                id="siteTitleInput"
+                type="text"
+                value={siteTitle}
+                onChange={(e) => {
+                  setSiteTitle(e.target.value)
+                  setFeedback(null)
+                }}
+                maxLength={120}
+                placeholder={`Mặc định: ${trimmedName || "CAPYGO STORE"} - Hệ thống phân phối tài khoản tự động`}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-secondary/60 border border-border/80 text-sm text-foreground placeholder:text-muted-foreground/60 transition-colors focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"
+              />
+              <p className="text-[11px] text-muted-foreground leading-relaxed flex items-center gap-1.5 mt-1.5">
+                <Info className="size-3.5 text-accent shrink-0" />
+                Tiêu đề này hiển thị trực tiếp trên tab trình duyệt (kèm ảnh avatar) và kết quả tìm kiếm Google.
+              </p>
+            </div>
+
+            {/* Field C: Avatar/Logo Website */}
             <div className="space-y-3 pt-2 border-t border-border/50">
               <div className="flex items-center justify-between">
                 <label className="block text-xs font-semibold text-foreground">
-                  Avatar / Biểu tượng thương hiệu
+                  Avatar / Biểu tượng thương hiệu &amp; Icon Tab
                 </label>
                 <span className="text-[11px] text-muted-foreground">PNG, JPG, WebP ≤ 5MB</span>
               </div>
@@ -526,27 +559,45 @@ export function SettingsClient({ initialData }: { initialData: InitialSettings }
               {previewDevice === "desktop" ? (
                 /* DESKTOP HEADER PREVIEW */
                 <div className="w-full space-y-4">
-                  {/* Simulated Browser Bar */}
-                  <div className="flex items-center gap-1.5 pb-2 border-b border-border/40 text-[10px] text-muted-foreground font-mono">
-                    <span className="size-2 rounded-full bg-red-500/80" />
-                    <span className="size-2 rounded-full bg-amber-500/80" />
-                    <span className="size-2 rounded-full bg-emerald-500/80" />
-                    <span className="ml-2 truncate max-w-[200px]">
-                      {trimmedName || "ACCGIARE"} - Hệ thống tài khoản
-                    </span>
+                  {/* Simulated Browser Bar with Dynamic Favicon and Title */}
+                  <div className="flex items-center justify-between pb-2 border-b border-border/40 text-[10px] text-muted-foreground font-mono">
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="size-2 rounded-full bg-red-500/80" />
+                      <span className="size-2 rounded-full bg-amber-500/80" />
+                      <span className="size-2 rounded-full bg-emerald-500/80" />
+                    </div>
+
+                    {/* Simulated Browser Tab */}
+                    <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-secondary/80 border border-border/70 text-[10.5px] text-foreground max-w-[280px] truncate shadow-xs">
+                      {currentEffectiveLogo ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={currentEffectiveLogo}
+                          alt="Tab Icon"
+                          className="size-3.5 object-cover rounded-xs shrink-0"
+                        />
+                      ) : (
+                        <span className="size-3.5 rounded-xs bg-accent/20 text-accent text-[8px] font-bold flex items-center justify-center shrink-0">
+                          {liveInitials}
+                        </span>
+                      )}
+                      <span className="truncate font-sans font-medium">
+                        {siteTitle.trim() || `${trimmedName || "CAPYGO STORE"} - Hệ thống phân phối tài khoản tự động`}
+                      </span>
+                    </div>
                   </div>
 
                   {/* Desktop Mock Header */}
-                  <div className="flex items-center justify-between py-2 px-3 rounded-xl bg-background/80 border border-border/80 backdrop-blur-md">
+                  <div className="flex items-center justify-between py-2.5 px-3.5 rounded-xl bg-background/80 border border-border/80 backdrop-blur-md">
                     {/* Brand */}
-                    <div className="flex items-center gap-2.5 shrink-0">
-                      <div className="size-8 rounded-xl bg-gradient-to-br from-secondary via-card to-secondary border border-border flex items-center justify-center text-xs font-bold text-accent shadow-xs overflow-hidden">
+                    <div className="flex items-center gap-3 shrink-0">
+                      <div className="size-10 rounded-2xl bg-gradient-to-br from-secondary via-card to-secondary border border-border flex items-center justify-center text-xs font-bold text-accent shadow-sm overflow-hidden">
                         {currentEffectiveLogo ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
                             src={currentEffectiveLogo}
                             alt="Logo"
-                            className="size-full object-contain p-0.5 rounded-lg"
+                            className="size-full object-cover rounded-2xl"
                           />
                         ) : (
                           <span>{liveInitials}</span>
@@ -592,13 +643,13 @@ export function SettingsClient({ initialData }: { initialData: InitialSettings }
                   <div className="flex items-center justify-between py-2 px-3 rounded-xl bg-background/90 border border-border/80">
                     {/* Brand */}
                     <div className="flex items-center gap-2 min-w-0">
-                      <div className="size-7 rounded-lg bg-gradient-to-br from-secondary via-card to-secondary border border-border flex items-center justify-center text-[11px] font-bold text-accent shrink-0 overflow-hidden">
+                      <div className="size-9 rounded-xl bg-gradient-to-br from-secondary via-card to-secondary border border-border flex items-center justify-center text-xs font-bold text-accent shrink-0 overflow-hidden shadow-xs">
                         {currentEffectiveLogo ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
                             src={currentEffectiveLogo}
                             alt="Logo"
-                            className="size-full object-contain p-0.5 rounded-md"
+                            className="size-full object-cover rounded-xl"
                           />
                         ) : (
                           <span>{liveInitials}</span>

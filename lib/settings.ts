@@ -1,8 +1,9 @@
-import { unstable_cache, revalidateTag } from "next/cache"
+import { unstable_cache, revalidateTag, revalidatePath } from "next/cache"
 import { prisma } from "@/lib/db"
 
 export interface SiteSettingsData {
   siteName: string
+  siteTitle: string | null
   logoUrl: string | null
   initials: string
   updatedAt?: Date | string
@@ -50,10 +51,12 @@ async function fetchSettingsFromDb(): Promise<SiteSettingsData> {
 
     const fallbackName = process.env.NEXT_PUBLIC_STORE_NAME || "ACCGIARE"
     const siteName = row?.siteName?.trim() || fallbackName
+    const siteTitle = (row as any)?.siteTitle?.trim() || null
     const logoUrl = row?.logoUrl?.trim() || null
 
     return {
       siteName,
+      siteTitle,
       logoUrl,
       initials: getInitials(siteName),
       updatedAt: row?.updatedAt ? row.updatedAt.toISOString() : undefined,
@@ -64,6 +67,7 @@ async function fetchSettingsFromDb(): Promise<SiteSettingsData> {
     const fallbackName = process.env.NEXT_PUBLIC_STORE_NAME || "ACCGIARE"
     return {
       siteName: fallbackName,
+      siteTitle: null,
       logoUrl: null,
       initials: getInitials(fallbackName),
       version: 1,
@@ -88,10 +92,12 @@ export async function getSiteSettings(): Promise<SiteSettingsData> {
 
 export async function updateSiteSettings(data: {
   siteName: string
+  siteTitle?: string | null
   logoUrl?: string | null
   expectedVersion?: number
 }): Promise<SiteSettingsData> {
   const cleanName = data.siteName.trim()
+  const cleanTitle = data.siteTitle !== undefined ? (data.siteTitle ? data.siteTitle.trim() : null) : undefined
   const cleanLogo = data.logoUrl !== undefined ? (data.logoUrl ? data.logoUrl.trim() : null) : undefined
 
   // Upsert settings in database
@@ -99,7 +105,7 @@ export async function updateSiteSettings(data: {
     where: { shopId: "main" },
   })
 
-  let updated
+  let updated: any
   if (current) {
     if (data.expectedVersion !== undefined && data.expectedVersion !== current.version) {
       throw new Error("VERSION_CONFLICT: Cấu hình đã bị thay đổi bởi người khác. Vui lòng tải lại trang.")
@@ -109,6 +115,7 @@ export async function updateSiteSettings(data: {
       where: { shopId: "main" },
       data: {
         siteName: cleanName,
+        ...(cleanTitle !== undefined ? { siteTitle: cleanTitle } : {}),
         ...(cleanLogo !== undefined ? { logoUrl: cleanLogo } : {}),
         version: { increment: 1 },
       },
@@ -118,23 +125,27 @@ export async function updateSiteSettings(data: {
       data: {
         shopId: "main",
         siteName: cleanName,
+        siteTitle: cleanTitle ?? null,
         logoUrl: cleanLogo ?? null,
         version: 1,
       },
     })
   }
 
-  // Invalidate Next.js cache tag
+  // Invalidate Next.js cache tag & purge layout routes
   try {
     // Next.js 16+ accepts "max" as second argument for revalidateTag
     // @ts-ignore
     revalidateTag("site-settings", "max")
+    revalidatePath("/", "layout")
+    revalidatePath("/")
   } catch (e) {
     // ignore outside request context
   }
 
   return {
     siteName: updated.siteName,
+    siteTitle: updated.siteTitle || null,
     logoUrl: updated.logoUrl,
     initials: getInitials(updated.siteName),
     updatedAt: updated.updatedAt.toISOString(),

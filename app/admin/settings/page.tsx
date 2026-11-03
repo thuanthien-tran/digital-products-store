@@ -12,6 +12,7 @@ export default async function AdminSettingsPage() {
 
   const initialData = {
     siteName: settings?.siteName || fallbackName,
+    siteTitle: (settings as any)?.siteTitle || null,
     logoUrl: settings?.logoUrl || null,
     version: settings?.version || 1,
     updatedAt: settings?.updatedAt ? settings.updatedAt.toISOString() : null,
