@@ -16,8 +16,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Không tìm thấy tệp tải lên." }, { status: 400 })
     }
 
-    if (file.size > 2 * 1024 * 1024) {
-      return NextResponse.json({ error: "Dung lượng ảnh vượt quá 2MB." }, { status: 400 })
+    if (file.size > 5 * 1024 * 1024) {
+      return NextResponse.json({ error: "Dung lượng ảnh vượt quá 5MB." }, { status: 400 })
     }
 
     const arrayBuffer = await file.arrayBuffer()

@@ -104,8 +104,8 @@ export function SettingsClient({ initialData }: { initialData: InitialSettings }
     if (!file) return
 
     // Client-side checks
-    if (file.size > 2 * 1024 * 1024) {
-      setFeedback({ type: "error", message: "Tệp quá lớn. Dung lượng tối đa cho phép là 2MB." })
+    if (file.size > 5 * 1024 * 1024) {
+      setFeedback({ type: "error", message: "Tệp quá lớn. Dung lượng tối đa cho phép là 5MB." })
       if (fileInputRef.current) fileInputRef.current.value = ""
       return
     }
@@ -338,7 +338,7 @@ export function SettingsClient({ initialData }: { initialData: InitialSettings }
                 <label className="block text-xs font-semibold text-foreground">
                   Avatar / Biểu tượng thương hiệu
                 </label>
-                <span className="text-[11px] text-muted-foreground">PNG, JPG, WebP ≤ 2MB</span>
+                <span className="text-[11px] text-muted-foreground">PNG, JPG, WebP ≤ 5MB</span>
               </div>
 
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 bg-secondary/30 p-4 rounded-xl border border-border/60">

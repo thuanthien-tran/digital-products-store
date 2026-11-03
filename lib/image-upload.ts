@@ -11,16 +11,15 @@ export interface ImageValidationResult {
   extension?: string
 }
 
-const MAX_FILE_SIZE = 2 * 1024 * 1024 // 2 MB
-const MAX_DIMENSION = 2048
+const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5 MB
+const MAX_DIMENSION = 4096
 const MIN_DIMENSION = 16
 
 /**
  * Validates image buffer by verifying:
- * 1. File size <= 2MB
+ * 1. File size <= 5MB
  * 2. Magic byte signatures (strict PNG, JPEG, WebP only)
- * 3. Reject forbidden strings (SVG, HTML, PHP, scripts)
- * 4. Extracts and validates image dimensions (16px to 2048px)
+ * 3. Extracts and validates image dimensions (16px to 4096px)
  */
 export function validateImageBuffer(buffer: Buffer): ImageValidationResult {
   if (!buffer || buffer.length === 0) {
@@ -28,27 +27,18 @@ export function validateImageBuffer(buffer: Buffer): ImageValidationResult {
   }
 
   if (buffer.length > MAX_FILE_SIZE) {
-    return { valid: false, error: "Dung lượng ảnh vượt quá giới hạn cho phép (tối đa 2MB)." }
+    return { valid: false, error: "Dung lượng ảnh vượt quá giới hạn cho phép (tối đa 5MB)." }
   }
 
-  // Scan for dangerous code strings in first 4KB and last 1KB (polyglot / injection checks)
-  const probeLength = Math.min(buffer.length, 4096)
-  const probeText = buffer.subarray(0, probeLength).toString("utf-8").toLowerCase()
-  const forbiddenPatterns = [
-    "<svg",
-    "<script",
-    "<?php",
-    "<!doctype",
-    "<html",
-    "javascript:",
-    "onerror=",
-    "onload=",
-  ]
-
-  for (const pattern of forbiddenPatterns) {
-    if (probeText.includes(pattern)) {
-      return { valid: false, error: "Tệp chứa nội dung mã không hợp lệ hoặc định dạng bị cấm (chỉ chấp nhận PNG, JPG, WebP)." }
-    }
+  // Reject obvious HTML, PHP, or script files attempting to bypass extension
+  const probeHeader = buffer.subarray(0, Math.min(buffer.length, 256)).toString("utf-8").toLowerCase().trim()
+  if (
+    probeHeader.startsWith("<!doctype") ||
+    probeHeader.startsWith("<html") ||
+    probeHeader.startsWith("<?php") ||
+    probeHeader.startsWith("<script")
+  ) {
+    return { valid: false, error: "Tệp chứa mã không hợp lệ (chỉ chấp nhận định dạng ảnh PNG, JPG, WebP)." }
   }
 
   // Check PNG (89 50 4E 47 0D 0A 1A 0A)
