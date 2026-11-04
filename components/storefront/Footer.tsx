@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { MessageCircle, Mail, Phone, MapPin, ShieldCheck } from "lucide-react"
+import { MessageCircle } from "lucide-react"
 import { OfficeCapybara } from "@/components/storefront/OfficeCapybara"
 
 const ZALO_PHONE = process.env.NEXT_PUBLIC_ZALO_PHONE_1 || "0356970964"
@@ -131,45 +131,6 @@ export function Footer({ initialSettings }: FooterProps) {
               <MessageCircle className="size-4 shrink-0 text-teal-400" />
               <span>Liên hệ Zalo</span>
             </a>
-          </div>
-        </div>
-
-        {/* HÀNG THÔNG TIN ĐỊNH DANH PHÁP LÝ & HỖ TRỢ */}
-        <div className="border-t border-border/50 pt-5 sm:pt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs text-muted-foreground">
-          <div className="space-y-1">
-            <p className="font-semibold text-foreground">Đơn vị vận hành</p>
-            <p>{settings.siteName} Digital Services</p>
-            <p className="text-[11px] text-muted-foreground/75">Hệ thống dịch vụ sản phẩm số tự động</p>
-          </div>
-
-          <div className="space-y-1">
-            <p className="font-semibold text-foreground flex items-center gap-1.5">
-              <Phone className="size-3 text-teal-400" />
-              <span>Hotline / Zalo hỗ trợ</span>
-            </p>
-            <p className="text-teal-300 font-mono font-medium">{ZALO_PHONE}</p>
-            <p className="text-[11px] text-muted-foreground/75">Hỗ trợ từ 08:00 - 23:00 hàng ngày</p>
-          </div>
-
-          <div className="space-y-1">
-            <p className="font-semibold text-foreground flex items-center gap-1.5">
-              <Mail className="size-3 text-teal-400" />
-              <span>Thư điện tử (Email)</span>
-            </p>
-            <p className="text-foreground/90">support@capygo.id.vn</p>
-            <p className="text-[11px] text-muted-foreground/75">Tiếp nhận hỗ trợ và bảo vệ dữ liệu</p>
-          </div>
-
-          <div className="space-y-1">
-            <p className="font-semibold text-foreground flex items-center gap-1.5">
-              <MapPin className="size-3 text-teal-400" />
-              <span>Khu vực hoạt động</span>
-            </p>
-            <p>Hồ Chí Minh, Việt Nam</p>
-            <p className="text-[11px] text-emerald-400 flex items-center gap-1">
-              <ShieldCheck className="size-3" />
-              <span>Thanh toán VietQR an toàn</span>
-            </p>
           </div>
         </div>
 
