@@ -53,6 +53,14 @@ interface RawProduct {
   statusOverride?: string
   sortOrder?: number
   createdAt: string
+  sourceProduct?: {
+    id: string
+    externalId: string
+    hasChangeAlert: boolean
+    changeAlertDetails: string | null
+    sourcePrice: number
+    sourceStatus: string
+  } | null
   variants?: RawVariant[]
 }
 
@@ -80,6 +88,14 @@ interface ProductItem {
   draftSnapshot: string | null
   statusOverride?: string
   createdAt: string
+  hasChangeAlert?: boolean
+  changeAlertDetails?: string | null
+  sourceAlert?: {
+    hasAlert: boolean
+    details: string[]
+    sourcePrice?: number
+    sourceStatus?: string
+  } | null
   variants: Array<{
     id: string
     name: string
@@ -262,6 +278,24 @@ export function ProductManagerClient({ groups }: Props) {
               draftSnapshot: p.draftSnapshot || null,
               statusOverride: p.statusOverride || "auto",
               createdAt: p.createdAt,
+              hasChangeAlert: Boolean(p.sourceProduct?.hasChangeAlert),
+              changeAlertDetails: p.sourceProduct?.changeAlertDetails || null,
+              sourceAlert: p.sourceProduct?.hasChangeAlert
+                ? {
+                    hasAlert: true,
+                    details: (() => {
+                      try {
+                        return p.sourceProduct?.changeAlertDetails
+                          ? JSON.parse(p.sourceProduct.changeAlertDetails)
+                          : ["Nguồn hàng có biến động"]
+                      } catch {
+                        return [p.sourceProduct?.changeAlertDetails || "Nguồn hàng có biến động"]
+                      }
+                    })(),
+                    sourcePrice: p.sourceProduct?.sourcePrice,
+                    sourceStatus: p.sourceProduct?.sourceStatus,
+                  }
+                : null,
               variants: (p.variants || []).map((v: RawVariant) => ({
                 id: v.id,
                 name: v.name,
@@ -886,7 +920,11 @@ export function ProductManagerClient({ groups }: Props) {
                     <tr
                       key={p.id}
                       className={`transition-colors ${
-                        isSelected ? "bg-primary/5 hover:bg-primary/10" : "hover:bg-secondary/20"
+                        p.hasChangeAlert
+                          ? "bg-amber-500/5 hover:bg-amber-500/10 border-l-2 border-l-amber-500"
+                          : isSelected
+                          ? "bg-primary/5 hover:bg-primary/10"
+                          : "hover:bg-secondary/20"
                       }`}
                     >
                       {/* Checkbox */}
@@ -944,10 +982,29 @@ export function ProductManagerClient({ groups }: Props) {
                                   Bản nháp chờ công bố
                                 </span>
                               )}
+                              {p.hasChangeAlert && (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/40 animate-pulse">
+                                  <AlertTriangle className="size-3 text-amber-400" />
+                                  <span>Đại lý có biến động</span>
+                                </span>
+                              )}
                             </div>
                             <span className="text-[11px] text-muted-foreground block truncate">
                               /{p.slug}
                             </span>
+                            {p.sourceAlert && p.sourceAlert.details.length > 0 && (
+                              <div className="pt-1 flex flex-col gap-0.5">
+                                {p.sourceAlert.details.map((detail, idx) => (
+                                  <div
+                                    key={idx}
+                                    className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-400/90 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 max-w-fit"
+                                  >
+                                    <span className="size-1 rounded-full bg-amber-400" />
+                                    <span>{detail}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         </div>
                       </td>

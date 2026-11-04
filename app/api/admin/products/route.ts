@@ -57,7 +57,7 @@ export async function GET(req: Request) {
             },
           },
           sourceProduct: {
-            select: { id: true, externalId: true, hasChangeAlert: true },
+            select: { id: true, externalId: true, hasChangeAlert: true, changeAlertDetails: true, sourcePrice: true, sourceStatus: true },
           },
         },
       }),

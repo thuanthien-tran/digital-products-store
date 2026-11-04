@@ -464,9 +464,34 @@ export function SourcesClient({ initialConnections }: SourcesClientProps) {
                           </span>
                         </div>
                         {s.hasChangeAlert && (
-                          <div className="mt-1 flex items-center gap-1 text-[10px] text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20 w-fit">
-                            <AlertTriangle className="size-2.5" />
-                            <span>Cần đối soát biến động</span>
+                          <div className="mt-1 flex flex-col gap-1">
+                            <div className="flex items-center gap-1 text-[10px] font-bold text-amber-400 bg-amber-500/15 px-2 py-0.5 rounded border border-amber-500/30 w-fit">
+                              <AlertTriangle className="size-3" />
+                              <span>Cần đối soát biến động</span>
+                            </div>
+                            {(() => {
+                              try {
+                                const details: string[] = s.changeAlertDetails
+                                  ? JSON.parse(s.changeAlertDetails)
+                                  : []
+                                if (details.length === 0) return null
+                                return (
+                                  <div className="flex flex-col gap-0.5">
+                                    {details.map((d, i) => (
+                                      <span key={i} className="text-[11px] text-amber-300/90 font-medium bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 w-fit">
+                                        • {d}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )
+                              } catch {
+                                return s.changeAlertDetails ? (
+                                  <span className="text-[11px] text-amber-300/90 font-medium bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 w-fit">
+                                    • {s.changeAlertDetails}
+                                  </span>
+                                ) : null
+                              }
+                            })()}
                           </div>
                         )}
                       </td>
