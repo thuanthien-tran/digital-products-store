@@ -12,7 +12,7 @@ export async function GET() {
           visibility: 'public',
           editorialStatus: 'published',
         },
-        orderBy: { sortOrder: 'asc' },
+        orderBy: [{ sortOrder: 'asc' }, { updatedAt: 'desc' }],
         include: {
           group: true,
           variants: {
@@ -44,6 +44,7 @@ export async function GET() {
         id: p.id,
         name: p.name,
         slug: p.slug,
+        sortOrder: p.sortOrder ?? 0,
         description: p.description,
         images: parsedImages,
         groupId: p.groupId,

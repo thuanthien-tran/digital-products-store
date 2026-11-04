@@ -51,6 +51,7 @@ interface RawProduct {
   hasPendingChanges?: boolean
   draftSnapshot?: string | null
   statusOverride?: string
+  sortOrder?: number
   createdAt: string
   variants?: RawVariant[]
 }
@@ -64,6 +65,7 @@ interface ProductItem {
   id: string
   name: string
   slug: string
+  sortOrder: number
   groupId: string | null
   groupName: string
   description: string
@@ -135,6 +137,7 @@ export function ProductManagerClient({ groups }: Props) {
     instructions: "",
     warranty: "",
     notes: "",
+    sortOrder: 1,
   })
   const [saving, setSaving] = useState(false)
   const [confirmBelowCost, setConfirmBelowCost] = useState(false)
@@ -244,6 +247,7 @@ export function ProductManagerClient({ groups }: Props) {
               id: p.id,
               name: p.name,
               slug: p.slug,
+              sortOrder: typeof p.sortOrder === "number" ? p.sortOrder : 0,
               groupId: p.groupId,
               groupName: p.group?.name || "Chưa phân loại",
               description: p.description || "",
@@ -274,6 +278,7 @@ export function ProductManagerClient({ groups }: Props) {
               })),
             }
           })
+          mapped.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
           setProducts(mapped)
           if (data.counts) setCounts(data.counts)
         }
@@ -380,6 +385,7 @@ export function ProductManagerClient({ groups }: Props) {
       instructions: initialInstructions,
       warranty: initialWarranty,
       notes: initialNotes,
+      sortOrder: prod.sortOrder || 1,
     })
     setConfirmBelowCost(false)
   }
@@ -427,6 +433,7 @@ export function ProductManagerClient({ groups }: Props) {
         body: JSON.stringify({
           name: editForm.name,
           groupId: editForm.groupId,
+          sortOrder: Number(editForm.sortOrder) || 1,
           description: fullDesc,
           warrantyTerms: editForm.warranty,
           usageInstructions: editForm.instructions,
@@ -468,6 +475,34 @@ export function ProductManagerClient({ groups }: Props) {
       setMessage({ text: "Lỗi kết nối khi cập nhật", type: "error" })
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleQuickSortOrderChange = (productId: string, newOrder: number) => {
+    setProducts((prev) =>
+      prev.map((p) => (p.id === productId ? { ...p, sortOrder: newOrder } : p))
+    )
+  }
+
+  const handleSaveSortOrder = async (productId: string, newOrder: number) => {
+    try {
+      const res = await fetch(`/api/admin/products/${productId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sortOrder: newOrder }),
+      })
+      if (res.ok) {
+        notifyCatalogChange()
+        setProducts((prev) =>
+          [...prev].sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
+        )
+        setMessage({
+          text: `Đã cập nhật STT ưu tiên (#${newOrder}) và tự động sắp xếp lại danh sách!`,
+          type: "success",
+        })
+      }
+    } catch {
+      setMessage({ text: "Lỗi lưu STT sản phẩm", type: "error" })
     }
   }
 
@@ -816,6 +851,9 @@ export function ProductManagerClient({ groups }: Props) {
                     title="Chọn tất cả sản phẩm"
                   />
                 </th>
+                <th className="py-3 px-2 w-16 text-center font-bold" title="Thứ tự ưu tiên hiển thị (1, 2, 3...)">
+                  STT
+                </th>
                 <th className="py-3 px-4">Sản phẩm</th>
                 <th className="py-3 px-4">Danh mục</th>
                 <th className="py-3 px-4">Giá bán</th>
@@ -827,13 +865,13 @@ export function ProductManagerClient({ groups }: Props) {
             <tbody className="divide-y divide-border">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-muted-foreground">
+                  <td colSpan={8} className="py-12 text-center text-muted-foreground">
                     Đang tải danh sách sản phẩm...
                   </td>
                 </tr>
               ) : products.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-muted-foreground">
+                  <td colSpan={8} className="py-12 text-center text-muted-foreground">
                     Không có sản phẩm nào trong mục này.
                   </td>
                 </tr>
@@ -859,6 +897,25 @@ export function ProductManagerClient({ groups }: Props) {
                           onChange={() => handleToggleSelectOne(p.id)}
                           className="size-4 rounded border-border bg-card text-primary focus:ring-1 focus:ring-primary cursor-pointer accent-primary align-middle"
                           title={`Chọn ${p.name}`}
+                        />
+                      </td>
+
+                      {/* STT Priority Input */}
+                      <td className="py-3 px-2 text-center">
+                        <input
+                          type="number"
+                          min={1}
+                          value={p.sortOrder || ""}
+                          placeholder={String(products.indexOf(p) + 1)}
+                          onChange={(e) => handleQuickSortOrderChange(p.id, parseInt(e.target.value) || 0)}
+                          onBlur={() => handleSaveSortOrder(p.id, p.sortOrder)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.currentTarget.blur()
+                            }
+                          }}
+                          className="w-12 h-7 text-center font-bold text-xs rounded-md border border-border bg-background text-foreground focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-colors"
+                          title="Nhập STT ưu tiên (1, 2, 3...) và bấm Enter hoặc click ra ngoài để lưu & tự sắp xếp"
                         />
                       </td>
 
@@ -1119,9 +1176,9 @@ export function ProductManagerClient({ groups }: Props) {
                     </p>
                   </div>
 
-                  {/* 2. Product Name & Category */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
+                  {/* 2. Product Name, Category & Sort Order */}
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                    <div className="sm:col-span-6">
                       <label className="block text-muted-foreground font-medium mb-1">
                         Tên sản phẩm trên website *
                       </label>
@@ -1134,7 +1191,7 @@ export function ProductManagerClient({ groups }: Props) {
                       />
                     </div>
 
-                    <div>
+                    <div className="sm:col-span-4">
                       <label className="block text-muted-foreground font-medium mb-1">
                         Danh mục nhóm sản phẩm *
                       </label>
@@ -1149,6 +1206,20 @@ export function ProductManagerClient({ groups }: Props) {
                           </option>
                         ))}
                       </select>
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <label className="block text-muted-foreground font-medium mb-1" title="Số thứ tự ưu tiên hiển thị (1, 2, 3...)">
+                        STT ưu tiên
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        value={editForm.sortOrder || 1}
+                        onChange={(e) => setEditForm({ ...editForm, sortOrder: parseInt(e.target.value) || 1 })}
+                        className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground text-xs focus:outline-none focus:ring-1 focus:ring-primary font-bold text-center"
+                        title="Số thứ tự hiển thị trên website (1 là đầu tiên, 2, 3...)"
+                      />
                     </div>
                   </div>
 

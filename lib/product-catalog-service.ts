@@ -31,6 +31,7 @@ export interface UpdateProductInput {
   action?: 'save_draft' | 'publish_now'
   visibility?: string
   editorialStatus?: string
+  sortOrder?: number
   confirmBelowCost?: boolean
 }
 
@@ -208,6 +209,7 @@ export async function updateProductDetails(
 
   if (input.visibility !== undefined) updatedData.visibility = input.visibility
   if (input.editorialStatus !== undefined) updatedData.editorialStatus = input.editorialStatus
+  if (input.sortOrder !== undefined) updatedData.sortOrder = Number(input.sortOrder)
 
   const updatedProduct = await prisma.product.update({
     where: { id: productId },

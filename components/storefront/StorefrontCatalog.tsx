@@ -12,6 +12,7 @@ export interface StorefrontProduct {
   id: string
   name: string
   slug: string
+  sortOrder?: number
   description?: string
   images?: string[]
   groupId: string | null
@@ -246,6 +247,8 @@ export function StorefrontCatalog({ groups, products }: StorefrontCatalogProps) 
       sorted.sort((a, b) => viCollator.compare(a.name, b.name))
     } else if (sortBy === "name_desc") {
       sorted.sort((a, b) => viCollator.compare(b.name, a.name))
+    } else {
+      sorted.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
     }
 
     return sorted
