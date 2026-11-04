@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { 
   Package, 
   Edit3, 
@@ -13,7 +13,8 @@ import {
   Send,
   Image as ImageIcon,
   Loader2,
-  RefreshCw
+  RefreshCw,
+  UploadCloud
 } from "lucide-react"
 import { ProductCard } from "@/components/storefront/ProductCard"
 
@@ -149,6 +150,50 @@ export function ProductManagerClient({ groups }: Props) {
     imageUrl: "",
     warrantyTerms: "Bảo hành 1 đổi 1 trong thời gian sử dụng.",
   })
+
+  // Image Uploading States & Refs
+  const [isUploadingEditImage, setIsUploadingEditImage] = useState(false)
+  const [isUploadingManualImage, setIsUploadingManualImage] = useState(false)
+  const editFileInputRef = useRef<HTMLInputElement>(null)
+  const manualFileInputRef = useRef<HTMLInputElement>(null)
+
+  const handleUploadImage = async (file: File, target: "edit" | "manual") => {
+    if (!file) return
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Dung lượng ảnh vượt quá 5MB. Vui lòng chọn ảnh nhỏ hơn.")
+      return
+    }
+
+    const setLoading = target === "edit" ? setIsUploadingEditImage : setIsUploadingManualImage
+    setLoading(true)
+
+    try {
+      const formData = new FormData()
+      formData.append("file", file)
+
+      const res = await fetch("/api/admin/products/upload", {
+        method: "POST",
+        body: formData,
+      })
+
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        alert(data.error || "Tải ảnh lên thất bại")
+        return
+      }
+
+      if (target === "edit") {
+        setEditForm((prev) => ({ ...prev, imageUrl: data.url }))
+      } else {
+        setManualForm((prev) => ({ ...prev, imageUrl: data.url }))
+      }
+    } catch (err: any) {
+      alert("Lỗi khi tải ảnh lên: " + (err.message || "Không xác định"))
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const [isSyncing, setIsSyncing] = useState(false)
 
@@ -989,7 +1034,7 @@ export function ProductManagerClient({ groups }: Props) {
                 {/* Form Controls: lg:col-span-7 */}
                 <div className="lg:col-span-7 space-y-4">
                   {/* 1. Cover Image 16:9 */}
-                  <div className="p-3.5 rounded-xl border border-border bg-secondary/20 space-y-2.5">
+                  <div className="p-3.5 rounded-xl border border-border bg-secondary/20 space-y-3">
                     <div className="flex items-center justify-between">
                       <label className="text-[11px] font-bold uppercase tracking-wider text-primary flex items-center gap-1.5">
                         <ImageIcon className="size-3.5" />
@@ -1006,16 +1051,71 @@ export function ProductManagerClient({ groups }: Props) {
                       )}
                     </div>
 
-                    <input
-                      type="url"
-                      placeholder="Dán link ảnh HTTPS (ví dụ: https://...)"
-                      value={editForm.imageUrl}
-                      onChange={(e) => setEditForm({ ...editForm, imageUrl: e.target.value })}
-                      className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground text-xs focus:outline-none focus:ring-1 focus:ring-primary font-mono text-[11px]"
-                    />
+                    <div className="flex flex-col sm:flex-row gap-2.5 items-start sm:items-center">
+                      <input
+                        ref={editFileInputRef}
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0]
+                          if (file) handleUploadImage(file, "edit")
+                          e.target.value = ""
+                        }}
+                      />
+
+                      <button
+                        type="button"
+                        onClick={() => editFileInputRef.current?.click()}
+                        disabled={isUploadingEditImage}
+                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-primary/50 bg-primary/10 hover:bg-primary/20 text-primary text-xs font-semibold transition-colors disabled:opacity-50 cursor-pointer shrink-0"
+                      >
+                        {isUploadingEditImage ? (
+                          <>
+                            <Loader2 className="size-3.5 animate-spin" />
+                            <span>Đang tải lên…</span>
+                          </>
+                        ) : (
+                          <>
+                            <UploadCloud className="size-3.5" />
+                            <span>Tải ảnh từ máy tính</span>
+                          </>
+                        )}
+                      </button>
+
+                      <input
+                        type="url"
+                        placeholder="Hoặc dán link ảnh HTTPS (ví dụ: https://...)"
+                        value={editForm.imageUrl}
+                        onChange={(e) => setEditForm({ ...editForm, imageUrl: e.target.value })}
+                        className="w-full p-2 rounded-lg border border-border bg-background text-foreground text-xs focus:outline-none focus:ring-1 focus:ring-primary font-mono text-[11px]"
+                      />
+                    </div>
+
+                    {editForm.imageUrl && (
+                      <div className="flex items-center gap-3 p-2 rounded-lg border border-border/60 bg-background/60">
+                        <div className="relative size-12 rounded-md overflow-hidden border border-border shrink-0 bg-secondary/50">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={editForm.imageUrl}
+                            alt="Ảnh sản phẩm"
+                            className="size-full object-cover"
+                            onError={(e) => {
+                              ;(e.target as HTMLElement).style.display = "none"
+                            }}
+                          />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[11px] font-medium text-foreground truncate">
+                            {editForm.imageUrl}
+                          </p>
+                          <p className="text-[10px] text-emerald-400 font-medium">✓ Đã gắn ảnh sản phẩm</p>
+                        </div>
+                      </div>
+                    )}
 
                     <p className="text-[10.5px] text-muted-foreground">
-                      Gợi ý: Dùng ảnh tỷ lệ 16:9 (1280x720 hoặc 1920x1080), không viền thừa để tràn đều khung thẻ sản phẩm.
+                      Gợi ý: Hỗ trợ tệp PNG, JPG, WebP tối đa 5MB. Tỷ lệ 16:9 (1280x720 hoặc 1920x1080), không viền thừa để tràn đều khung thẻ sản phẩm.
                     </p>
                   </div>
 
@@ -1358,15 +1458,83 @@ export function ProductManagerClient({ groups }: Props) {
                 </select>
               </div>
 
-              <div>
-                <label className="block text-muted-foreground font-medium mb-1">Ảnh đại diện 16:9 (URL)</label>
-                <input
-                  type="url"
-                  placeholder="https://..."
-                  value={manualForm.imageUrl}
-                  onChange={(e) => setManualForm({ ...manualForm, imageUrl: e.target.value })}
-                  className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground text-xs focus:outline-none focus:ring-1 focus:ring-primary font-mono text-[11px]"
-                />
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-muted-foreground font-medium">
+                    Ảnh đại diện 16:9
+                  </label>
+                  {manualForm.imageUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setManualForm({ ...manualForm, imageUrl: "" })}
+                      className="text-[10px] text-muted-foreground hover:text-destructive transition-colors"
+                    >
+                      Xóa ảnh
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-2">
+                    <input
+                      ref={manualFileInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) handleUploadImage(file, "manual")
+                        e.target.value = ""
+                      }}
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() => manualFileInputRef.current?.click()}
+                      disabled={isUploadingManualImage}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-primary/50 bg-primary/10 hover:bg-primary/20 text-primary text-xs font-semibold transition-colors disabled:opacity-50 cursor-pointer shrink-0"
+                    >
+                      {isUploadingManualImage ? (
+                        <>
+                          <Loader2 className="size-3.5 animate-spin" />
+                          <span>Đang tải lên…</span>
+                        </>
+                      ) : (
+                        <>
+                          <UploadCloud className="size-3.5" />
+                          <span>Tải ảnh từ máy tính</span>
+                        </>
+                      )}
+                    </button>
+
+                    <input
+                      type="url"
+                      placeholder="Hoặc dán link: https://..."
+                      value={manualForm.imageUrl}
+                      onChange={(e) => setManualForm({ ...manualForm, imageUrl: e.target.value })}
+                      className="flex-1 p-2 rounded-lg border border-border bg-background text-foreground text-xs focus:outline-none focus:ring-1 focus:ring-primary font-mono text-[11px]"
+                    />
+                  </div>
+
+                  {manualForm.imageUrl && (
+                    <div className="flex items-center gap-2.5 p-2 rounded-lg border border-border/60 bg-background/60">
+                      <div className="size-10 rounded overflow-hidden border border-border shrink-0 bg-secondary/50">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={manualForm.imageUrl}
+                          alt="Preview"
+                          className="size-full object-cover"
+                          onError={(e) => {
+                            ;(e.target as HTMLElement).style.display = "none"
+                          }}
+                        />
+                      </div>
+                      <p className="text-[11px] text-foreground font-mono truncate flex-1">
+                        {manualForm.imageUrl}
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div>

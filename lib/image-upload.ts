@@ -202,3 +202,21 @@ export async function saveBrandAvatar(buffer: Buffer, extension: string): Promis
   // Returns URL for the custom serving endpoint
   return `/api/uploads/branding/${filename}`
 }
+
+/**
+ * Saves validated product image buffer to disk under public/uploads/products/
+ * with a secure random filename.
+ */
+export async function saveProductImage(buffer: Buffer, extension: string): Promise<string> {
+  const uploadDir = path.join(process.cwd(), "public", "uploads", "products")
+  await fs.mkdir(uploadDir, { recursive: true })
+
+  const uniqueId = crypto.randomUUID()
+  const filename = `prod-${uniqueId}.${extension}`
+  const filePath = path.join(uploadDir, filename)
+
+  await fs.writeFile(filePath, buffer)
+
+  // Returns URL for the custom serving endpoint
+  return `/api/uploads/products/${filename}`
+}
