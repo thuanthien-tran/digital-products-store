@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation"
 import { LayoutDashboard, Package, KeyRound, ShoppingBag, LogOut, ArrowLeft, Layers, Globe, Settings } from "lucide-react"
 import { NotificationBell } from "@/components/admin/NotificationBell"
 import { ChangePasswordModal } from "@/components/admin/ChangePasswordModal"
+import { AdminAutoLogoutListener } from "@/components/admin/AdminAutoLogoutListener"
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -123,6 +124,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         onClose={() => setIsChangePasswordOpen(false)}
         currentUsername="thunthin"
       />
+
+      {/* Auto logout on 10 minutes inactivity */}
+      <AdminAutoLogoutListener />
     </div>
   )
 }
