@@ -107,7 +107,7 @@ export function Header({ initialSettings }: HeaderProps) {
     >
       {/* Vệt ánh sáng gradient loang tinh tế ở đáy viền Header (Phong cách Vercel/Apple Studio) */}
       <div
-        className={`pointer-events-none absolute bottom-0 left-1/2 -translate-x-1/2 h-[1px] w-3/5 max-w-4xl bg-gradient-to-r from-transparent via-purple-500/60 to-transparent transition-opacity duration-500 ${
+        className={`pointer-events-none absolute bottom-0 left-1/2 -translate-x-1/2 h-[1px] w-3/5 max-w-4xl bg-gradient-to-r from-transparent via-caramel/50 to-transparent transition-opacity duration-500 ${
           scrolled ? "opacity-100" : "opacity-40"
         }`}
       />
@@ -116,7 +116,7 @@ export function Header({ initialSettings }: HeaderProps) {
         {/* [KHỐI TRÁI]: Logo Thương Hiệu Cửa Hàng */}
         <div className="flex items-center gap-3.5 shrink-0 z-10">
           <Link href="/" className="flex items-center gap-3.5 group active-bounce">
-            <span className="flex size-11 sm:size-12 items-center justify-center rounded-2xl bg-gradient-to-br from-secondary via-card to-secondary border border-border/80 text-sm font-bold text-accent tracking-wider shadow-md transition-all duration-300 group-hover:scale-105 group-hover:border-accent/60 group-hover:shadow-xl group-hover:shadow-purple-950/40 overflow-hidden">
+            <span className="flex size-11 sm:size-12 items-center justify-center rounded-2xl bg-gradient-to-br from-secondary via-card to-secondary border border-border/80 text-sm font-bold text-accent tracking-wider shadow-md transition-all duration-300 group-hover:scale-105 group-hover:border-accent/60 group-hover:shadow-xl group-hover:shadow-caramel/20 overflow-hidden">
               {settings.logoUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
@@ -158,10 +158,10 @@ export function Header({ initialSettings }: HeaderProps) {
 
                 {/* Đường kẻ phát sáng Neon Underline mở rộng từ tâm khi Hover hoặc Active */}
                 <span
-                  className={`absolute bottom-0.5 left-3 right-3 h-[2px] rounded-full bg-gradient-to-r from-purple-500 via-indigo-400 to-purple-500 transition-all duration-300 ease-out origin-center ${
+                  className={`absolute bottom-0.5 left-3 right-3 h-[2px] rounded-full bg-gradient-to-r from-caramel via-caramel-light to-caramel transition-all duration-300 ease-out origin-center ${
                     isActive
-                      ? "scale-x-100 opacity-100 shadow-[0_0_10px_rgba(168,85,247,0.7)]"
-                      : "scale-x-0 opacity-0 group-hover:scale-x-100 group-hover:opacity-100 group-hover:shadow-[0_0_8px_rgba(168,85,247,0.5)]"
+                      ? "scale-x-100 opacity-100 shadow-[0_0_10px_rgba(230,166,111,0.6)]"
+                      : "scale-x-0 opacity-0 group-hover:scale-x-100 group-hover:opacity-100 group-hover:shadow-[0_0_8px_rgba(230,166,111,0.4)]"
                   }`}
                 />
               </Link>
@@ -176,11 +176,11 @@ export function Header({ initialSettings }: HeaderProps) {
             href="https://zalo.me/0356970964"
             target="_blank"
             rel="noopener noreferrer"
-            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-secondary/60 hover:bg-secondary border border-border/80 hover:border-teal-500/40 text-xs font-medium text-muted-foreground hover:text-teal-300 transition-all backdrop-blur shadow-sm group"
+            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-secondary/60 hover:bg-secondary border border-border/80 hover:border-caramel/50 text-xs font-medium text-muted-foreground hover:text-caramel-light transition-all backdrop-blur shadow-sm group"
             title="Nhắn tin Zalo hỗ trợ: 0356 970 964"
           >
-            <Phone className="size-3 text-teal-400 group-hover:scale-110 transition-transform" />
-            <span>Hỗ trợ: <strong className="font-mono text-foreground group-hover:text-teal-300 font-semibold">0356 970 964</strong></span>
+            <Phone className="size-3 text-caramel group-hover:scale-110 transition-transform" />
+            <span>Hỗ trợ: <strong className="font-mono text-foreground group-hover:text-caramel-light font-semibold">0356 970 964</strong></span>
           </a>
 
           {/* Badge Hệ Thống Tự Động Online */}
@@ -236,11 +236,11 @@ export function Header({ initialSettings }: HeaderProps) {
               className="flex items-center justify-between p-3 rounded-xl bg-secondary/50 border border-border/70 text-xs font-medium text-muted-foreground hover:text-foreground"
             >
               <div className="flex items-center gap-2">
-                <Phone className="size-3.5 text-teal-400" />
+                <Phone className="size-3.5 text-caramel" />
                 <span>Hỗ trợ Zalo:</span>
                 <span className="font-mono font-bold text-foreground">0356 970 964</span>
               </div>
-              <span className="text-[11px] text-teal-400 font-semibold">Nhắn tin ↗</span>
+              <span className="text-[11px] text-caramel font-semibold">Nhắn tin ↗</span>
             </a>
           </div>
         </div>

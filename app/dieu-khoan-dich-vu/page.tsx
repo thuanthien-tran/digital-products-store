@@ -21,14 +21,14 @@ export default async function TermsOfServicePage() {
   const settings = await getSiteSettings()
 
   return (
-    <div className="flex min-h-screen flex-col bg-background text-foreground selection:bg-teal-500/20 selection:text-teal-300">
+    <div className="flex min-h-screen flex-col bg-background text-foreground selection:bg-caramel/20 selection:text-caramel-light">
       <Header initialSettings={settings} />
 
       <main className="mx-auto w-full max-w-4xl flex-1 px-4 sm:px-6 py-8 sm:py-12 space-y-8">
         {/* Back Link */}
         <Link
           href="/"
-          className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-muted-foreground hover:text-teal-400 transition-colors"
+          className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-muted-foreground hover:text-caramel-light transition-colors"
         >
           <ChevronLeft className="size-4" />
           <span>Quay lại trang chủ</span>
@@ -36,11 +36,11 @@ export default async function TermsOfServicePage() {
 
         {/* Title Header */}
         <div className="space-y-3 border-b border-border/70 pb-6">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-teal-500/10 text-teal-300 border border-teal-500/20">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-caramel/10 text-caramel-light border border-caramel/25">
             <BookOpen className="size-3.5" />
             <span>Quy chế giao dịch Thương mại điện tử theo Luật TMĐT số 122/2025/QH15</span>
           </div>
-          <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-foreground">
+          <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-oat-cream">
             Điều Khoản Dịch Vụ
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground">
@@ -53,8 +53,8 @@ export default async function TermsOfServicePage() {
 
           {/* Section 1 */}
           <section className="space-y-3 rounded-2xl border border-border/80 bg-card/60 p-5 sm:p-6 backdrop-blur">
-            <h2 className="text-base sm:text-lg text-teal-400 font-extrabold flex items-center gap-2">
-              <span className="size-6 rounded-md bg-teal-500/20 text-teal-300 flex items-center justify-center text-xs">1</span>
+            <h2 className="text-base sm:text-lg text-caramel font-extrabold flex items-center gap-2">
+              <span className="size-6 rounded-md bg-caramel/20 text-caramel-light flex items-center justify-center text-xs">1</span>
               Nguyên tắc chung & Phạm vi áp dụng
             </h2>
             <p>
@@ -67,8 +67,8 @@ export default async function TermsOfServicePage() {
 
           {/* Section 2 */}
           <section className="space-y-3 rounded-2xl border border-border/80 bg-card/60 p-5 sm:p-6 backdrop-blur">
-            <h2 className="text-base sm:text-lg text-teal-400 font-extrabold flex items-center gap-2">
-              <span className="size-6 rounded-md bg-teal-500/20 text-teal-300 flex items-center justify-center text-xs">2</span>
+            <h2 className="text-base sm:text-lg text-caramel font-extrabold flex items-center gap-2">
+              <span className="size-6 rounded-md bg-caramel/20 text-caramel-light flex items-center justify-center text-xs">2</span>
               Quy trình đặt hàng & Thanh toán tự động
             </h2>
             <ol className="list-decimal pl-5 space-y-2">
@@ -86,8 +86,8 @@ export default async function TermsOfServicePage() {
 
           {/* Section 3 */}
           <section className="space-y-3 rounded-2xl border border-border/80 bg-card/60 p-5 sm:p-6 backdrop-blur">
-            <h2 className="text-base sm:text-lg text-teal-400 font-extrabold flex items-center gap-2">
-              <span className="size-6 rounded-md bg-teal-500/20 text-teal-300 flex items-center justify-center text-xs">3</span>
+            <h2 className="text-base sm:text-lg text-caramel font-extrabold flex items-center gap-2">
+              <span className="size-6 rounded-md bg-caramel/20 text-caramel-light flex items-center justify-center text-xs">3</span>
               Quy trình giao nhận sản phẩm số
             </h2>
             <p>
@@ -105,8 +105,8 @@ export default async function TermsOfServicePage() {
 
           {/* Section 4 */}
           <section className="space-y-3 rounded-2xl border border-border/80 bg-card/60 p-5 sm:p-6 backdrop-blur">
-            <h2 className="text-base sm:text-lg text-teal-400 font-extrabold flex items-center gap-2">
-              <span className="size-6 rounded-md bg-teal-500/20 text-teal-300 flex items-center justify-center text-xs">4</span>
+            <h2 className="text-base sm:text-lg text-caramel font-extrabold flex items-center gap-2">
+              <span className="size-6 rounded-md bg-caramel/20 text-caramel-light flex items-center justify-center text-xs">4</span>
               Trách nhiệm của khách hàng khi sử dụng
             </h2>
             <ul className="list-disc pl-5 space-y-1.5">
@@ -119,8 +119,8 @@ export default async function TermsOfServicePage() {
 
           {/* Section 5 */}
           <section className="space-y-3 rounded-2xl border border-border/80 bg-card/60 p-5 sm:p-6 backdrop-blur">
-            <h2 className="text-base sm:text-lg text-teal-400 font-extrabold flex items-center gap-2">
-              <span className="size-6 rounded-md bg-teal-500/20 text-teal-300 flex items-center justify-center text-xs">5</span>
+            <h2 className="text-base sm:text-lg text-caramel font-extrabold flex items-center gap-2">
+              <span className="size-6 rounded-md bg-caramel/20 text-caramel-light flex items-center justify-center text-xs">5</span>
               Tuyên bố miễn trừ trách nhiệm về Nhãn hiệu bên thứ ba
             </h2>
             <div className="p-3.5 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-200">
@@ -136,8 +136,8 @@ export default async function TermsOfServicePage() {
 
           {/* Section 6 */}
           <section className="space-y-3 rounded-2xl border border-border/80 bg-card/60 p-5 sm:p-6 backdrop-blur">
-            <h2 className="text-base sm:text-lg text-teal-400 font-extrabold flex items-center gap-2">
-              <span className="size-6 rounded-md bg-teal-500/20 text-teal-300 flex items-center justify-center text-xs">6</span>
+            <h2 className="text-base sm:text-lg text-caramel font-extrabold flex items-center gap-2">
+              <span className="size-6 rounded-md bg-caramel/20 text-caramel-light flex items-center justify-center text-xs">6</span>
               Cơ chế tiếp nhận và giải quyết khiếu nại
             </h2>
             <p>

@@ -390,8 +390,8 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
                     outOfStock
                       ? "opacity-40 cursor-not-allowed bg-secondary/10 border-border/40"
                       : isSelected
-                      ? "border-teal-500 bg-teal-950/20 ring-1 ring-teal-500/80 cursor-pointer shadow-sm"
-                      : "border-border/80 bg-secondary/30 hover:border-border hover:bg-secondary/60 cursor-pointer focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                      ? "border-caramel bg-caramel/10 ring-1 ring-caramel/80 cursor-pointer shadow-sm"
+                      : "border-border/80 bg-secondary/30 hover:border-border hover:bg-secondary/60 cursor-pointer focus-visible:ring-2 focus-visible:ring-caramel-light focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   }`}
                 >
                   {/* Left: Radio Dot & Package Title & Badges */}
@@ -402,11 +402,11 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
                         outOfStock
                           ? "border-border bg-secondary/20"
                           : isSelected
-                          ? "border-teal-400 bg-teal-950/40 ring-2 ring-teal-500/30"
+                          ? "border-caramel bg-secondary/60 ring-2 ring-caramel/30"
                           : "border-border bg-secondary/40 group-hover:border-muted-foreground/60"
                       }`}
                     >
-                      {isSelected && <div className="size-2 rounded-full bg-teal-400" />}
+                      {isSelected && <div className="size-2 rounded-full bg-caramel" />}
                     </div>
 
                     <div className="space-y-1 min-w-0">
@@ -487,7 +487,7 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
               className={`w-full h-11 px-3.5 rounded-xl border bg-secondary/40 text-foreground text-sm placeholder:text-muted-foreground/50 transition-all focus:outline-none ${
                 emailTouched && emailError
                   ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20"
-                  : "border-border hover:border-border/90 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20"
+                  : "border-border hover:border-border/90 focus:border-caramel focus:ring-2 focus:ring-caramel/20"
               }`}
             />
           </div>
@@ -603,7 +603,7 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
 
           <div className="pt-2 border-t border-border/60 flex items-center justify-between">
             <span className="text-sm font-semibold text-foreground/90">Tổng thanh toán:</span>
-            <span className="text-2xl font-black text-foreground tracking-tight tabular-nums">
+            <span className="text-2xl font-black text-oat-cream tracking-tight tabular-nums">
               {formatPrice(totalPrice)}
             </span>
           </div>
@@ -614,7 +614,7 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
           <label className={`flex items-start gap-2.5 p-3 rounded-xl border transition-all duration-150 cursor-pointer select-none ${
             consentError && !consentAgreed
               ? "border-red-500/60 bg-red-500/10 text-red-200 shadow-xs"
-              : "border-border/70 bg-secondary/20 hover:border-teal-500/40 hover:bg-secondary/35 text-muted-foreground hover:text-foreground"
+              : "border-border/70 bg-secondary/20 hover:border-caramel/40 hover:bg-secondary/35 text-muted-foreground hover:text-foreground"
           }`}>
             <input
               type="checkbox"
@@ -626,14 +626,14 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
                   if (submitError?.includes("đồng ý")) setSubmitError(null)
                 }
               }}
-              className="mt-0.5 size-4 rounded border-border text-teal-600 focus:ring-teal-500 shrink-0 cursor-pointer accent-teal-500"
+              className="mt-0.5 size-4 rounded border-border text-caramel focus:ring-caramel-light shrink-0 cursor-pointer accent-caramel"
             />
             <span className="text-xs leading-relaxed">
               Tôi đã đọc và đồng ý với{" "}
               <Link
                 href="/dieu-khoan-dich-vu"
                 target="_blank"
-                className="text-teal-400 font-semibold underline underline-offset-2 hover:text-teal-300 transition-colors"
+                className="text-caramel font-semibold underline underline-offset-2 hover:text-caramel-light transition-colors"
                 onClick={(e) => e.stopPropagation()}
               >
                 Điều khoản dịch vụ
@@ -642,7 +642,7 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
               <Link
                 href="/chinh-sach-bao-mat"
                 target="_blank"
-                className="text-teal-400 font-semibold underline underline-offset-2 hover:text-teal-300 transition-colors"
+                className="text-caramel font-semibold underline underline-offset-2 hover:text-caramel-light transition-colors"
                 onClick={(e) => e.stopPropagation()}
               >
                 Chính sách bảo mật
@@ -656,11 +656,11 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
         <button
           type="submit"
           disabled={loading || isOutOfStock}
-          className="w-full h-12 rounded-xl text-sm font-bold bg-[#0F766E] hover:bg-[#115E59] active:bg-[#134E4A] text-white shadow-sm transition-all duration-150 flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-2 focus-visible:ring-offset-background cursor-pointer"
+          className="w-full h-12 rounded-xl text-sm font-bold bg-caramel hover:bg-caramel-light active:bg-[#D9955C] text-espresso shadow-sm transition-all duration-150 flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel-light focus-visible:ring-offset-2 focus-visible:ring-offset-background cursor-pointer"
         >
           {loading ? (
             <>
-              <Loader2 className="size-4 animate-spin text-white" />
+              <Loader2 className="size-4 animate-spin text-espresso" />
               <span>Đang kiểm tra nguồn hàng & tạo đơn…</span>
             </>
           ) : isOutOfStock ? (
@@ -694,11 +694,11 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
         {/* Trust Badges */}
         <div className="pt-3 border-t border-border/40 flex items-center justify-center gap-4 text-[11px] text-muted-foreground">
           <span className="inline-flex items-center gap-1">
-            <Zap className="size-3 text-teal-400" />
+            <Zap className="size-3 text-caramel" />
             Giao tự động
           </span>
           <span className="inline-flex items-center gap-1">
-            <ShieldCheck className="size-3 text-teal-400" />
+            <ShieldCheck className="size-3 text-caramel" />
             Thanh toán an toàn
           </span>
         </div>

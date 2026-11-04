@@ -39,7 +39,7 @@ export function ZaloWidget() {
         href={`https://zalo.me/${zalo1}`}
         target="_blank"
         rel="noopener noreferrer"
-        className="group relative flex size-12 items-center justify-center rounded-full bg-gradient-to-br from-purple-600 via-indigo-600 to-primary text-white shadow-lg shadow-purple-900/30 border border-purple-400/30 hover:scale-110 active:scale-95 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        className="group relative flex size-12 items-center justify-center rounded-full bg-gradient-to-br from-caramel via-[#DE985E] to-[#C98045] text-espresso shadow-lg shadow-black/30 border border-caramel-light/40 hover:scale-110 active:scale-95 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel-light"
         aria-label="Hỗ trợ kỹ thuật qua Zalo"
       >
         <Headphones className="size-5 transition-transform duration-200 group-hover:scale-110" strokeWidth={2} />

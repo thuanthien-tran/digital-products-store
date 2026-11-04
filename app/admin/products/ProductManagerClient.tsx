@@ -689,7 +689,7 @@ export function ProductManagerClient({ groups }: Props) {
             onClick={() => setActiveTab("published")}
             className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
               activeTab === "published"
-                ? "bg-background text-foreground shadow-sm"
+                ? "bg-primary text-primary-foreground shadow-sm font-semibold"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
@@ -699,7 +699,7 @@ export function ProductManagerClient({ groups }: Props) {
             onClick={() => setActiveTab("draft")}
             className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
               activeTab === "draft"
-                ? "bg-background text-foreground shadow-sm"
+                ? "bg-primary text-primary-foreground shadow-sm font-semibold"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
@@ -709,7 +709,7 @@ export function ProductManagerClient({ groups }: Props) {
             onClick={() => setActiveTab("hidden")}
             className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
               activeTab === "hidden"
-                ? "bg-background text-foreground shadow-sm"
+                ? "bg-primary text-primary-foreground shadow-sm font-semibold"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
@@ -719,7 +719,7 @@ export function ProductManagerClient({ groups }: Props) {
             onClick={() => setActiveTab("all")}
             className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
               activeTab === "all"
-                ? "bg-background text-foreground shadow-sm"
+                ? "bg-primary text-primary-foreground shadow-sm font-semibold"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >

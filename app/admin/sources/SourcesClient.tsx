@@ -283,12 +283,14 @@ export function SourcesClient({ initialConnections }: SourcesClientProps) {
           onClick={() => setActiveTab("unadded")}
           className={`px-3 py-1.5 rounded-lg font-semibold flex items-center gap-1.5 transition-colors ${
             activeTab === "unadded"
-              ? "bg-secondary text-foreground border border-border"
+              ? "bg-primary text-primary-foreground shadow-sm"
               : "text-muted-foreground hover:text-foreground"
           }`}
         >
           <span>Chưa thêm vào web</span>
-          <span className="px-1.5 py-0.2 rounded-full bg-primary/20 text-primary text-[10px]">
+          <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+            activeTab === "unadded" ? "bg-espresso/20 text-espresso" : "bg-primary/20 text-primary"
+          }`}>
             {counts.unadded}
           </span>
         </button>
@@ -297,12 +299,14 @@ export function SourcesClient({ initialConnections }: SourcesClientProps) {
           onClick={() => setActiveTab("added")}
           className={`px-3 py-1.5 rounded-lg font-semibold flex items-center gap-1.5 transition-colors ${
             activeTab === "added"
-              ? "bg-secondary text-foreground border border-border"
+              ? "bg-primary text-primary-foreground shadow-sm"
               : "text-muted-foreground hover:text-foreground"
           }`}
         >
           <span>Đã thêm vào web</span>
-          <span className="px-1.5 py-0.2 rounded-full bg-secondary text-muted-foreground text-[10px]">
+          <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+            activeTab === "added" ? "bg-espresso/20 text-espresso" : "bg-secondary text-muted-foreground"
+          }`}>
             {counts.added}
           </span>
         </button>
@@ -311,14 +315,16 @@ export function SourcesClient({ initialConnections }: SourcesClientProps) {
           onClick={() => setActiveTab("review")}
           className={`px-3 py-1.5 rounded-lg font-semibold flex items-center gap-1.5 transition-colors ${
             activeTab === "review"
-              ? "bg-secondary text-foreground border border-border"
+              ? "bg-primary text-primary-foreground shadow-sm"
               : "text-muted-foreground hover:text-foreground"
           }`}
         >
-          <AlertTriangle className="size-3.5 text-amber-400" />
+          <AlertTriangle className={`size-3.5 ${activeTab === "review" ? "text-espresso" : "text-amber-400"}`} />
           <span>Cần xem lại</span>
           {counts.review > 0 && (
-            <span className="px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-300 text-[10px]">
+            <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+              activeTab === "review" ? "bg-espresso/20 text-espresso" : "bg-amber-500/20 text-amber-300"
+            }`}>
               {counts.review}
             </span>
           )}
@@ -328,13 +334,15 @@ export function SourcesClient({ initialConnections }: SourcesClientProps) {
           onClick={() => setActiveTab("ignored")}
           className={`px-3 py-1.5 rounded-lg font-semibold flex items-center gap-1.5 transition-colors ${
             activeTab === "ignored"
-              ? "bg-secondary text-foreground border border-border"
+              ? "bg-primary text-primary-foreground shadow-sm"
               : "text-muted-foreground hover:text-foreground"
           }`}
         >
           <span>Đã bỏ qua</span>
           {counts.ignored > 0 && (
-            <span className="px-1.5 py-0.2 rounded-full bg-secondary text-muted-foreground text-[10px]">
+            <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+              activeTab === "ignored" ? "bg-espresso/20 text-espresso" : "bg-secondary text-muted-foreground"
+            }`}>
               {counts.ignored}
             </span>
           )}
@@ -344,12 +352,14 @@ export function SourcesClient({ initialConnections }: SourcesClientProps) {
           onClick={() => setActiveTab("all")}
           className={`px-3 py-1.5 rounded-lg font-semibold flex items-center gap-1.5 transition-colors ${
             activeTab === "all"
-              ? "bg-secondary text-foreground border border-border"
+              ? "bg-primary text-primary-foreground shadow-sm"
               : "text-muted-foreground hover:text-foreground"
           }`}
         >
           <span>Tất cả</span>
-          <span className="px-1.5 py-0.2 rounded-full bg-secondary text-muted-foreground text-[10px]">
+          <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+            activeTab === "all" ? "bg-espresso/20 text-espresso" : "bg-secondary text-muted-foreground"
+          }`}>
             {counts.all}
           </span>
         </button>

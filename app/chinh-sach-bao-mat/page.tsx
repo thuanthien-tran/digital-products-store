@@ -21,14 +21,14 @@ export default async function PrivacyPolicyPage() {
   const settings = await getSiteSettings()
 
   return (
-    <div className="flex min-h-screen flex-col bg-background text-foreground selection:bg-teal-500/20 selection:text-teal-300">
+    <div className="flex min-h-screen flex-col bg-background text-foreground selection:bg-caramel/20 selection:text-caramel-light">
       <Header initialSettings={settings} />
 
       <main className="mx-auto w-full max-w-4xl flex-1 px-4 sm:px-6 py-8 sm:py-12 space-y-8">
         {/* Back Link */}
         <Link
           href="/"
-          className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-muted-foreground hover:text-teal-400 transition-colors"
+          className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-muted-foreground hover:text-caramel-light transition-colors"
         >
           <ChevronLeft className="size-4" />
           <span>Quay lại trang chủ</span>
@@ -36,11 +36,11 @@ export default async function PrivacyPolicyPage() {
 
         {/* Title Header */}
         <div className="space-y-3 border-b border-border/70 pb-6">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-teal-500/10 text-teal-300 border border-teal-500/20">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-caramel/10 text-caramel-light border border-caramel/25">
             <ShieldCheck className="size-3.5" />
             <span>Tuân thủ Luật Bảo vệ dữ liệu cá nhân số 91/2025/QH15 & NĐ 356/2025/NĐ-CP</span>
           </div>
-          <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-foreground">
+          <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-oat-cream">
             Chính Sách Bảo Vệ Dữ Liệu Cá Nhân
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground">
@@ -53,8 +53,8 @@ export default async function PrivacyPolicyPage() {
           
           {/* Section 1 */}
           <section className="space-y-3 rounded-2xl border border-border/80 bg-card/60 p-5 sm:p-6 backdrop-blur">
-            <h2 className="text-base sm:text-lg text-teal-400 font-extrabold flex items-center gap-2">
-              <span className="size-6 rounded-md bg-teal-500/20 text-teal-300 flex items-center justify-center text-xs">1</span>
+            <h2 className="text-base sm:text-lg text-caramel font-extrabold flex items-center gap-2">
+              <span className="size-6 rounded-md bg-caramel/20 text-caramel-light flex items-center justify-center text-xs">1</span>
               Chúng tôi là ai & Thông tin liên hệ
             </h2>
             <p>
@@ -70,8 +70,8 @@ export default async function PrivacyPolicyPage() {
 
           {/* Section 2 */}
           <section className="space-y-3 rounded-2xl border border-border/80 bg-card/60 p-5 sm:p-6 backdrop-blur">
-            <h2 className="text-base sm:text-lg text-teal-400 font-extrabold flex items-center gap-2">
-              <span className="size-6 rounded-md bg-teal-500/20 text-teal-300 flex items-center justify-center text-xs">2</span>
+            <h2 className="text-base sm:text-lg text-caramel font-extrabold flex items-center gap-2">
+              <span className="size-6 rounded-md bg-caramel/20 text-caramel-light flex items-center justify-center text-xs">2</span>
               Dữ liệu thu thập & Mục đích xử lý
             </h2>
             <p>
@@ -114,8 +114,8 @@ export default async function PrivacyPolicyPage() {
 
           {/* Section 3 */}
           <section className="space-y-3 rounded-2xl border border-border/80 bg-card/60 p-5 sm:p-6 backdrop-blur">
-            <h2 className="text-base sm:text-lg text-teal-400 font-extrabold flex items-center gap-2">
-              <span className="size-6 rounded-md bg-teal-500/20 text-teal-300 flex items-center justify-center text-xs">3</span>
+            <h2 className="text-base sm:text-lg text-caramel font-extrabold flex items-center gap-2">
+              <span className="size-6 rounded-md bg-caramel/20 text-caramel-light flex items-center justify-center text-xs">3</span>
               Bên thứ ba có thể tiếp nhận dữ liệu
             </h2>
             <p>
@@ -132,8 +132,8 @@ export default async function PrivacyPolicyPage() {
 
           {/* Section 4 */}
           <section className="space-y-3 rounded-2xl border border-border/80 bg-card/60 p-5 sm:p-6 backdrop-blur">
-            <h2 className="text-base sm:text-lg text-teal-400 font-extrabold flex items-center gap-2">
-              <span className="size-6 rounded-md bg-teal-500/20 text-teal-300 flex items-center justify-center text-xs">4</span>
+            <h2 className="text-base sm:text-lg text-caramel font-extrabold flex items-center gap-2">
+              <span className="size-6 rounded-md bg-caramel/20 text-caramel-light flex items-center justify-center text-xs">4</span>
               Thời gian lưu trữ dữ liệu
             </h2>
             <p>
@@ -146,8 +146,8 @@ export default async function PrivacyPolicyPage() {
 
           {/* Section 5 */}
           <section className="space-y-3 rounded-2xl border border-border/80 bg-card/60 p-5 sm:p-6 backdrop-blur">
-            <h2 className="text-base sm:text-lg text-teal-400 font-extrabold flex items-center gap-2">
-              <span className="size-6 rounded-md bg-teal-500/20 text-teal-300 flex items-center justify-center text-xs">5</span>
+            <h2 className="text-base sm:text-lg text-caramel font-extrabold flex items-center gap-2">
+              <span className="size-6 rounded-md bg-caramel/20 text-caramel-light flex items-center justify-center text-xs">5</span>
               Quyền của bạn đối với dữ liệu cá nhân
             </h2>
             <p>
@@ -160,9 +160,9 @@ export default async function PrivacyPolicyPage() {
               <li>Quyền yêu cầu xóa bỏ hoàn toàn dữ liệu cá nhân của mình.</li>
             </ul>
 
-            <div className="mt-3 p-3.5 rounded-xl border border-teal-500/30 bg-teal-500/10 text-teal-200">
+            <div className="mt-3 p-3.5 rounded-xl border border-caramel/30 bg-caramel/10 text-caramel-light">
               <p className="font-bold flex items-center gap-2">
-                <Clock className="size-4 shrink-0 text-teal-400" />
+                <Clock className="size-4 shrink-0 text-caramel" />
                 Thời hạn cam kết phản hồi (Theo Điều 5 Nghị định 356/2025/NĐ-CP):
               </p>
               <ul className="list-disc pl-5 mt-1 space-y-0.5 text-xs">
@@ -178,8 +178,8 @@ export default async function PrivacyPolicyPage() {
 
           {/* Section 6 */}
           <section className="space-y-3 rounded-2xl border border-border/80 bg-card/60 p-5 sm:p-6 backdrop-blur">
-            <h2 className="text-base sm:text-lg text-teal-400 font-extrabold flex items-center gap-2">
-              <span className="size-6 rounded-md bg-teal-500/20 text-teal-300 flex items-center justify-center text-xs">6</span>
+            <h2 className="text-base sm:text-lg text-caramel font-extrabold flex items-center gap-2">
+              <span className="size-6 rounded-md bg-caramel/20 text-caramel-light flex items-center justify-center text-xs">6</span>
               Bảo mật và Cookie
             </h2>
             <p>

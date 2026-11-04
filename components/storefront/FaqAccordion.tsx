@@ -32,8 +32,8 @@ export function FaqAccordion({ items }: FaqAccordionProps) {
             key={idx}
             className={`rounded-2xl border transition-all duration-200 backdrop-blur-md overflow-hidden ${
               isOpen
-                ? "border-teal-500/40 bg-card/90 shadow-md shadow-teal-950/20"
-                : "border-border/75 bg-card/60 hover:border-teal-500/30 hover:bg-card/80"
+                ? "border-caramel/40 bg-card/90 shadow-md shadow-caramel/10"
+                : "border-border/75 bg-card/60 hover:border-caramel/30 hover:bg-card/80"
             }`}
           >
             <h3>
@@ -43,14 +43,14 @@ export function FaqAccordion({ items }: FaqAccordionProps) {
                 aria-expanded={isOpen}
                 aria-controls={answerId}
                 onClick={() => toggleItem(idx)}
-                className="w-full flex items-center justify-between gap-3.5 p-4 sm:p-5 text-left text-foreground transition-colors group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                className="w-full flex items-center justify-between gap-3.5 p-4 sm:p-5 text-left text-foreground transition-colors group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel-light focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               >
                 <div className="flex items-center gap-3 min-w-0">
                   <div
                     className={`size-7 sm:size-8 rounded-lg border flex items-center justify-center shrink-0 transition-colors ${
                       isOpen
-                        ? "border-teal-500/40 bg-teal-500/15 text-teal-300"
-                        : "border-border/70 bg-secondary/60 text-muted-foreground group-hover:text-teal-300 group-hover:border-teal-500/30"
+                        ? "border-caramel/40 bg-caramel/15 text-caramel-light"
+                        : "border-border/70 bg-secondary/60 text-muted-foreground group-hover:text-caramel-light group-hover:border-caramel/30"
                     }`}
                     aria-hidden="true"
                   >
@@ -58,7 +58,7 @@ export function FaqAccordion({ items }: FaqAccordionProps) {
                   </div>
                   <span
                     className={`text-sm sm:text-base font-semibold tracking-tight transition-colors ${
-                      isOpen ? "text-teal-300" : "text-foreground group-hover:text-teal-200"
+                      isOpen ? "text-caramel-light" : "text-foreground group-hover:text-caramel-light"
                     }`}
                   >
                     {item.q}
@@ -67,7 +67,7 @@ export function FaqAccordion({ items }: FaqAccordionProps) {
 
                 <div
                   className={`size-6 rounded-full flex items-center justify-center shrink-0 transition-transform duration-200 ${
-                    isOpen ? "rotate-180 text-teal-400" : "text-muted-foreground group-hover:text-teal-300"
+                    isOpen ? "rotate-180 text-caramel" : "text-muted-foreground group-hover:text-caramel-light"
                   }`}
                   aria-hidden="true"
                 >

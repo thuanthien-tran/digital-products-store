@@ -21,14 +21,14 @@ export default async function WarrantyPolicyPage() {
   const settings = await getSiteSettings()
 
   return (
-    <div className="flex min-h-screen flex-col bg-background text-foreground selection:bg-teal-500/20 selection:text-teal-300">
+    <div className="flex min-h-screen flex-col bg-background text-foreground selection:bg-caramel/20 selection:text-caramel-light">
       <Header initialSettings={settings} />
 
       <main className="mx-auto w-full max-w-4xl flex-1 px-4 sm:px-6 py-8 sm:py-12 space-y-8">
         {/* Back Link */}
         <Link
           href="/"
-          className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-muted-foreground hover:text-teal-400 transition-colors"
+          className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-muted-foreground hover:text-caramel-light transition-colors"
         >
           <ChevronLeft className="size-4" />
           <span>Quay lại trang chủ</span>
@@ -36,11 +36,11 @@ export default async function WarrantyPolicyPage() {
 
         {/* Title Header */}
         <div className="space-y-3 border-b border-border/70 pb-6">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-teal-500/10 text-teal-300 border border-teal-500/20">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-caramel/10 text-caramel-light border border-caramel/25">
             <RefreshCw className="size-3.5" />
             <span>Cam kết quyền lợi người tiêu dùng theo Luật số 19/2023/QH15</span>
           </div>
-          <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-foreground">
+          <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-oat-cream">
             Chính Sách Bảo Hành &amp; Hoàn Tiền
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground">
@@ -53,8 +53,8 @@ export default async function WarrantyPolicyPage() {
 
           {/* Section 1 */}
           <section className="space-y-3 rounded-2xl border border-border/80 bg-card/60 p-5 sm:p-6 backdrop-blur">
-            <h2 className="text-base sm:text-lg text-teal-400 font-extrabold flex items-center gap-2">
-              <span className="size-6 rounded-md bg-teal-500/20 text-teal-300 flex items-center justify-center text-xs">1</span>
+            <h2 className="text-base sm:text-lg text-caramel font-extrabold flex items-center gap-2">
+              <span className="size-6 rounded-md bg-caramel/20 text-caramel-light flex items-center justify-center text-xs">1</span>
               Cam kết bảo hành 1 đổi 1
             </h2>
             <p>
@@ -67,8 +67,8 @@ export default async function WarrantyPolicyPage() {
 
           {/* Section 2 */}
           <section className="space-y-3 rounded-2xl border border-border/80 bg-card/60 p-5 sm:p-6 backdrop-blur">
-            <h2 className="text-base sm:text-lg text-teal-400 font-extrabold flex items-center gap-2">
-              <span className="size-6 rounded-md bg-teal-500/20 text-teal-300 flex items-center justify-center text-xs">2</span>
+            <h2 className="text-base sm:text-lg text-caramel font-extrabold flex items-center gap-2">
+              <span className="size-6 rounded-md bg-caramel/20 text-caramel-light flex items-center justify-center text-xs">2</span>
               Các trường hợp được bảo hành
             </h2>
             <ul className="list-disc pl-5 space-y-1.5">
@@ -80,8 +80,8 @@ export default async function WarrantyPolicyPage() {
 
           {/* Section 3 */}
           <section className="space-y-3 rounded-2xl border border-border/80 bg-card/60 p-5 sm:p-6 backdrop-blur">
-            <h2 className="text-base sm:text-lg text-teal-400 font-extrabold flex items-center gap-2">
-              <span className="size-6 rounded-md bg-teal-500/20 text-teal-300 flex items-center justify-center text-xs">3</span>
+            <h2 className="text-base sm:text-lg text-caramel font-extrabold flex items-center gap-2">
+              <span className="size-6 rounded-md bg-caramel/20 text-caramel-light flex items-center justify-center text-xs">3</span>
               Chính sách hoàn tiền minh bạch
             </h2>
             <p>
@@ -102,8 +102,8 @@ export default async function WarrantyPolicyPage() {
 
           {/* Section 4 */}
           <section className="space-y-3 rounded-2xl border border-border/80 bg-card/60 p-5 sm:p-6 backdrop-blur">
-            <h2 className="text-base sm:text-lg text-teal-400 font-extrabold flex items-center gap-2">
-              <span className="size-6 rounded-md bg-teal-500/20 text-teal-300 flex items-center justify-center text-xs">4</span>
+            <h2 className="text-base sm:text-lg text-caramel font-extrabold flex items-center gap-2">
+              <span className="size-6 rounded-md bg-caramel/20 text-caramel-light flex items-center justify-center text-xs">4</span>
               Các trường hợp từ chối bảo hành
             </h2>
             <div className="p-3.5 rounded-xl border border-red-500/30 bg-red-500/10 text-red-200">
@@ -122,8 +122,8 @@ export default async function WarrantyPolicyPage() {
 
           {/* Section 5 */}
           <section className="space-y-3 rounded-2xl border border-border/80 bg-card/60 p-5 sm:p-6 backdrop-blur">
-            <h2 className="text-base sm:text-lg text-teal-400 font-extrabold flex items-center gap-2">
-              <span className="size-6 rounded-md bg-teal-500/20 text-teal-300 flex items-center justify-center text-xs">5</span>
+            <h2 className="text-base sm:text-lg text-caramel font-extrabold flex items-center gap-2">
+              <span className="size-6 rounded-md bg-caramel/20 text-caramel-light flex items-center justify-center text-xs">5</span>
               Quy trình gửi yêu cầu bảo hành
             </h2>
             <p>

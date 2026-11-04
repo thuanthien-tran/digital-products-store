@@ -3,7 +3,7 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* Minimal Tech Palette: Deep Charcoal, Subtle Borders, Focused Violet Accent */
+  /* CapyGo Palette: Deep Charcoal, Subtle Borders, Warm Capybara Fur Accent */
   --background: 220 11% 7%;      /* #101114 */
   --foreground: 220 13% 96%;     /* #F3F4F6 */
   
@@ -13,8 +13,8 @@
   --popover: 220 13% 10%;        /* #17191E */
   --popover-foreground: 220 13% 96%;
   
-  --primary: 263 70% 58%;        /* #7C3AED (Main CTA) */
-  --primary-foreground: 0 0% 100%;
+  --primary: 28 71% 67%;         /* #E6A66F Caramel (Main Action) */
+  --primary-foreground: 21 30% 11%; /* #251A14 Espresso Brown */
   
   --secondary: 220 14% 15%;      /* #20232B (Surface Hover) */
   --secondary-foreground: 220 13% 96%;
@@ -22,8 +22,8 @@
   --muted: 220 14% 14%;          /* #1E2128 */
   --muted-foreground: 218 15% 70%;/* #A8B0BF */
   
-  --accent: 257 91% 76%;         /* #A78BFA (Focused Highlight) */
-  --accent-foreground: 220 11% 7%;
+  --accent: 28 71% 67%;          /* #E6A66F Caramel */
+  --accent-foreground: 21 30% 11%; /* #251A14 Espresso Brown */
   
   --destructive: 0 84% 60%;      /* #EF4444 / #F87171 */
   --destructive-foreground: 0 0% 100%;
@@ -33,7 +33,14 @@
   
   --border: 220 15% 20%;         /* #2B303B */
   --input: 220 15% 20%;          /* #2B303B */
-  --ring: 263 70% 58%;           /* #7C3AED */
+  --ring: 28 79% 75%;            /* #F2BC8E Light Caramel Focus Ring */
+
+  /* CapyGo Brand Palette Tokens */
+  --caramel: 28 71% 67%;         /* #E6A66F */
+  --caramel-light: 28 79% 75%;   /* #F2BC8E */
+  --espresso: 21 30% 11%;        /* #251A14 */
+  --oat-cream: 33 58% 91%;       /* #F5E9DA */
+  --sage: 107 17% 69%;           /* #A8BDA2 */
   
   --radius: 8px;
 }
@@ -58,6 +65,12 @@
   --color-border: hsl(var(--border));
   --color-input: hsl(var(--input));
   --color-ring: hsl(var(--ring));
+
+  --color-caramel: hsl(var(--caramel));
+  --color-caramel-light: hsl(var(--caramel-light));
+  --color-espresso: hsl(var(--espresso));
+  --color-oat-cream: hsl(var(--oat-cream));
+  --color-sage: hsl(var(--sage));
   
   --radius-sm: 6px;
   --radius-md: 8px;

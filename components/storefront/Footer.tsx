@@ -101,7 +101,7 @@ export function Footer({ initialSettings }: FooterProps) {
             <Link
               href="/#products"
               onClick={(e) => handleNavScroll(e, "products")}
-              className="text-xs sm:text-sm font-medium text-muted-foreground hover:text-teal-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-md transition-colors duration-150"
+              className="text-xs sm:text-sm font-medium text-muted-foreground hover:text-caramel-light focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel-light focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-md transition-colors duration-150"
             >
               Sản phẩm
             </Link>
@@ -109,7 +109,7 @@ export function Footer({ initialSettings }: FooterProps) {
             <Link
               href="/#how"
               onClick={(e) => handleNavScroll(e, "how")}
-              className="text-xs sm:text-sm font-medium text-muted-foreground hover:text-teal-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-md transition-colors duration-150"
+              className="text-xs sm:text-sm font-medium text-muted-foreground hover:text-caramel-light focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel-light focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-md transition-colors duration-150"
             >
               Hướng dẫn mua hàng
             </Link>
@@ -117,7 +117,7 @@ export function Footer({ initialSettings }: FooterProps) {
             <Link
               href="/#faq"
               onClick={(e) => handleNavScroll(e, "faq")}
-              className="text-xs sm:text-sm font-medium text-muted-foreground hover:text-teal-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-md transition-colors duration-150"
+              className="text-xs sm:text-sm font-medium text-muted-foreground hover:text-caramel-light focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel-light focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-md transition-colors duration-150"
             >
               FAQ
             </Link>
@@ -126,9 +126,9 @@ export function Footer({ initialSettings }: FooterProps) {
               href={`https://zalo.me/${cleanZaloPhone}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-3.5 py-2 sm:px-4 sm:py-2 rounded-xl border border-teal-500/50 bg-teal-500/10 text-teal-300 hover:bg-teal-500/20 hover:border-teal-400 hover:text-teal-200 text-xs sm:text-sm font-medium transition-all duration-150 shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-2 focus-visible:ring-offset-background active:scale-95"
+              className="inline-flex items-center gap-2 px-3.5 py-2 sm:px-4 sm:py-2 rounded-xl border border-caramel/50 bg-caramel/10 text-caramel hover:bg-caramel/20 hover:border-caramel-light hover:text-caramel-light text-xs sm:text-sm font-medium transition-all duration-150 shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel-light focus-visible:ring-offset-2 focus-visible:ring-offset-background active:scale-95"
             >
-              <MessageCircle className="size-4 shrink-0 text-teal-400" />
+              <MessageCircle className="size-4 shrink-0 text-caramel" />
               <span>Liên hệ Zalo</span>
             </a>
           </div>
@@ -146,19 +146,19 @@ export function Footer({ initialSettings }: FooterProps) {
           <div className="flex flex-wrap items-center gap-x-4 sm:gap-x-6 gap-y-2 text-xs">
             <Link
               href="/dieu-khoan-dich-vu"
-              className="hover:text-teal-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 rounded transition-colors duration-150"
+              className="hover:text-caramel-light focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel-light rounded transition-colors duration-150"
             >
               Điều khoản dịch vụ
             </Link>
             <Link
               href="/chinh-sach-bao-hanh"
-              className="hover:text-teal-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 rounded transition-colors duration-150"
+              className="hover:text-caramel-light focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel-light rounded transition-colors duration-150"
             >
               Chính sách bảo hành &amp; Hoàn tiền
             </Link>
             <Link
               href="/chinh-sach-bao-mat"
-              className="hover:text-teal-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 rounded transition-colors duration-150"
+              className="hover:text-caramel-light focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel-light rounded transition-colors duration-150"
             >
               Chính sách bảo vệ dữ liệu cá nhân
             </Link>

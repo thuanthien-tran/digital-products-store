@@ -104,7 +104,7 @@ export default async function HomePage() {
           <ScrollReveal>
             <div className="text-center space-y-2">
               <span className="text-xs font-bold uppercase tracking-wider text-accent">Quy trình đơn giản</span>
-              <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
+              <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-oat-cream">
                 Mua Hàng Trong 4 Bước
               </h2>
               <p className="text-xs sm:text-sm text-muted-foreground max-w-md mx-auto">
@@ -119,29 +119,29 @@ export default async function HomePage() {
                 step: "01",
                 title: "Chọn gói tài khoản",
                 desc: "Duyệt qua danh mục và chọn gói thời hạn phù hợp với nhu cầu công việc của bạn.",
-                color: "text-purple-400",
-                borderHover: "hover:border-purple-500/40 hover:shadow-purple-950/30",
+                color: "text-caramel",
+                borderHover: "hover:border-caramel/40 hover:shadow-black/30",
               },
               {
                 step: "02",
                 title: "Nhập Email nhận key",
                 desc: "Điền địa chỉ email của bạn để hệ thống tự động lưu biên lai và gửi thông tin dự phòng.",
-                color: "text-cyan-400",
-                borderHover: "hover:border-cyan-500/40 hover:shadow-cyan-950/30",
+                color: "text-caramel-light",
+                borderHover: "hover:border-caramel-light/40 hover:shadow-black/30",
               },
               {
                 step: "03",
                 title: "Quét mã VietQR",
                 desc: "Mở app ngân hàng quét mã QR, chuyển đúng nội dung định sẵn trong 3 giây.",
-                color: "text-blue-400",
-                borderHover: "hover:border-blue-500/40 hover:shadow-blue-950/30",
+                color: "text-sage",
+                borderHover: "hover:border-sage/40 hover:shadow-black/30",
               },
               {
                 step: "04",
                 title: "Nhận tài khoản ngay",
                 desc: "Màn hình tự động hiển thị tài khoản/key ngay lập tức kèm hướng dẫn kích hoạt chi tiết.",
-                color: "text-emerald-400",
-                borderHover: "hover:border-emerald-500/40 hover:shadow-emerald-950/30",
+                color: "text-caramel",
+                borderHover: "hover:border-caramel/40 hover:shadow-black/30",
               },
             ].map(({ step, title, desc, color, borderHover }, idx) => (
               <ScrollReveal key={step} delayMs={idx * 90}>
@@ -153,7 +153,7 @@ export default async function HomePage() {
                   >
                     {step}
                   </span>
-                  <h3 className="font-extrabold text-sm text-foreground transition-colors duration-200 group-hover:text-teal-300">
+                  <h3 className="font-extrabold text-sm text-foreground transition-colors duration-200 group-hover:text-caramel-light">
                     {title}
                   </h3>
                   <p className="text-xs text-muted-foreground leading-relaxed group-hover:text-slate-200 transition-colors duration-200">
@@ -170,7 +170,7 @@ export default async function HomePage() {
           <ScrollReveal>
             <div className="text-center space-y-2">
               <span className="text-xs font-bold uppercase tracking-wider text-accent">Giải đáp thắc mắc</span>
-              <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
+              <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-oat-cream">
                 Câu Hỏi Thường Gặp
               </h2>
               <p className="text-xs sm:text-sm text-muted-foreground max-w-md mx-auto">
