@@ -1357,7 +1357,7 @@ export function ProductManagerClient({ groups }: Props) {
                           <input
                             type="number"
                             min={0}
-                            step={1000}
+                            step="any"
                             value={editForm.providerPrice || 0}
                             onChange={(e) => setEditForm({ ...editForm, providerPrice: Number(e.target.value) || 0 })}
                             className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground text-xs font-mono font-bold focus:outline-none focus:ring-1 focus:ring-primary"
@@ -1377,7 +1377,7 @@ export function ProductManagerClient({ groups }: Props) {
                           value={editForm.priceCents}
                           onChange={(e) => setEditForm({ ...editForm, priceCents: Number(e.target.value) })}
                           className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground text-xs font-mono font-bold focus:outline-none focus:ring-1 focus:ring-primary"
-                          step={1000}
+                          step="any"
                           min={0}
                         />
                       </div>
@@ -1391,7 +1391,7 @@ export function ProductManagerClient({ groups }: Props) {
                           value={editForm.compareAtPriceCents || ""}
                           onChange={(e) => setEditForm({ ...editForm, compareAtPriceCents: Number(e.target.value) })}
                           className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground text-xs font-mono focus:outline-none focus:ring-1 focus:ring-primary"
-                          step={1000}
+                          step="any"
                           min={0}
                           placeholder="Bỏ trống nếu không giảm giá"
                         />
@@ -1747,7 +1747,7 @@ export function ProductManagerClient({ groups }: Props) {
                     onChange={(e) => setManualForm({ ...manualForm, providerPrice: Number(e.target.value) || 0 })}
                     className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground text-xs font-mono font-bold focus:outline-none focus:ring-1 focus:ring-primary"
                     placeholder="0"
-                    step={1000}
+                    step="any"
                     min={0}
                     title="Giá bạn mua từ đại lý (chỉ dùng nội bộ để tính lãi/lỗ)"
                   />
@@ -1761,7 +1761,7 @@ export function ProductManagerClient({ groups }: Props) {
                     value={manualForm.priceCents}
                     onChange={(e) => setManualForm({ ...manualForm, priceCents: Number(e.target.value) })}
                     className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground text-xs font-mono font-bold focus:outline-none focus:ring-1 focus:ring-primary"
-                    step={1000}
+                    step="any"
                     min={0}
                   />
                 </div>
