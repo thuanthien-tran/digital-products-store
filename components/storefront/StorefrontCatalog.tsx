@@ -2,8 +2,9 @@
 
 import { useState, useMemo, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Search, X, RefreshCw, Layers, ChevronDown, SlidersHorizontal } from "lucide-react"
+import { Search, X, RefreshCw, Layers, ChevronDown, SlidersHorizontal, Star } from "lucide-react"
 import { ProductCard, type ProductCardVariant } from "@/components/storefront/ProductCard"
+import { calculateProductPricing } from "@/lib/pricing"
 import { normalizeVietnamese } from "@/lib/utils"
 
 export type StorefrontVariant = ProductCardVariant
@@ -12,6 +13,7 @@ export interface StorefrontProduct {
   id: string
   name: string
   slug: string
+  isFeatured?: boolean
   sortOrder?: number
   description?: string
   images?: string[]
@@ -176,6 +178,40 @@ export function StorefrontCatalog({ groups, products }: StorefrontCatalogProps) 
     }))
   }, [catalogProducts, liveStockMap])
 
+  // Featured Products (Sản phẩm nổi bật)
+  // Shared live stock data with zero duplicate polling
+  // Rút khỏi khu nổi bật khi hết hàng, tự xuất hiện lại khi có hàng
+  const featuredProducts = useMemo(() => {
+    return productsWithLiveStock
+      .filter((p) => {
+        if (!p.isFeatured) return false
+        if (p.statusOverride === "out_of_stock") return false
+        if (p.statusOverride === "in_stock") return true
+        if (p.deliveryType === "contact") return true
+        const pricing = calculateProductPricing(p.variants, p.statusOverride)
+        return pricing.hasStock && !pricing.isOutOfStock
+      })
+      .sort((a, b) => {
+        const orderA = a.sortOrder ?? 0
+        const orderB = b.sortOrder ?? 0
+        if (orderA !== orderB) return orderA - orderB
+        return a.id.localeCompare(b.id)
+      })
+      .slice(0, 6)
+  }, [productsWithLiveStock])
+
+  const handleScrollToCatalog = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
+    e.preventDefault()
+    const target = document.getElementById("catalog-heading")
+    if (target) {
+      target.scrollIntoView({
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+      })
+      window.history.pushState(null, "", "#catalog-heading")
+    }
+  }
+
   // Filter groups to only those with public products
   const activeGroups = useMemo(() => {
     return catalogGroups
@@ -289,9 +325,76 @@ export function StorefrontCatalog({ groups, products }: StorefrontCatalogProps) 
   }
 
   return (
-    <section id="products" className="space-y-4 sm:space-y-5 scroll-mt-24 pt-6 sm:pt-8 border-t border-border/70">
+    <section id="products" className="scroll-mt-24 pt-6 sm:pt-8 border-t border-border/70">
+      {/* Khu "Sản phẩm nổi bật" (Chỉ hiển thị khi có sản phẩm thỏa điều kiện bán) */}
+      {featuredProducts.length > 0 && (
+        <div className="relative mb-8 sm:mb-12 p-4 sm:p-7 rounded-3xl bg-gradient-to-b from-caramel/[0.08] via-card/65 to-card/45 border-2 border-caramel/35 shadow-2xl shadow-black/35 ring-1 ring-caramel/20 overflow-hidden">
+          {/* Ambient Warm Spotlight Glow */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute -top-28 left-1/2 -translate-x-1/2 w-[32rem] h-56 bg-caramel/20 blur-3xl rounded-full"
+          />
+
+          <div className="relative space-y-4 sm:space-y-6">
+            {/* Tiêu đề khu nổi bật: Icon ngôi sao caramel + Tiêu đề oat-cream + Link "Xem tất cả →" (Không mô tả phụ) */}
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 sm:gap-3">
+                <span className="size-8 rounded-xl bg-gradient-to-br from-caramel/30 to-caramel/10 border border-caramel/45 flex items-center justify-center text-caramel shadow-md shadow-caramel/20 shrink-0">
+                  <Star className="size-4 fill-caramel text-caramel" aria-hidden="true" />
+                </span>
+                <h2 className="text-xl sm:text-2xl font-black tracking-tight text-oat-cream">
+                  Sản phẩm nổi bật
+                </h2>
+              </div>
+              <a
+                href="#catalog-heading"
+                onClick={handleScrollToCatalog}
+                className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-caramel hover:text-espresso bg-caramel/15 hover:bg-caramel border border-caramel/40 px-3.5 py-1.5 rounded-full transition-all duration-200 group focus:outline-none focus:ring-2 focus:ring-caramel/50 shadow-xs"
+              >
+                <span>Xem tất cả</span>
+                <span className="transition-transform duration-200 motion-safe:group-hover:translate-x-1">→</span>
+              </a>
+            </div>
+
+            {/* Danh sách thẻ nổi bật: Mobile cuộn ngang (86vw, snap-x) / Desktop lưới 3 cột (tối đa 6 thẻ) */}
+            <div className="w-full overflow-hidden -mx-4 px-4 sm:mx-0 sm:px-0">
+              <div
+                role="region"
+                aria-label="Danh sách sản phẩm nổi bật"
+                tabIndex={0}
+                className="flex sm:grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 overflow-x-auto sm:overflow-visible pb-3 sm:pb-0 snap-x snap-mandatory focus:outline-none focus:ring-1 focus:ring-caramel/40 rounded-2xl scrollbar-none items-stretch"
+              >
+                {featuredProducts.map((p) => (
+                  <div
+                    key={`featured-${p.id}`}
+                    className="w-[86vw] max-w-[340px] shrink-0 sm:w-auto snap-center sm:snap-align-none h-full flex flex-col"
+                  >
+                    <ProductCard
+                      id={p.id}
+                      name={p.name}
+                      slug={p.slug}
+                      description={p.description}
+                      images={p.images}
+                      groupId={p.groupId}
+                      groupName={p.groupName}
+                      deliveryType={p.deliveryType}
+                      statusOverride={p.statusOverride}
+                      highlights={p.highlights}
+                      warrantyTerms={p.warrantyTerms}
+                      noticeNotes={p.noticeNotes}
+                      variants={p.variants}
+                      featured={true}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 1. Tiêu đề H2 Danh mục sản phẩm */}
-      <div className="space-y-1 text-left">
+      <div id="catalog-heading" className={`space-y-1 text-left scroll-mt-24 ${featuredProducts.length > 0 ? "pt-1 sm:pt-2" : ""}`}>
         <h2 className="text-xl sm:text-2xl md:text-[28px] font-black tracking-tight text-foreground">
           Danh mục sản phẩm
         </h2>
@@ -301,7 +404,7 @@ export function StorefrontCatalog({ groups, products }: StorefrontCatalogProps) 
       </div>
 
       {/* Search Bar, Price Filter & Sort Controls */}
-      <div className="p-4 sm:p-5 rounded-2xl border border-border/80 bg-card/70 backdrop-blur space-y-3.5 shadow-xs">
+      <div className="p-4 sm:p-5 rounded-2xl border border-border/80 bg-card/70 backdrop-blur space-y-3.5 shadow-xs mt-4 sm:mt-5">
         {/* Row 1: Search Input & Filter Dropdowns */}
         <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2.5">
           {/* Search Input */}

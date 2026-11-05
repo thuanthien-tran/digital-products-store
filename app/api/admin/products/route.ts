@@ -15,6 +15,7 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url)
     const tab = searchParams.get("tab") || "all"
     const search = (searchParams.get("search") || "").trim()
+    const featuredOnly = searchParams.get("featured") === "true"
 
     const where: Prisma.ProductWhereInput = {}
 
@@ -23,6 +24,10 @@ export async function GET(req: Request) {
         { name: { contains: search } },
         { slug: { contains: search } },
       ]
+    }
+
+    if (featuredOnly) {
+      where.isFeatured = true
     }
 
     if (tab === "draft") {
@@ -37,7 +42,7 @@ export async function GET(req: Request) {
       ]
     }
 
-    const [products, total, draftCount, publishedCount, hiddenCount] = await Promise.all([
+    const [products, total, draftCount, publishedCount, hiddenCount, featuredCount] = await Promise.all([
       prisma.product.findMany({
         where,
         orderBy: [{ sortOrder: "asc" }, { updatedAt: "desc" }],
@@ -65,6 +70,7 @@ export async function GET(req: Request) {
       prisma.product.count({ where: { editorialStatus: "draft" } }),
       prisma.product.count({ where: { editorialStatus: "published", visibility: "public" } }),
       prisma.product.count({ where: { OR: [{ editorialStatus: "hidden" }, { visibility: "hidden", editorialStatus: { not: "draft" } }] } }),
+      prisma.product.count({ where: { isFeatured: true } }),
     ])
 
     return NextResponse.json({
@@ -76,6 +82,7 @@ export async function GET(req: Request) {
         draft: draftCount,
         published: publishedCount,
         hidden: hiddenCount,
+        featured: featuredCount,
       },
     })
   } catch (err: unknown) {

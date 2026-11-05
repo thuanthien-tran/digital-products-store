@@ -59,6 +59,7 @@ async function getStoreData() {
           id: p.id,
           name: p.name,
           slug: p.slug,
+          isFeatured: p.isFeatured,
           sortOrder: p.sortOrder ?? 0,
           description: p.description,
           images: parsedImages,

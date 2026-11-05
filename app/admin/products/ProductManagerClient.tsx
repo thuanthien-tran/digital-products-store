@@ -14,7 +14,8 @@ import {
   Image as ImageIcon,
   Loader2,
   RefreshCw,
-  UploadCloud
+  UploadCloud,
+  Star
 } from "lucide-react"
 import { ProductCard } from "@/components/storefront/ProductCard"
 
@@ -51,6 +52,7 @@ interface RawProduct {
   hasPendingChanges?: boolean
   draftSnapshot?: string | null
   statusOverride?: string
+  isFeatured?: boolean
   sortOrder?: number
   createdAt: string
   sourceProduct?: {
@@ -87,6 +89,7 @@ interface ProductItem {
   hasPendingChanges: boolean
   draftSnapshot: string | null
   statusOverride?: string
+  isFeatured: boolean
   createdAt: string
   hasChangeAlert?: boolean
   changeAlertDetails?: string | null
@@ -134,7 +137,9 @@ export function ProductManagerClient({ groups }: Props) {
   const [search, setSearch] = useState("")
   const [loading, setLoading] = useState(true)
   const [refreshTrigger, setRefreshTrigger] = useState(0)
-  const [counts, setCounts] = useState({ all: 0, draft: 0, published: 0, hidden: 0 })
+  const [counts, setCounts] = useState({ all: 0, draft: 0, published: 0, hidden: 0, featured: 0 })
+  const [featuredFilter, setFeaturedFilter] = useState<"all" | "featured">("all")
+  const [savingFeaturedIds, setSavingFeaturedIds] = useState<Set<string>>(new Set())
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [isDeletingBulk, setIsDeletingBulk] = useState(false)
@@ -247,6 +252,7 @@ export function ProductManagerClient({ groups }: Props) {
         const params = new URLSearchParams()
         params.set("tab", activeTab)
         if (search) params.set("search", search)
+        if (featuredFilter === "featured") params.set("featured", "true")
 
         const res = await fetch(`/api/admin/products?${params.toString()}`)
         if (res.ok && !ignore) {
@@ -281,6 +287,7 @@ export function ProductManagerClient({ groups }: Props) {
               hasPendingChanges: Boolean(p.hasPendingChanges),
               draftSnapshot: p.draftSnapshot || null,
               statusOverride: p.statusOverride || "auto",
+              isFeatured: Boolean(p.isFeatured),
               createdAt: p.createdAt,
               hasChangeAlert: Boolean(p.sourceProduct?.hasChangeAlert),
               changeAlertDetails: p.sourceProduct?.changeAlertDetails || null,
@@ -331,11 +338,80 @@ export function ProductManagerClient({ groups }: Props) {
     return () => {
       ignore = true
     }
-  }, [activeTab, search, refreshTrigger])
+  }, [activeTab, search, featuredFilter, refreshTrigger])
 
   useEffect(() => {
     setSelectedIds([])
-  }, [activeTab, search])
+  }, [activeTab, search, featuredFilter])
+
+  const handleToggleFeatured = async (product: ProductItem) => {
+    const nextVal = !product.isFeatured
+
+    // Client-side guard against exceeding 6 featured products
+    if (nextVal && counts.featured >= 6) {
+      setMessage({
+        type: "error",
+        text: "Đã đạt giới hạn tối đa 6 sản phẩm nổi bật (bao gồm cả bản nháp và sản phẩm ẩn). Vui lòng bỏ chọn bớt sản phẩm khác trước.",
+      })
+      return
+    }
+
+    setSavingFeaturedIds((prev) => new Set(prev).add(product.id))
+    const prevFeatured = product.isFeatured
+
+    // Optimistic UI update
+    setProducts((prev) =>
+      prev.map((p) => (p.id === product.id ? { ...p, isFeatured: nextVal } : p))
+    )
+    setCounts((prev) => ({
+      ...prev,
+      featured: nextVal ? prev.featured + 1 : Math.max(0, prev.featured - 1),
+    }))
+
+    try {
+      const res = await fetch(`/api/admin/products/${product.id}/featured`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isFeatured: nextVal }),
+      })
+
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Không thể cập nhật trạng thái nổi bật")
+      }
+
+      if (typeof data.featuredCount === "number") {
+        setCounts((prev) => ({ ...prev, featured: data.featuredCount }))
+      }
+
+      setMessage({
+        type: "success",
+        text: nextVal
+          ? `Đã thêm "${product.name}" vào danh sách nổi bật (${data.featuredCount}/6).`
+          : `Đã gỡ "${product.name}" khỏi danh sách nổi bật (${data.featuredCount}/6).`,
+      })
+      notifyCatalogChange()
+    } catch (err: unknown) {
+      // Revert on error
+      setProducts((prev) =>
+        prev.map((p) => (p.id === product.id ? { ...p, isFeatured: prevFeatured } : p))
+      )
+      setCounts((prev) => ({
+        ...prev,
+        featured: prevFeatured ? prev.featured : Math.max(0, prev.featured - 1),
+      }))
+      setMessage({
+        type: "error",
+        text: err instanceof Error ? err.message : "Lỗi cập nhật nổi bật",
+      })
+    } finally {
+      setSavingFeaturedIds((prev) => {
+        const next = new Set(prev)
+        next.delete(product.id)
+        return next
+      })
+    }
+  }
 
   const openEditor = (prod: ProductItem) => {
     setEditingProduct(prod)
@@ -766,49 +842,81 @@ export function ProductManagerClient({ groups }: Props) {
       )}
 
       {/* Action Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        {/* Tabs */}
-        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-secondary/50 border border-border w-fit text-xs">
-          <button
-            onClick={() => setActiveTab("published")}
-            className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
-              activeTab === "published"
-                ? "bg-primary text-primary-foreground shadow-sm font-semibold"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            Đang bán ({counts.published})
-          </button>
-          <button
-            onClick={() => setActiveTab("draft")}
-            className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
-              activeTab === "draft"
-                ? "bg-primary text-primary-foreground shadow-sm font-semibold"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            Bản nháp ({counts.draft})
-          </button>
-          <button
-            onClick={() => setActiveTab("hidden")}
-            className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
-              activeTab === "hidden"
-                ? "bg-primary text-primary-foreground shadow-sm font-semibold"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            Tạm ẩn ({counts.hidden})
-          </button>
-          <button
-            onClick={() => setActiveTab("all")}
-            className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
-              activeTab === "all"
-                ? "bg-primary text-primary-foreground shadow-sm font-semibold"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            Tất cả ({counts.all})
-          </button>
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        {/* Left Tabs & Featured Filter */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Status Tabs */}
+          <div className="flex items-center gap-1.5 p-1 rounded-xl bg-secondary/50 border border-border w-fit text-xs">
+            <button
+              onClick={() => setActiveTab("published")}
+              className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
+                activeTab === "published"
+                  ? "bg-primary text-primary-foreground shadow-sm font-semibold"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Đang bán ({counts.published})
+            </button>
+            <button
+              onClick={() => setActiveTab("draft")}
+              className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
+                activeTab === "draft"
+                  ? "bg-primary text-primary-foreground shadow-sm font-semibold"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Bản nháp ({counts.draft})
+            </button>
+            <button
+              onClick={() => setActiveTab("hidden")}
+              className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
+                activeTab === "hidden"
+                  ? "bg-primary text-primary-foreground shadow-sm font-semibold"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Tạm ẩn ({counts.hidden})
+            </button>
+            <button
+              onClick={() => setActiveTab("all")}
+              className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
+                activeTab === "all"
+                  ? "bg-primary text-primary-foreground shadow-sm font-semibold"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Tất cả ({counts.all})
+            </button>
+          </div>
+
+          {/* Featured Filter Toggle & Counter */}
+          <div className="flex items-center gap-1.5 p-1 rounded-xl bg-secondary/50 border border-border w-fit text-xs">
+            <button
+              type="button"
+              onClick={() => setFeaturedFilter(featuredFilter === "featured" ? "all" : "featured")}
+              className={`px-3 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1.5 ${
+                featuredFilter === "featured"
+                  ? "bg-caramel text-espresso font-bold shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+              title="Lọc chỉ hiển thị các sản phẩm đã được chọn nổi bật"
+            >
+              <Star className={`size-3.5 ${featuredFilter === "featured" ? "fill-espresso text-espresso" : "text-caramel fill-caramel/20"}`} />
+              <span>{featuredFilter === "featured" ? "Đã chọn nổi bật" : "Lọc nổi bật"}</span>
+            </button>
+
+            <span
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 border transition-colors ${
+                counts.featured >= 6
+                  ? "bg-caramel/20 text-caramel border-caramel/40"
+                  : "bg-background/80 text-muted-foreground border-border"
+              }`}
+              title="Số sản phẩm nổi bật đã chọn (tối đa 6)"
+            >
+              <Star className="size-3 text-caramel fill-caramel" />
+              <span>Đã chọn <strong>{counts.featured}/6</strong></span>
+            </span>
+          </div>
         </div>
 
         {/* Right Search & Add manual */}
@@ -903,6 +1011,12 @@ export function ProductManagerClient({ groups }: Props) {
                 <th className="py-3 px-2 w-16 text-center font-bold" title="Thứ tự ưu tiên hiển thị (1, 2, 3...)">
                   STT
                 </th>
+                <th className="py-3 px-2 w-24 text-center font-bold" title="Chọn hiển thị tại khu Sản phẩm nổi bật trên trang chủ (tối đa 6)">
+                  <div className="inline-flex items-center justify-center gap-1 text-caramel">
+                    <Star className="size-3 fill-caramel text-caramel" />
+                    <span>Nổi bật</span>
+                  </div>
+                </th>
                 <th className="py-3 px-4">Sản phẩm</th>
                 <th className="py-3 px-4">Danh mục</th>
                 <th className="py-3 px-4">Giá bán</th>
@@ -914,13 +1028,13 @@ export function ProductManagerClient({ groups }: Props) {
             <tbody className="divide-y divide-border">
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-muted-foreground">
+                  <td colSpan={9} className="py-12 text-center text-muted-foreground">
                     Đang tải danh sách sản phẩm...
                   </td>
                 </tr>
               ) : products.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-muted-foreground">
+                  <td colSpan={9} className="py-12 text-center text-muted-foreground">
                     Không có sản phẩm nào trong mục này.
                   </td>
                 </tr>
@@ -970,6 +1084,41 @@ export function ProductManagerClient({ groups }: Props) {
                           className="w-12 h-7 text-center font-bold text-xs rounded-md border border-border bg-background text-foreground focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-colors"
                           title="Nhập STT ưu tiên (1, 2, 3...) và bấm Enter hoặc click ra ngoài để lưu & tự sắp xếp"
                         />
+                      </td>
+
+                      {/* Checkbox Nổi bật */}
+                      <td className="py-3 px-2 text-center">
+                        <div className="flex flex-col items-center justify-center gap-1">
+                          {savingFeaturedIds.has(p.id) ? (
+                            <div className="size-4 flex items-center justify-center">
+                              <Loader2 className="size-3.5 animate-spin text-caramel" />
+                            </div>
+                          ) : (
+                            <input
+                              type="checkbox"
+                              checked={Boolean(p.isFeatured)}
+                              onChange={() => handleToggleFeatured(p)}
+                              disabled={savingFeaturedIds.has(p.id) || (!p.isFeatured && counts.featured >= 6)}
+                              aria-label={`Chọn ${p.name} làm sản phẩm nổi bật`}
+                              title={
+                                !p.isFeatured && counts.featured >= 6
+                                  ? "Đã đạt giới hạn tối đa 6 sản phẩm nổi bật. Bỏ chọn sản phẩm khác trước."
+                                  : p.isFeatured
+                                  ? `Bỏ chọn nổi bật cho ${p.name}`
+                                  : `Chọn ${p.name} làm sản phẩm nổi bật`
+                              }
+                              className="size-4 rounded border-border bg-card text-caramel focus:ring-1 focus:ring-caramel cursor-pointer accent-caramel align-middle disabled:opacity-30 disabled:cursor-not-allowed"
+                            />
+                          )}
+                          {p.isFeatured && (p.editorialStatus !== "published" || p.visibility !== "public") && (
+                            <span
+                              className="text-[9px] text-amber-400 font-medium leading-none whitespace-nowrap bg-amber-400/10 px-1 py-0.5 rounded border border-amber-400/20"
+                              title="Sản phẩm đang ở dạng bản nháp hoặc ẩn, sẽ tự động xuất hiện tại khu nổi bật ngay khi được đăng bán"
+                            >
+                              Sẽ hiển thị khi đăng bán
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       {/* Product Name & Source Info */}

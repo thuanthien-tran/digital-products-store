@@ -43,15 +43,15 @@ const SLOGAN_FEATURES = [
 ]
 
 export function HeroSection() {
-  const handleScrollToProducts = (e: React.MouseEvent<HTMLAnchorElement>) => {
+  const handleScrollToCatalog = (e: React.MouseEvent<HTMLAnchorElement>) => {
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
     e.preventDefault()
-    const target = document.getElementById("products")
+    const target = document.getElementById("catalog-heading") || document.getElementById("products")
     if (target) {
       target.scrollIntoView({
         behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
       })
-      window.history.pushState(null, "", "#products")
+      window.history.pushState(null, "", "#catalog-heading")
     }
   }
 
@@ -104,8 +104,8 @@ export function HeroSection() {
         {/* 4. Nút chính "Khám phá các gói" */}
         <div className="pt-0.5 sm:pt-1 animate-fade-up" style={{ animationDelay: "250ms" }}>
           <a
-            href="#products"
-            onClick={handleScrollToProducts}
+            href="#catalog-heading"
+            onClick={handleScrollToCatalog}
             className="inline-flex items-center gap-2 px-5 sm:px-6 py-2 sm:py-2.5 rounded-full bg-caramel hover:bg-caramel-light active:bg-[#D9955C] text-espresso font-bold text-xs sm:text-sm shadow-md shadow-black/30 hover:shadow-caramel/25 active:scale-95 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel-light focus-visible:ring-offset-2 focus-visible:ring-offset-background group"
           >
             <span>Khám phá các gói</span>

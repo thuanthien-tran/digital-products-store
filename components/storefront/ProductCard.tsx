@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { formatPrice } from "@/lib/utils"
 import { calculateProductPricing, type PricingVariant } from "@/lib/pricing"
 import { BrandIcon } from "@/components/storefront/BrandIcons"
-import { Check, ArrowRight, AlertCircle, Clock, Zap, Info, X, MessageCircle } from "lucide-react"
+import { Check, ArrowRight, AlertCircle, Clock, Zap, Info, X, MessageCircle, Star } from "lucide-react"
 
 export interface ProductCardVariant extends PricingVariant {
   id: string
@@ -34,6 +34,7 @@ export interface ProductCardProps {
   variants: ProductCardVariant[]
   className?: string
   priority?: boolean
+  featured?: boolean
 }
 
 // Category aesthetic theme
@@ -192,6 +193,7 @@ export function ProductCard({
   noticeNotes,
   variants = [],
   className = "",
+  featured = false,
 }: ProductCardProps) {
   const [imgError, setImgError] = useState(false)
   const [activeCondition, setActiveCondition] = useState<{ label: string; detail: string } | null>(null)
@@ -249,7 +251,11 @@ export function ProductCard({
 
   return (
     <div
-      className={`group relative flex flex-col justify-between h-full rounded-2xl border border-border/70 bg-card/60 backdrop-blur-md transition-all duration-300 hover:-translate-y-1.5 hover:shadow-2xl overflow-hidden ${theme.cardBorder} ${className}`}
+      className={`group relative flex flex-col justify-between h-full rounded-2xl border backdrop-blur-md transition-all duration-300 hover:-translate-y-1.5 hover:shadow-2xl overflow-hidden ${
+        featured
+          ? "border-caramel/50 hover:border-caramel/90 bg-gradient-to-b from-card/95 via-card/85 to-card/75 shadow-lg shadow-black/20 hover:shadow-caramel/20 ring-1 ring-caramel/30 hover:ring-caramel/60 before:absolute before:inset-x-0 before:top-0 before:h-[3px] before:bg-gradient-to-r before:from-transparent before:via-caramel before:to-transparent before:z-10"
+          : `border-border/70 bg-card/60 ${theme.cardBorder}`
+      } ${className}`}
     >
       {/* Upper Section */}
       <div className="flex flex-col flex-1">
@@ -322,13 +328,19 @@ export function ProductCard({
 
         {/* Content Body */}
         <div className="flex flex-col flex-1 p-4 sm:p-5">
-          {/* Category Pill */}
-          <div className="flex items-center pb-2">
+          {/* Category Pill & Featured Badge */}
+          <div className="flex items-center justify-between gap-2 pb-2">
             <span
               className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold border backdrop-blur transition-transform duration-200 ${theme.badge}`}
             >
               {groupName}
             </span>
+            {featured && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-gradient-to-r from-caramel/25 to-caramel/10 text-caramel border border-caramel/40 shadow-xs tracking-wide select-none">
+                <Star className="size-2.5 fill-caramel text-caramel" />
+                Nổi bật
+              </span>
+            )}
           </div>
 
           {/* Product Title (2 lines max, accessible link) */}
@@ -368,7 +380,7 @@ export function ProductCard({
                   className="flex items-start gap-2 text-xs leading-relaxed text-muted-foreground group-hover:text-foreground/90 transition-colors"
                 >
                   <Check
-                    className={`size-3.5 mt-0.5 shrink-0 ${theme.accent}`}
+                    className={`size-3.5 mt-0.5 shrink-0 ${featured ? "text-caramel" : theme.accent}`}
                     strokeWidth={2.5}
                   />
                   <span className="line-clamp-1">{hl}</span>
@@ -445,7 +457,11 @@ export function ProductCard({
           </span>
 
           <div className="flex items-baseline gap-2 flex-wrap">
-            <span className="text-xl sm:text-2xl font-black text-foreground tracking-tight tabular-nums">
+            <span
+              className={`text-xl sm:text-2xl font-black tracking-tight tabular-nums ${
+                featured ? "text-caramel drop-shadow-xs" : "text-foreground"
+              }`}
+            >
               {pricing.priceText}
             </span>
 
@@ -506,14 +522,18 @@ export function ProductCard({
           <Button
             size="sm"
             asChild
-            variant="outline"
-            className="text-xs h-9 px-3.5 font-medium border-border/80 group/btn active-bounce group-hover:border-accent/50 group-hover:text-accent transition-all duration-150 shrink-0"
+            variant={featured ? "default" : "outline"}
+            className={
+              featured
+                ? "text-xs h-9 px-4 font-bold bg-caramel text-espresso hover:bg-caramel-light shadow-md shadow-caramel/25 border border-caramel/60 group/btn active-bounce transition-all duration-150 shrink-0"
+                : "text-xs h-9 px-3.5 font-medium border-border/80 group/btn active-bounce group-hover:border-accent/50 group-hover:text-accent transition-all duration-150 shrink-0"
+            }
           >
             <Link href={`/product/${slug}`}>
               <span>{pricing.hasMultipleVariants ? "Chọn gói" : "Xem chi tiết"}</span>
               <ArrowRight
                 className="size-3.5 ml-1 transition-transform duration-200 group-hover:translate-x-1"
-                strokeWidth={2}
+                strokeWidth={2.5}
               />
             </Link>
           </Button>
