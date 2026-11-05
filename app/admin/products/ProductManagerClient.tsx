@@ -502,7 +502,10 @@ export function ProductManagerClient({ groups }: Props) {
       if (res.ok) {
         notifyCatalogChange()
         setMessage({
-          text: "Đã cập nhật giá bán và thông tin sản phẩm đồng bộ thành công lên website!",
+          text:
+            actionType === "save_draft"
+              ? "Đã lưu thông tin vào Bản nháp (ẩn) thành công!"
+              : "Đã cập nhật giá bán và thông tin sản phẩm đồng bộ thành công lên website!",
           type: "success",
         })
         setEditingProduct(null)
@@ -1585,17 +1588,32 @@ export function ProductManagerClient({ groups }: Props) {
                   Hủy
                 </button>
 
+                {editingProduct.editorialStatus === "draft" && (
+                  <button
+                    type="button"
+                    onClick={() => handleSaveProduct("save_draft")}
+                    disabled={saving}
+                    className="px-3.5 py-1.5 rounded-lg border border-border bg-secondary hover:bg-secondary/80 text-foreground text-xs font-semibold flex items-center gap-1.5 transition-all disabled:opacity-50"
+                    title="Lưu lại các thay đổi nhưng vẫn giữ sản phẩm ở trạng thái Bản nháp ẩn, chưa đăng lên web"
+                  >
+                    <Save className="size-3.5 text-muted-foreground" />
+                    <span>Lưu bản nháp</span>
+                  </button>
+                )}
+
                 <button
                   type="button"
                   onClick={() => handleSaveProduct("publish_now")}
                   disabled={saving}
                   className="px-4 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-bold flex items-center gap-1.5 hover:opacity-90 active:scale-95 transition-all disabled:opacity-50"
                 >
-                  <Save className="size-3.5" />
+                  <Send className="size-3.5" />
                   <span>
                     {saving
                       ? "Đang lưu..."
-                      : "Lưu & Cập nhật giá lên web ngay"}
+                      : editingProduct.editorialStatus === "draft"
+                      ? "Lưu & Đăng bán lên web"
+                      : "Lưu & Cập nhật lên web"}
                   </span>
                 </button>
               </div>
