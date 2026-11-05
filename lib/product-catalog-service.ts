@@ -16,6 +16,8 @@ export interface UpdateProductInput {
   warrantyTerms?: string | null
   usageInstructions?: string | null
   noticeNotes?: string | null
+  deliveryType?: string
+  statusOverride?: string
   images?: string[]
   variants?: Array<{
     id?: string
@@ -197,6 +199,8 @@ export async function updateProductDetails(
     updatedData.serviceInstructions = input.usageInstructions
   }
   if (input.noticeNotes !== undefined) updatedData.noticeNotes = input.noticeNotes
+  if (input.deliveryType !== undefined) updatedData.deliveryType = input.deliveryType
+  if (input.statusOverride !== undefined) updatedData.statusOverride = input.statusOverride
   if (input.images !== undefined) updatedData.images = JSON.stringify(input.images)
 
   if (input.action === 'publish_now') {

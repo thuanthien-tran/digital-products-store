@@ -64,18 +64,29 @@ export default async function ProductPage({ params }: Props) {
   ])
   if (!product) notFound()
 
-  const variantsWithStock = product.variants.map((v) => ({
-    id: v.id,
-    name: v.name,
-    priceCents: v.priceCents,
-    compareAtPriceCents: v.compareAtPriceCents,
-    availableStock:
+  const variantsWithStock = product.variants.map((v) => {
+    let stock =
       v.provider || product.deliveryType === "fatcat" || product.deliveryType === "dino"
         ? (v.providerStock ?? 0) + v._count.serials
-        : v._count.serials,
-    minQuantity: v.minQuantity,
-    maxQuantity: v.maxQuantity,
-  }))
+        : v._count.serials
+
+    // Respect product level status override and contact mode
+    if (product.statusOverride === "in_stock" || product.deliveryType === "contact") {
+      stock = Math.max(stock, 999)
+    } else if (product.statusOverride === "out_of_stock") {
+      stock = 0
+    }
+
+    return {
+      id: v.id,
+      name: v.name,
+      priceCents: v.priceCents,
+      compareAtPriceCents: v.compareAtPriceCents,
+      availableStock: stock,
+      minQuantity: v.minQuantity,
+      maxQuantity: v.maxQuantity,
+    }
+  })
 
   // Parse images
   let parsedImages: string[] = []
@@ -138,12 +149,57 @@ export default async function ProductPage({ params }: Props) {
                     <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground leading-snug">
                       {product.name}
                     </h1>
-                    <p className="text-xs text-muted-foreground">
-                      Hình thức bàn giao:{" "}
-                      <span className="text-foreground font-medium">
-                        {product.deliveryType === "serials" ? "Mã tự động hiển thị ngay sau thanh toán" : "Hỗ trợ kích hoạt trực tiếp"}
+                    <div className="flex items-center gap-2 pt-1 flex-wrap">
+                      <span
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
+                          product.statusOverride === "out_of_stock"
+                            ? "bg-rose-500/10 text-rose-400 border-rose-500/30"
+                            : product.statusOverride === "in_stock" || product.deliveryType === "contact"
+                            ? product.deliveryType === "contact"
+                              ? "bg-sky-500/10 text-sky-400 border-sky-500/30"
+                              : "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                            : variantsWithStock.every((v) => v.availableStock <= 0)
+                            ? "bg-rose-500/10 text-rose-400 border-rose-500/30"
+                            : "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                        }`}
+                      >
+                        <span
+                          className={`size-1.5 rounded-full ${
+                            product.statusOverride === "out_of_stock"
+                              ? "bg-rose-400"
+                              : product.statusOverride === "in_stock" || product.deliveryType === "contact"
+                              ? product.deliveryType === "contact"
+                                ? "bg-sky-400"
+                                : "bg-emerald-400 animate-pulse"
+                              : variantsWithStock.every((v) => v.availableStock <= 0)
+                              ? "bg-rose-400"
+                              : "bg-emerald-400 animate-pulse"
+                          }`}
+                        />
+                        <span>
+                          {product.statusOverride === "out_of_stock"
+                            ? "Hết hàng"
+                            : product.statusOverride === "in_stock"
+                            ? "Còn hàng"
+                            : product.deliveryType === "contact"
+                            ? "Tư vấn & Sẵn sàng cấp"
+                            : variantsWithStock.every((v) => v.availableStock <= 0)
+                            ? "Hết hàng"
+                            : "Còn hàng"}
+                        </span>
                       </span>
-                    </p>
+
+                      <p className="text-xs text-muted-foreground">
+                        • Hình thức bàn giao:{" "}
+                        <span className="text-foreground font-medium">
+                          {product.deliveryType === "contact"
+                            ? "Liên hệ Zalo đặt mua & Bàn giao trực tiếp"
+                            : product.deliveryType === "serials"
+                            ? "Mã tự động hiển thị ngay sau thanh toán"
+                            : "Hỗ trợ kích hoạt trực tiếp"}
+                        </span>
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>

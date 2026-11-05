@@ -153,6 +153,8 @@ export function ProductManagerClient({ groups }: Props) {
     instructions: "",
     warranty: "",
     notes: "",
+    deliveryType: "serials",
+    statusOverride: "auto",
     sortOrder: 1,
   })
   const [saving, setSaving] = useState(false)
@@ -167,6 +169,7 @@ export function ProductManagerClient({ groups }: Props) {
     variantName: "Gói Mặc Định",
     description: "",
     imageUrl: "",
+    deliveryType: "contact",
     warrantyTerms: "Bảo hành 1 đổi 1 trong thời gian sử dụng.",
   })
 
@@ -419,6 +422,8 @@ export function ProductManagerClient({ groups }: Props) {
       instructions: initialInstructions,
       warranty: initialWarranty,
       notes: initialNotes,
+      deliveryType: prod.deliveryType || "serials",
+      statusOverride: prod.statusOverride || "auto",
       sortOrder: prod.sortOrder || 1,
     })
     setConfirmBelowCost(false)
@@ -467,6 +472,8 @@ export function ProductManagerClient({ groups }: Props) {
         body: JSON.stringify({
           name: editForm.name,
           groupId: editForm.groupId,
+          deliveryType: editForm.deliveryType,
+          statusOverride: editForm.statusOverride,
           sortOrder: Number(editForm.sortOrder) || 1,
           description: fullDesc,
           warrantyTerms: editForm.warranty,
@@ -672,6 +679,7 @@ export function ProductManagerClient({ groups }: Props) {
           groupId: manualForm.groupId,
           priceCents: manualForm.priceCents,
           variantName: manualForm.variantName,
+          deliveryType: manualForm.deliveryType,
           description: manualForm.description,
           images: manualForm.imageUrl ? [manualForm.imageUrl.trim()] : [],
           warrantyTerms: manualForm.warrantyTerms,
@@ -691,6 +699,7 @@ export function ProductManagerClient({ groups }: Props) {
           variantName: "Gói Mặc Định",
           description: "",
           imageUrl: "",
+          deliveryType: "contact",
           warrantyTerms: "Bảo hành 1 đổi 1 trong thời gian sử dụng.",
         })
         setRefreshTrigger((prev) => prev + 1)
@@ -1233,9 +1242,9 @@ export function ProductManagerClient({ groups }: Props) {
                     </p>
                   </div>
 
-                  {/* 2. Product Name, Category & Sort Order */}
+                  {/* 2. Product Name, Category, Delivery Type & Sort Order */}
                   <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-                    <div className="sm:col-span-6">
+                    <div className="sm:col-span-4">
                       <label className="block text-muted-foreground font-medium mb-1">
                         Tên sản phẩm trên website *
                       </label>
@@ -1248,7 +1257,7 @@ export function ProductManagerClient({ groups }: Props) {
                       />
                     </div>
 
-                    <div className="sm:col-span-4">
+                    <div className="sm:col-span-3">
                       <label className="block text-muted-foreground font-medium mb-1">
                         Danh mục nhóm sản phẩm *
                       </label>
@@ -1266,8 +1275,39 @@ export function ProductManagerClient({ groups }: Props) {
                     </div>
 
                     <div className="sm:col-span-2">
+                      <label className="block text-muted-foreground font-medium mb-1" title="Hình thức phân phối sản phẩm">
+                        Hình thức bán *
+                      </label>
+                      <select
+                        value={editForm.deliveryType}
+                        onChange={(e) => setEditForm({ ...editForm, deliveryType: e.target.value })}
+                        className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground text-xs focus:outline-none focus:ring-1 focus:ring-primary font-medium"
+                      >
+                        <option value="serials">Kho mã / Key (Tự động)</option>
+                        <option value="fatcat">Đại lý FatCat (API)</option>
+                        <option value="service">Nâng cấp thủ công</option>
+                        <option value="contact">Liên hệ Zalo đặt mua</option>
+                      </select>
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <label className="block text-muted-foreground font-medium mb-1" title="Trạng thái hàng hiển thị cho khách">
+                        Trạng thái kho *
+                      </label>
+                      <select
+                        value={editForm.statusOverride}
+                        onChange={(e) => setEditForm({ ...editForm, statusOverride: e.target.value })}
+                        className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground text-xs focus:outline-none focus:ring-1 focus:ring-primary font-medium"
+                      >
+                        <option value="auto">Tự động (Theo tồn kho)</option>
+                        <option value="in_stock">Bắt buộc Còn hàng</option>
+                        <option value="out_of_stock">Bắt buộc Hết hàng</option>
+                      </select>
+                    </div>
+
+                    <div className="sm:col-span-1">
                       <label className="block text-muted-foreground font-medium mb-1" title="Số thứ tự ưu tiên hiển thị (1, 2, 3...)">
-                        STT ưu tiên
+                        STT
                       </label>
                       <input
                         type="number"
@@ -1663,6 +1703,19 @@ export function ProductManagerClient({ groups }: Props) {
                     </div>
                   )}
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-muted-foreground font-medium mb-1">Hình thức bán *</label>
+                <select
+                  value={manualForm.deliveryType}
+                  onChange={(e) => setManualForm({ ...manualForm, deliveryType: e.target.value })}
+                  className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground text-xs focus:outline-none focus:ring-1 focus:ring-primary font-medium"
+                >
+                  <option value="contact">Liên hệ Zalo đặt mua (Khuyên dùng cho đại lý không có API)</option>
+                  <option value="serials">Kho mã / Key (Tự động)</option>
+                  <option value="service">Nâng cấp thủ công</option>
+                </select>
               </div>
 
               <div>

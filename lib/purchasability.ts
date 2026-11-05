@@ -134,6 +134,25 @@ export function evaluateVariantPurchasability(params: {
     }
   }
 
+  // If admin explicitly overrides status to "in_stock" or deliveryType is "contact"
+  if (product.statusOverride === "in_stock" || product.deliveryType === "contact") {
+    return {
+      variantId: variant.id,
+      productId: product.id,
+      productName: product.name,
+      variantName: variant.name,
+      isPurchasable: product.deliveryType !== "contact",
+      reason: "available",
+      displayStatus: "in_stock",
+      availableStock: 999,
+      localStock: 999,
+      providerStock: 0,
+      minQuantity,
+      maxQuantity,
+      unitPriceCents: variant.priceCents,
+    }
+  }
+
   // 2. Evaluate Provider Stock Validity
   const isProviderBacked = Boolean(
     variant.provider ||

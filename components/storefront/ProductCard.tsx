@@ -213,8 +213,11 @@ export function ProductCard({
 
   // Extract key attributes
   const duration = detectDuration(name, variants)
+  const isContactOnly = deliveryType === "contact"
   const deliveryLabel =
-    deliveryType === "service"
+    isContactOnly
+      ? "Liên hệ đặt hàng"
+      : deliveryType === "service"
       ? "Nâng cấp tài khoản"
       : "Giao tự động tức thì"
 
@@ -284,17 +287,23 @@ export function ProductCard({
           {/* Product Stock Status Badge (Top-Left over Image) */}
           <div
             className={`absolute top-2.5 left-2.5 inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-0.5 rounded-full border backdrop-blur-md shadow-md pointer-events-none transition-colors ${
-              pricing.hasStock
+              isContactOnly
+                ? "text-sky-300 bg-sky-950/80 border-sky-500/40 shadow-sky-950/30"
+                : pricing.hasStock
                 ? "text-emerald-300 bg-emerald-950/80 border-emerald-500/40 shadow-emerald-950/30"
                 : "text-rose-300 bg-rose-950/80 border-rose-500/40 shadow-rose-950/30"
             }`}
           >
             <span
               className={`size-1.5 rounded-full ${
-                pricing.hasStock ? "bg-emerald-400 animate-pulse" : "bg-rose-400"
+                isContactOnly
+                  ? "bg-sky-400"
+                  : pricing.hasStock
+                  ? "bg-emerald-400 animate-pulse"
+                  : "bg-rose-400"
               }`}
             />
-            <span>{pricing.hasStock ? "Còn hàng" : "Hết hàng"}</span>
+            <span>{isContactOnly ? "Tư vấn & Đặt hàng" : pricing.hasStock ? "Còn hàng" : "Hết hàng"}</span>
           </div>
 
           {/* Discount Percentage Badge (Top-Right over Image) */}
@@ -444,7 +453,26 @@ export function ProductCard({
         </div>
 
         {/* Action Button */}
-        {pricing.isOutOfStock ? (
+        {isContactOnly ? (
+          <Button
+            size="sm"
+            asChild
+            variant="outline"
+            className="text-xs h-9 px-3.5 font-bold border-sky-500/40 text-sky-400 hover:bg-sky-500/10 hover:border-sky-500/60 transition-all duration-150 shrink-0"
+          >
+            <a
+              href={`https://zalo.me/${process.env.NEXT_PUBLIC_ZALO_PHONE_1 || "0356970964"}?text=${encodeURIComponent(
+                `Chào shop CapyGo, mình cần tư vấn đặt mua gói: ${name}`
+              )}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`Liên hệ Zalo tư vấn mua ${name}`}
+            >
+              <MessageCircle className="size-3.5 mr-1 text-sky-400" />
+              <span>Liên hệ</span>
+            </a>
+          </Button>
+        ) : pricing.isOutOfStock ? (
           <Button
             size="sm"
             asChild

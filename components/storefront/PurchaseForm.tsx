@@ -430,7 +430,11 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
                           </span>
                         )}
                         <span className="text-[11px]">
-                          {outOfStock ? "Hết hàng" : `Kho còn: ${vStock}`}
+                          {product.deliveryType === "contact"
+                            ? "Sẵn sàng cấp qua Zalo"
+                            : outOfStock
+                            ? "Hết hàng"
+                            : `Kho còn: ${vStock}`}
                         </span>
                       </div>
                     </div>
@@ -652,44 +656,67 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
           </label>
         </div>
 
-        {/* F. Nút chính & Chặn thanh toán khi hết hàng */}
-        <button
-          type="submit"
-          disabled={loading || isOutOfStock}
-          className="w-full h-12 rounded-xl text-sm font-bold bg-caramel hover:bg-caramel-light active:bg-[#D9955C] text-espresso shadow-sm transition-all duration-150 flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel-light focus-visible:ring-offset-2 focus-visible:ring-offset-background cursor-pointer"
-        >
-          {loading ? (
-            <>
-              <Loader2 className="size-4 animate-spin text-espresso" />
-              <span>Đang kiểm tra nguồn hàng & tạo đơn…</span>
-            </>
-          ) : isOutOfStock ? (
-            <span>Gói hiện đã hết hàng</span>
-          ) : (
-            <>
-              <span>Tiếp tục đến VietQR</span>
-              <ArrowRight className="size-4" strokeWidth={2.2} />
-            </>
-          )}
-        </button>
+        {/* F. Nút chính / Nút Liên Hệ Đặt Hàng */}
+        {product.deliveryType === "contact" ? (
+          <div className="space-y-3 pt-1">
+            <a
+              href={`https://zalo.me/${process.env.NEXT_PUBLIC_ZALO_PHONE_1 || "0356970964"}?text=${encodeURIComponent(
+                `Chào shop CapyGo, mình cần đặt mua gói: ${product.name}${
+                  selectedVariant ? ` (${selectedVariant.name})` : ""
+                }`
+              )}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full h-12 rounded-xl text-sm font-bold bg-sky-500 hover:bg-sky-400 active:bg-sky-600 text-white shadow-md shadow-sky-500/20 transition-all duration-150 flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <MessageCircle className="size-5" />
+              <span>Liên hệ Zalo để đặt hàng ngay</span>
+            </a>
+            <p className="text-xs text-center text-sky-400/90 font-medium leading-relaxed bg-sky-500/10 border border-sky-500/20 p-2.5 rounded-xl">
+              Sản phẩm này được cấp theo yêu cầu riêng. Quý khách vui lòng nhắn Zalo để nhân viên kiểm tra tình trạng kho và bàn giao trực tiếp.
+            </p>
+          </div>
+        ) : (
+          <>
+            <button
+              type="submit"
+              disabled={loading || isOutOfStock}
+              className="w-full h-12 rounded-xl text-sm font-bold bg-caramel hover:bg-caramel-light active:bg-[#D9955C] text-espresso shadow-sm transition-all duration-150 flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel-light focus-visible:ring-offset-2 focus-visible:ring-offset-background cursor-pointer"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="size-4 animate-spin text-espresso" />
+                  <span>Đang kiểm tra nguồn hàng & tạo đơn…</span>
+                </>
+              ) : isOutOfStock ? (
+                <span>Gói hiện đã hết hàng</span>
+              ) : (
+                <>
+                  <span>Tiếp tục đến VietQR</span>
+                  <ArrowRight className="size-4" strokeWidth={2.2} />
+                </>
+              )}
+            </button>
 
-        {/* Out of Stock Contact Action */}
-        {isOutOfStock && (
-          <a
-            href={`https://zalo.me/${process.env.NEXT_PUBLIC_ZALO_PHONE_1 || "0356970964"}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-full h-11 rounded-xl text-xs font-semibold border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 flex items-center justify-center gap-2 transition-colors active-bounce"
-          >
-            <MessageCircle className="size-4 text-amber-400" />
-            <span>Liên hệ Zalo để đặt trước hoặc tư vấn gói</span>
-          </a>
+            {/* Out of Stock Contact Action */}
+            {isOutOfStock && (
+              <a
+                href={`https://zalo.me/${process.env.NEXT_PUBLIC_ZALO_PHONE_1 || "0356970964"}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full h-11 rounded-xl text-xs font-semibold border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 flex items-center justify-center gap-2 transition-colors active-bounce"
+              >
+                <MessageCircle className="size-4 text-amber-400" />
+                <span>Liên hệ Zalo để đặt trước hoặc tư vấn gói</span>
+              </a>
+            )}
+
+            {/* G. Hướng dẫn tiếp theo */}
+            <p className="text-xs text-center text-muted-foreground leading-relaxed px-1">
+              Mã QR, tài khoản nhận và nội dung chuyển khoản sẽ hiển thị ở bước tiếp theo.
+            </p>
+          </>
         )}
-
-        {/* G. Hướng dẫn tiếp theo */}
-        <p className="text-xs text-center text-muted-foreground leading-relaxed px-1">
-          Mã QR, tài khoản nhận và nội dung chuyển khoản sẽ hiển thị ở bước tiếp theo.
-        </p>
 
         {/* Trust Badges */}
         <div className="pt-3 border-t border-border/40 flex items-center justify-center gap-4 text-[11px] text-muted-foreground">
