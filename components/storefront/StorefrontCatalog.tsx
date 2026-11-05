@@ -1,8 +1,8 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
-import { Search, X, RefreshCw, Layers, ChevronDown, SlidersHorizontal, Star } from "lucide-react"
+import { Search, X, RefreshCw, Layers, ChevronDown, SlidersHorizontal, Star, ChevronLeft, ChevronRight } from "lucide-react"
 import { ProductCard, type ProductCardVariant } from "@/components/storefront/ProductCard"
 import { calculateProductPricing } from "@/lib/pricing"
 import { normalizeVietnamese } from "@/lib/utils"
@@ -205,6 +205,99 @@ export function StorefrontCatalog({ groups, products }: StorefrontCatalogProps) 
     }
   }
 
+  // Featured Carousel Mobile State & Controls
+  const [featuredIndex, setFeaturedIndex] = useState(0)
+  const featuredCarouselRef = useRef<HTMLDivElement>(null)
+  const activeFeaturedIdRef = useRef<string | null>(null)
+
+  // Maintain active featured slide by product ID during background sync/inventory updates
+  useEffect(() => {
+    if (featuredProducts.length === 0) {
+      setFeaturedIndex(0)
+      activeFeaturedIdRef.current = null
+      return
+    }
+
+    // Preserve product by ID if still in list
+    if (activeFeaturedIdRef.current) {
+      const existingIdx = featuredProducts.findIndex((p) => p.id === activeFeaturedIdRef.current)
+      if (existingIdx !== -1) {
+        setFeaturedIndex(existingIdx)
+        return
+      }
+    }
+
+    // Otherwise safely clamp index
+    setFeaturedIndex((prev) => {
+      const clamped = Math.min(prev, featuredProducts.length - 1)
+      activeFeaturedIdRef.current = featuredProducts[clamped]?.id || null
+      return clamped
+    })
+  }, [featuredProducts])
+
+  // Track slide on swipe via IntersectionObserver (lightweight, zero-lag)
+  useEffect(() => {
+    const container = featuredCarouselRef.current
+    if (!container || featuredProducts.length <= 1) return
+
+    const slides = container.querySelectorAll<HTMLElement>("[data-featured-slide]")
+    if (slides.length === 0) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
+            const idxAttr = entry.target.getAttribute("data-slide-index")
+            const idAttr = entry.target.getAttribute("data-product-id")
+            if (idxAttr !== null) {
+              const parsed = parseInt(idxAttr, 10)
+              if (!isNaN(parsed)) {
+                setFeaturedIndex(parsed)
+                if (idAttr) activeFeaturedIdRef.current = idAttr
+              }
+            }
+          }
+        }
+      },
+      {
+        root: container,
+        threshold: 0.5,
+      }
+    )
+
+    slides.forEach((s) => observer.observe(s))
+    return () => observer.disconnect()
+  }, [featuredProducts])
+
+  const scrollFeaturedTo = (index: number) => {
+    const container = featuredCarouselRef.current
+    if (!container) return
+    const slides = container.querySelectorAll<HTMLElement>("[data-featured-slide]")
+    const target = slides[index]
+    if (target) {
+      target.scrollIntoView({
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+        block: "nearest",
+        inline: "start",
+      })
+      setFeaturedIndex(index)
+      const idAttr = target.getAttribute("data-product-id")
+      if (idAttr) activeFeaturedIdRef.current = idAttr
+    }
+  }
+
+  const handlePrevFeatured = () => {
+    if (featuredIndex > 0) {
+      scrollFeaturedTo(featuredIndex - 1)
+    }
+  }
+
+  const handleNextFeatured = () => {
+    if (featuredIndex < featuredProducts.length - 1) {
+      scrollFeaturedTo(featuredIndex + 1)
+    }
+  }
+
   // Filter groups to only those with public products
   const activeGroups = useMemo(() => {
     return catalogGroups
@@ -321,7 +414,7 @@ export function StorefrontCatalog({ groups, products }: StorefrontCatalogProps) 
     <section id="products" className="scroll-mt-24 pt-6 sm:pt-8 border-t border-border/70">
       {/* Khu "Sản phẩm nổi bật" (Chỉ hiển thị khi có sản phẩm thỏa điều kiện bán) */}
       {featuredProducts.length > 0 && (
-        <div className="relative mb-8 sm:mb-12 p-4 sm:p-7 rounded-3xl bg-gradient-to-b from-caramel/[0.08] via-card/65 to-card/45 border-2 border-caramel/35 shadow-2xl shadow-black/35 ring-1 ring-caramel/20 overflow-hidden">
+        <div className="relative mb-8 sm:mb-12 p-3.5 sm:p-7 rounded-2xl sm:rounded-3xl bg-gradient-to-b from-caramel/[0.08] via-card/65 to-card/45 border-2 border-caramel/35 shadow-2xl shadow-black/35 ring-1 ring-caramel/20 overflow-hidden">
           {/* Ambient Warm Spotlight Glow */}
           <div
             aria-hidden="true"
@@ -329,38 +422,42 @@ export function StorefrontCatalog({ groups, products }: StorefrontCatalogProps) 
           />
 
           <div className="relative space-y-4 sm:space-y-6">
-            {/* Tiêu đề khu nổi bật: Icon ngôi sao caramel + Tiêu đề oat-cream + Link "Xem tất cả →" (Không mô tả phụ) */}
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2.5 sm:gap-3">
+            {/* Tiêu đề khu nổi bật: Cho phép wrap trên màn hình hẹp */}
+            <div className="flex items-center justify-between gap-2.5 sm:gap-3 flex-wrap">
+              <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                 <span className="size-8 rounded-xl bg-gradient-to-br from-caramel/30 to-caramel/10 border border-caramel/45 flex items-center justify-center text-caramel shadow-md shadow-caramel/20 shrink-0">
                   <Star className="size-4 fill-caramel text-caramel" aria-hidden="true" />
                 </span>
-                <h2 className="text-xl sm:text-2xl font-black tracking-tight text-oat-cream">
+                <h2 className="text-[20px] sm:text-2xl md:text-[26px] font-heading font-bold tracking-tight text-oat-cream truncate">
                   Sản phẩm nổi bật
                 </h2>
               </div>
               <a
                 href="#catalog-heading"
                 onClick={handleScrollToCatalog}
-                className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-caramel hover:text-espresso bg-caramel/15 hover:bg-caramel border border-caramel/40 px-3.5 py-1.5 rounded-full transition-all duration-200 group focus:outline-none focus:ring-2 focus:ring-caramel/50 shadow-xs"
+                className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-caramel hover:text-espresso bg-caramel/15 hover:bg-caramel border border-caramel/40 px-3.5 py-1.5 rounded-full transition-all duration-200 group focus:outline-none focus:ring-2 focus:ring-caramel/50 shadow-xs shrink-0"
               >
                 <span>Xem tất cả</span>
                 <span className="transition-transform duration-200 motion-safe:group-hover:translate-x-1">→</span>
               </a>
             </div>
 
-            {/* Danh sách thẻ nổi bật: Mobile cuộn ngang (86vw, snap-x) / Desktop lưới 3 cột (tối đa 6 thẻ) */}
-            <div className="w-full overflow-hidden -mx-4 px-4 sm:mx-0 sm:px-0">
+            {/* Carousel Container: Mobile 1 card trọn vẹn / Desktop 3 cột */}
+            <div className="w-full overflow-hidden">
               <div
+                ref={featuredCarouselRef}
                 role="region"
                 aria-label="Danh sách sản phẩm nổi bật"
                 tabIndex={0}
-                className="flex sm:grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 overflow-x-auto sm:overflow-visible pb-3 sm:pb-0 snap-x snap-mandatory focus:outline-none focus:ring-1 focus:ring-caramel/40 rounded-2xl scrollbar-none items-stretch"
+                className="flex sm:grid sm:grid-cols-2 lg:grid-cols-3 gap-0 sm:gap-6 overflow-x-auto sm:overflow-visible pb-1 sm:pb-0 snap-x snap-mandatory focus:outline-none focus:ring-1 focus:ring-caramel/40 rounded-2xl scrollbar-none items-stretch touch-pan-y"
               >
-                {featuredProducts.map((p) => (
+                {featuredProducts.map((p, idx) => (
                   <div
                     key={`featured-${p.id}`}
-                    className="w-[86vw] max-w-[340px] shrink-0 sm:w-auto snap-center sm:snap-align-none h-full flex flex-col"
+                    data-featured-slide
+                    data-slide-index={idx}
+                    data-product-id={p.id}
+                    className="w-full flex-none shrink-0 sm:w-auto sm:flex-initial snap-start snap-always sm:snap-align-none h-full flex flex-col min-w-0"
                   >
                     <ProductCard
                       id={p.id}
@@ -382,16 +479,61 @@ export function StorefrontCatalog({ groups, products }: StorefrontCatalogProps) 
                 ))}
               </div>
             </div>
+
+            {/* Mobile Carousel Controls: [Nút trước]  1 / N  [Nút sau] */}
+            {featuredProducts.length > 1 && (
+              <div className="flex sm:hidden items-center justify-between pt-1 px-1 select-none">
+                <button
+                  type="button"
+                  onClick={handlePrevFeatured}
+                  disabled={featuredIndex === 0}
+                  aria-label="Xem sản phẩm nổi bật trước"
+                  className="inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded-xl border border-border/80 bg-card/90 text-foreground hover:bg-caramel/20 hover:text-caramel-light hover:border-caramel/40 disabled:opacity-35 disabled:cursor-not-allowed transition-all active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel"
+                >
+                  <ChevronLeft className="size-5" />
+                  <span className="sr-only">Trước</span>
+                </button>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-foreground/90 tabular-nums">
+                    {featuredIndex + 1} / {featuredProducts.length}
+                  </span>
+                  <div className="flex items-center gap-1.5" aria-hidden="true">
+                    {featuredProducts.map((_, i) => (
+                      <span
+                        key={i}
+                        className={`transition-all duration-300 rounded-full ${
+                          i === featuredIndex
+                            ? "w-4 h-1.5 bg-caramel"
+                            : "w-1.5 h-1.5 bg-muted-foreground/30"
+                        }`}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleNextFeatured}
+                  disabled={featuredIndex >= featuredProducts.length - 1}
+                  aria-label="Xem sản phẩm nổi bật tiếp theo"
+                  className="inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded-xl border border-border/80 bg-card/90 text-foreground hover:bg-caramel/20 hover:text-caramel-light hover:border-caramel/40 disabled:opacity-35 disabled:cursor-not-allowed transition-all active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel"
+                >
+                  <ChevronRight className="size-5" />
+                  <span className="sr-only">Sau</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
 
       {/* 1. Tiêu đề H2 Danh mục sản phẩm */}
       <div id="catalog-heading" className={`space-y-1 text-left scroll-mt-24 ${featuredProducts.length > 0 ? "pt-1 sm:pt-2" : ""}`}>
-        <h2 className="text-xl sm:text-2xl md:text-[28px] font-black tracking-tight text-foreground">
+        <h2 className="text-[22px] sm:text-2xl md:text-[28px] font-heading font-bold tracking-tight text-foreground">
           Danh mục sản phẩm
         </h2>
-        <p className="text-xs sm:text-sm text-muted-foreground">
+        <p className="text-xs sm:text-sm text-muted-foreground font-normal">
           Khám phá và lựa chọn các gói dịch vụ, tài khoản bản quyền phù hợp với bạn
         </p>
       </div>
@@ -508,7 +650,7 @@ export function StorefrontCatalog({ groups, products }: StorefrontCatalogProps) 
           <span className="text-sm sm:text-base font-bold text-foreground">
             {currentGroupName ? `Danh mục: ${currentGroupName}` : "Danh sách sản phẩm"}
           </span>
-          <span className="text-xs text-muted-foreground font-mono font-medium">
+          <span className="text-xs text-muted-foreground font-medium tabular-nums">
             ({filteredProducts.length} sản phẩm)
           </span>
         </div>
@@ -617,12 +759,12 @@ export function StorefrontCatalog({ groups, products }: StorefrontCatalogProps) 
           </div>
         </div>
       ) : (
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 items-stretch">
+        <div className="grid grid-cols-1 min-[360px]:grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-6 items-stretch">
           {filteredProducts.map((p, idx) => (
             <div
               key={`${selectedGroup}-${p.id}`}
               style={{ animationDelay: `${idx * 40}ms` }}
-              className="animate-fade-up h-full"
+              className="animate-fade-up h-full flex flex-col min-w-0"
             >
               <ProductCard
                 id={p.id}

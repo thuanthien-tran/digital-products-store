@@ -745,7 +745,7 @@ export function OrderManagerClient({ orders }: { orders: OrderItem[] }) {
             <div className="space-y-2">
               <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
                 <span>Nhật ký thanh toán ({historyOrder.payments?.length || 0} giao dịch)</span>
-                <span className="text-primary font-mono font-bold text-sm">
+                <span className="text-primary tabular-nums font-bold text-sm">
                   Tổng nhận: {formatPrice(historyOrder.paidAmount || (historyOrder.status === "paid" ? historyOrder.totalCents : 0))} / {formatPrice(historyOrder.totalCents)}
                 </span>
               </h4>
@@ -802,7 +802,7 @@ export function OrderManagerClient({ orders }: { orders: OrderItem[] }) {
                     <div key={idx} className="p-3.5 rounded-xl border border-border/80 bg-background/50 space-y-2 text-xs">
                       <div className="flex items-center justify-between font-bold text-foreground">
                         <span>{it.name} {it.quantity && it.quantity > 1 ? `x${it.quantity}` : ""}</span>
-                        <span className="text-primary font-mono">{formatPrice(it.priceCents)}</span>
+                        <span className="text-primary tabular-nums font-bold">{formatPrice(it.priceCents)}</span>
                       </div>
 
                       {serialList.length > 0 ? (

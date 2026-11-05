@@ -546,7 +546,7 @@ export function FatCatClient({ groups, initialBalance }: FatCatClientProps) {
                       </td>
 
                       {/* Source Price */}
-                      <td className="py-3 px-4 text-right font-mono text-muted-foreground">
+                      <td className="py-3 px-4 text-right tabular-nums text-muted-foreground">
                         {formatMoney(wholesale)}
                         {item.sourceRegularPrice && (
                           <div className="text-[10px] line-through opacity-70">
@@ -558,7 +558,7 @@ export function FatCatClient({ groups, initialBalance }: FatCatClientProps) {
                       {/* Stock */}
                       <td className="py-3 px-4 text-center">
                         <span
-                          className={`px-1.5 py-0.5 rounded font-mono text-[11px] font-bold ${
+                          className={`px-1.5 py-0.5 rounded tabular-nums text-[11px] font-bold ${
                             item.sourceStock > 0
                               ? "bg-blue-500/10 text-blue-400 border border-blue-500/20"
                               : "bg-muted text-muted-foreground"
@@ -569,7 +569,7 @@ export function FatCatClient({ groups, initialBalance }: FatCatClientProps) {
                       </td>
 
                       {/* Retail Price */}
-                      <td className="py-3 px-4 text-right font-bold text-foreground font-mono">
+                      <td className="py-3 px-4 text-right font-bold text-foreground tabular-nums">
                         {retailPrice > 0 ? formatMoney(retailPrice) : <span className="text-muted-foreground font-normal">Chưa đặt</span>}
                       </td>
 
@@ -577,7 +577,7 @@ export function FatCatClient({ groups, initialBalance }: FatCatClientProps) {
                       <td className="py-3 px-4 text-right">
                         {retailPrice > 0 ? (
                           <span
-                            className={`inline-flex items-center gap-0.5 font-semibold text-[11px] font-mono ${
+                            className={`inline-flex items-center gap-0.5 font-semibold text-[11px] tabular-nums ${
                               isMarginPositive ? "text-emerald-400" : "text-rose-400"
                             }`}
                           >
@@ -763,18 +763,18 @@ export function FatCatClient({ groups, initialBalance }: FatCatClientProps) {
                   <div className="grid grid-cols-2 gap-2 pt-1">
                     <div>
                       <span className="text-muted-foreground block text-[10px]">Giá sỉ đại lý</span>
-                      <span className="font-bold text-foreground font-mono">{formatMoney(editingItem.sourcePrice)}</span>
+                      <span className="font-bold text-foreground tabular-nums">{formatMoney(editingItem.sourcePrice)}</span>
                     </div>
                     <div>
                       <span className="text-muted-foreground block text-[10px]">Tồn kho nguồn</span>
-                      <span className="font-bold text-blue-400 font-mono">{editingItem.sourceStock}</span>
+                      <span className="font-bold text-blue-400 tabular-nums">{editingItem.sourceStock}</span>
                     </div>
                   </div>
 
                   {editingItem.sourceRegularPrice && (
                     <div>
                       <span className="text-muted-foreground block text-[10px]">Giá gốc (Regular)</span>
-                      <span className="line-through text-muted-foreground font-mono">
+                      <span className="line-through text-muted-foreground tabular-nums">
                         {formatMoney(editingItem.sourceRegularPrice)}
                       </span>
                     </div>

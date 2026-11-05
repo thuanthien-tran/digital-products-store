@@ -40,7 +40,7 @@ export default async function PrivacyPolicyPage() {
             <ShieldCheck className="size-3.5" />
             <span>Tuân thủ Luật Bảo vệ dữ liệu cá nhân số 91/2025/QH15 & NĐ 356/2025/NĐ-CP</span>
           </div>
-          <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-oat-cream">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-heading font-bold tracking-tight text-oat-cream">
             Chính Sách Bảo Vệ Dữ Liệu Cá Nhân
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground">

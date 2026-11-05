@@ -101,12 +101,12 @@ export default async function AdminPreviewPage({ params }: Props) {
                 </span>
               </div>
 
-              <h1 className="text-2xl sm:text-3xl font-heading font-black tracking-tight text-foreground">
+              <h1 className="text-2xl sm:text-3xl font-sans font-bold tracking-tight text-foreground">
                 {displayName}
               </h1>
 
               <div className="flex items-baseline gap-3 pt-1">
-                <span className="text-3xl font-heading font-black text-foreground tabular-nums">
+                <span className="text-3xl font-sans font-extrabold text-foreground tabular-nums">
                   {formatPrice(displayPrice)}
                 </span>
                 {sourceProduct.sourceRegularPrice && (
@@ -159,7 +159,7 @@ export default async function AdminPreviewPage({ params }: Props) {
                 </div>
                 <div className="flex justify-between">
                   <span>Giá sỉ đại lý (chỉ admin thấy):</span>
-                  <span className="font-mono">{formatPrice(sourceProduct.sourcePrice)}</span>
+                  <span className="tabular-nums font-medium">{formatPrice(sourceProduct.sourcePrice)}</span>
                 </div>
                 <div className="flex justify-between text-emerald-400 font-semibold pt-1 border-t border-border">
                   <span>Lợi nhuận gộp ước tính:</span>

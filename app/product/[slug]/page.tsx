@@ -228,7 +228,7 @@ export default async function ProductPage({ params }: Props) {
                   <h2 className="text-sm font-semibold uppercase tracking-wider text-foreground">
                     Hướng dẫn sau khi nhận mã
                   </h2>
-                  <div className="p-4 rounded-lg border border-border/80 bg-secondary/30 text-xs text-muted-foreground leading-relaxed whitespace-pre-line font-mono">
+                  <div className="p-4 rounded-lg border border-border/80 bg-secondary/30 text-xs text-muted-foreground leading-relaxed whitespace-pre-line">
                     {product.serviceInstructions}
                   </div>
                 </div>

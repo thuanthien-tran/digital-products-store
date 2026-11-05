@@ -504,7 +504,7 @@ export function SourcesClient({ initialConnections }: SourcesClientProps) {
                       </td>
 
                       {/* Price */}
-                      <td className="py-3 px-4 text-right font-mono font-bold text-foreground">
+                      <td className="py-3 px-4 text-right tabular-nums font-bold text-foreground">
                         {formatMoney(s.sourcePrice)}
                         {s.sourceRegularPrice && (
                           <div className="text-[10px] line-through text-muted-foreground font-normal">
@@ -514,7 +514,7 @@ export function SourcesClient({ initialConnections }: SourcesClientProps) {
                       </td>
 
                       {/* Stock */}
-                      <td className="py-3 px-4 text-center font-mono">
+                      <td className="py-3 px-4 text-center tabular-nums">
                         <span
                           className={`px-1.5 py-0.5 rounded text-[11px] font-bold ${
                             s.sourceStock > 0
@@ -651,11 +651,11 @@ export function SourcesClient({ initialConnections }: SourcesClientProps) {
               <div className="grid grid-cols-2 gap-3 p-3 rounded-xl bg-secondary/40 border border-border">
                 <div>
                   <span className="text-muted-foreground block text-[10px]">Giá sỉ đại lý:</span>
-                  <span className="font-bold text-foreground font-mono">{formatMoney(viewingSource.sourcePrice)}</span>
+                  <span className="font-bold text-foreground tabular-nums">{formatMoney(viewingSource.sourcePrice)}</span>
                 </div>
                 <div>
                   <span className="text-muted-foreground block text-[10px]">Tồn kho API:</span>
-                  <span className="font-bold text-blue-400 font-mono">{viewingSource.sourceStock}</span>
+                  <span className="font-bold text-blue-400 tabular-nums">{viewingSource.sourceStock}</span>
                 </div>
               </div>
 

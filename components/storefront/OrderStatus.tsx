@@ -242,7 +242,7 @@ export function OrderStatus({
                         <span className="text-xs font-semibold text-muted-foreground block mb-1">
                           Hướng dẫn kích hoạt:
                         </span>
-                        <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-line p-3 rounded-md bg-secondary/30 border border-border/40 font-mono">
+                        <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-line p-3 rounded-md bg-secondary/30 border border-border/40">
                           {item.serviceInstructions}
                         </p>
                       </div>
@@ -368,8 +368,8 @@ export function OrderStatus({
             </span>
           </div>
           <p className="text-muted-foreground leading-relaxed pt-1">
-            Hệ thống đã nhận <span className="font-bold text-foreground font-mono">{formatPrice(totalPaid)}</span>. Số tiền còn thiếu là{" "}
-            <span className="font-bold text-amber-400 font-mono">{formatPrice(remainingCents)}</span>. Vui lòng quét mã VietQR cập nhật bên dưới để chuyển tiếp số tiền còn lại.
+            Hệ thống đã nhận <span className="font-bold text-foreground tabular-nums">{formatPrice(totalPaid)}</span>. Số tiền còn thiếu là{" "}
+            <span className="font-bold text-amber-400 tabular-nums">{formatPrice(remainingCents)}</span>. Vui lòng quét mã VietQR cập nhật bên dưới để chuyển tiếp số tiền còn lại.
           </p>
         </div>
       ) : (
@@ -398,7 +398,7 @@ export function OrderStatus({
               <span>Thời hạn giữ đơn &amp; thanh toán:</span>
             </div>
             <div className="flex items-center gap-1.5 font-mono text-xs font-bold">
-              <span className={`px-2 py-0.5 rounded-md border font-mono text-sm tracking-wider font-black ${
+              <span className={`px-2 py-0.5 rounded-md border font-mono text-sm tracking-wider font-extrabold ${
                 secondsLeft <= 120
                   ? "bg-rose-500/20 border-rose-500/40 text-rose-300 animate-pulse"
                   : "bg-amber-500/20 border-amber-500/30 text-amber-300"
@@ -470,8 +470,8 @@ export function OrderStatus({
           ].map(({ label, value, copyVal, key, isCode }) => (
             <div key={key} className="flex items-center justify-between py-1 border-b border-border/40 last:border-0">
               <span className="text-muted-foreground">{label}:</span>
-              <div className="flex items-center gap-2 font-mono">
-                <span className={`font-semibold ${isCode ? "text-accent font-bold" : "text-foreground"}`}>
+              <div className="flex items-center gap-2">
+                <span className={`font-semibold ${isCode ? "text-accent font-bold font-mono" : key === "acc" ? "text-foreground font-mono" : "text-foreground tabular-nums"}`}>
                   {value}
                 </span>
                 <button

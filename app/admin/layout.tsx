@@ -100,7 +100,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <main className="flex-1 p-6 md:p-8 overflow-y-auto">
         <div className="max-w-5xl mx-auto space-y-6">
           <div className="flex items-center justify-between pb-2 border-b border-border/50">
-            <span className="text-xs text-muted-foreground font-mono">BẢNG ĐIỀU KHIỂN HỆ THỐNG</span>
+            <span className="text-xs text-muted-foreground font-semibold tracking-wider">BẢNG ĐIỀU KHIỂN HỆ THỐNG</span>
             <div className="flex items-center gap-2 sm:gap-3">
               <button
                 type="button"

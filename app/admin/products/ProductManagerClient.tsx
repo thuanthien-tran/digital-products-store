@@ -1181,19 +1181,19 @@ export function ProductManagerClient({ groups }: Props) {
                       </td>
 
                       {/* Price */}
-                      <td className="py-3 px-4 font-mono">
+                      <td className="py-3 px-4 tabular-nums">
                         <span className="font-bold text-foreground block">
                           {formatMoney(mainVariant?.priceCents || 0)}
                         </span>
                         {mainVariant?.compareAtPriceCents ? (
-                          <span className="text-[10px] text-muted-foreground line-through block">
+                          <span className="text-[10px] text-muted-foreground line-through block font-normal">
                             {formatMoney(mainVariant.compareAtPriceCents)}
                           </span>
                         ) : null}
                       </td>
 
                       {/* Stock */}
-                      <td className="py-3 px-4 text-center font-mono">
+                      <td className="py-3 px-4 text-center tabular-nums">
                         <span
                           className={`px-1.5 py-0.5 rounded text-[11px] font-bold ${
                             totalStock > 0

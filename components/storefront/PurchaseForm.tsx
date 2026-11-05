@@ -607,7 +607,7 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
 
           <div className="pt-2 border-t border-border/60 flex items-center justify-between">
             <span className="text-sm font-semibold text-foreground/90">Tổng thanh toán:</span>
-            <span className="text-2xl font-black text-oat-cream tracking-tight tabular-nums">
+            <span className="text-2xl font-extrabold text-oat-cream tracking-tight tabular-nums">
               {formatPrice(totalPrice)}
             </span>
           </div>

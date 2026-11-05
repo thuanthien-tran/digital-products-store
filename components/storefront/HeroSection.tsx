@@ -17,7 +17,7 @@ function renderHeroTitle(rawTitle: string, titleColor: string, highlightColor: s
         <span
           key={index}
           style={{ color: highlightColor }}
-          className="inline font-black"
+          className="inline font-extrabold"
         >
           {text}
         </span>
@@ -120,7 +120,7 @@ export function HeroSection({ settings }: HeroSectionProps) {
 
         {/* 2. Tiêu đề H1 */}
         <h1
-          className="text-2xl sm:text-3xl md:text-[38px] lg:text-[42px] font-black tracking-tight leading-[1.18] animate-fade-up max-w-3xl sm:max-w-4xl lg:max-w-5xl mx-auto"
+          className="font-heading text-[28px] sm:text-[34px] md:text-[40px] lg:text-[46px] font-extrabold tracking-tight leading-[1.25] animate-fade-up max-w-3xl sm:max-w-4xl lg:max-w-5xl mx-auto"
           style={{ animationDelay: "100ms" }}
         >
           {renderHeroTitle(heroTitle, titleColor, highlightColor)}
@@ -128,7 +128,7 @@ export function HeroSection({ settings }: HeroSectionProps) {
 
         {/* 3. Mô tả */}
         <p
-          className="text-xs sm:text-sm text-muted-foreground/90 max-w-2xl sm:max-w-3xl lg:max-w-4xl mx-auto leading-relaxed animate-fade-up whitespace-pre-line"
+          className="font-sans font-normal text-[15px] sm:text-base text-muted-foreground/90 max-w-2xl sm:max-w-3xl lg:max-w-4xl mx-auto leading-[1.6] animate-fade-up whitespace-pre-line"
           style={{ animationDelay: "200ms" }}
         >
           {heroSubtitle}
@@ -139,7 +139,7 @@ export function HeroSection({ settings }: HeroSectionProps) {
           <a
             href="#catalog-heading"
             onClick={handleScrollToCatalog}
-            className="inline-flex items-center gap-2 px-5 sm:px-6 py-2 sm:py-2.5 rounded-full bg-caramel hover:bg-caramel-light active:bg-[#D9955C] text-espresso font-bold text-xs sm:text-sm shadow-md shadow-black/30 hover:shadow-caramel/25 active:scale-95 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel-light focus-visible:ring-offset-2 focus-visible:ring-offset-background group"
+            className="inline-flex items-center gap-2 px-5 sm:px-6 py-2.5 sm:py-3 rounded-full bg-caramel hover:bg-caramel-light active:bg-[#D9955C] text-espresso font-semibold text-sm sm:text-[15px] shadow-md shadow-black/30 hover:shadow-caramel/25 active:scale-95 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel-light focus-visible:ring-offset-2 focus-visible:ring-offset-background group"
           >
             <span>{heroCtaText}</span>
             <ArrowDown className="size-4 transition-transform duration-200 group-hover:translate-y-0.5" strokeWidth={2.5} />
@@ -170,10 +170,10 @@ export function HeroSection({ settings }: HeroSectionProps) {
                 <IconComponent className="size-5 sm:size-5.5" strokeWidth={2.2} />
               </div>
               <div className="space-y-0.5 min-w-0">
-                <h3 className="font-bold text-sm sm:text-[14.5px] text-foreground group-hover:text-white transition-colors duration-200 tracking-tight leading-snug">
+                <h3 className="font-semibold text-sm sm:text-[14.5px] text-foreground group-hover:text-white transition-colors duration-200 tracking-tight leading-snug">
                   {item.title}
                 </h3>
-                <p className="text-xs text-muted-foreground/85 group-hover:text-slate-200 transition-colors duration-200 leading-relaxed">
+                <p className="text-xs text-muted-foreground/85 group-hover:text-slate-200 transition-colors duration-200 leading-relaxed font-normal">
                   {item.desc}
                 </p>
               </div>

@@ -40,7 +40,7 @@ export default async function WarrantyPolicyPage() {
             <RefreshCw className="size-3.5" />
             <span>Cam kết quyền lợi người tiêu dùng theo Luật số 19/2023/QH15</span>
           </div>
-          <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-oat-cream">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-heading font-bold tracking-tight text-oat-cream">
             Chính Sách Bảo Hành &amp; Hoàn Tiền
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground">

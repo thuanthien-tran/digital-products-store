@@ -1,25 +1,20 @@
 import type { Metadata } from 'next'
-import { Space_Grotesk, Plus_Jakarta_Sans, Space_Mono } from 'next/font/google'
+import { Plus_Jakarta_Sans, Be_Vietnam_Pro } from 'next/font/google'
 import './globals.css'
 import { Toaster } from '@/components/ui/toaster'
 import { getSiteSettings } from '@/lib/settings'
 
-const spaceGrotesk = Space_Grotesk({
-  variable: '--font-space-grotesk',
+const beVietnamPro = Be_Vietnam_Pro({
+  variable: '--font-be-vietnam-pro',
   subsets: ['latin', 'vietnamese'],
+  weight: ['400', '500', '600', '700', '800'],
   display: 'swap',
 })
 
 const plusJakartaSans = Plus_Jakarta_Sans({
   variable: '--font-plus-jakarta-sans',
   subsets: ['latin', 'vietnamese'],
-  display: 'swap',
-})
-
-const spaceMono = Space_Mono({
-  variable: '--font-space-mono',
-  weight: ['400', '700'],
-  subsets: ['latin'],
+  weight: ['700', '800'],
   display: 'swap',
 })
 
@@ -55,7 +50,7 @@ export default async function RootLayout({
         <link rel="apple-touch-icon" href={faviconUrl} />
       </head>
       <body
-        className={`${spaceGrotesk.variable} ${plusJakartaSans.variable} ${spaceMono.variable} font-sans antialiased bg-background text-foreground min-h-screen`}
+        className={`${beVietnamPro.variable} ${plusJakartaSans.variable} font-sans antialiased bg-background text-foreground min-h-screen`}
       >
         {children}
         <Toaster />

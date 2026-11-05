@@ -32,7 +32,7 @@ export function ZaloWidget() {
   return (
     <aside
       aria-label="Tiện ích hỗ trợ và điều hướng"
-      className="fixed bottom-6 right-6 z-40 flex flex-col items-center gap-3 print:hidden"
+      className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-40 flex flex-col items-center gap-2.5 sm:gap-3 print:hidden"
     >
       {/* Nút 1: Hỗ trợ kỹ thuật hình tròn kèm icon tai nghe */}
       <a

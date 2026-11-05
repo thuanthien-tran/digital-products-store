@@ -167,7 +167,7 @@ export default async function AdminDashboardPage() {
                     <p className="text-[11px] text-muted-foreground mt-0.5">{order.email}</p>
                   </div>
                   <div className="text-right">
-                    <p className="font-bold text-primary">{formatPrice(order.totalCents)}</p>
+                    <p className="font-bold text-primary tabular-nums">{formatPrice(order.totalCents)}</p>
                     <p className="text-[10px] text-muted-foreground">
                       {new Date(order.createdAt).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}
                     </p>

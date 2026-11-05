@@ -86,7 +86,7 @@ export function Footer({ initialSettings }: FooterProps) {
                     settings.initials
                   )}
                 </span>
-                <span className="font-heading font-black text-base sm:text-lg tracking-tight text-foreground">
+                <span className="font-heading font-extrabold text-base sm:text-lg tracking-tight text-foreground">
                   {settings.siteName}
                 </span>
               </div>

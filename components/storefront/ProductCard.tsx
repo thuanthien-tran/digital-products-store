@@ -327,53 +327,53 @@ export function ProductCard({
         </div>
 
         {/* Content Body */}
-        <div className="flex flex-col flex-1 p-4 sm:p-5">
-          {/* Category Pill & Featured Badge */}
-          <div className="flex items-center justify-between gap-2 pb-2">
-            <span
-              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold border backdrop-blur transition-transform duration-200 ${theme.badge}`}
-            >
-              {groupName}
-            </span>
-            {featured && (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-gradient-to-r from-caramel/25 to-caramel/10 text-caramel border border-caramel/40 shadow-xs tracking-wide select-none">
-                <Star className="size-2.5 fill-caramel text-caramel" />
-                Nổi bật
+        <div className="flex flex-col flex-1 p-2.5 min-[360px]:p-3 sm:p-5">
+          {/* Category Pill (desktop only for catalog cards) */}
+          {!featured && (
+            <div className="hidden sm:flex items-center justify-between gap-2 pb-2">
+              <span
+                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold border backdrop-blur transition-transform duration-200 ${theme.badge}`}
+              >
+                {groupName}
               </span>
-            )}
-          </div>
+            </div>
+          )}
 
-          {/* Product Title (2 lines max, accessible link) */}
-          <Link href={`/product/${slug}`} className="block group/title mt-0.5">
-            <h3 className="font-bold text-base sm:text-[17px] text-foreground group-hover/title:text-accent transition-colors duration-150 leading-snug line-clamp-2">
+          {/* Product Title (accessible link with natural wrap) */}
+          <Link href={`/product/${slug}`} className="block group/title mt-0.5 min-w-0">
+            <h3 className={`font-sans font-semibold text-foreground group-hover/title:text-accent transition-colors duration-150 leading-snug break-words ${
+              featured
+                ? "text-[15px] sm:text-[17px] line-clamp-2"
+                : "text-[13px] min-[360px]:text-[14px] sm:text-[17px] line-clamp-2 min-[360px]:line-clamp-3 sm:line-clamp-2"
+            }`}>
               {name}
             </h3>
           </Link>
 
           {/* Key Attributes Row: Duration & Delivery Mode */}
-          <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
+          <div className="flex flex-wrap items-center gap-1 sm:gap-1.5 mt-1.5 sm:mt-2.5">
             {isContactOnly ? (
-              <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-md bg-sky-500/10 text-sky-400 border border-sky-500/30">
-                <MessageCircle className="size-3 text-sky-400" />
-                <span>Liên hệ đặt hàng</span>
+              <span className="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-semibold px-1.5 sm:px-2 py-0.5 rounded-md bg-sky-500/10 text-sky-400 border border-sky-500/30 shrink-0">
+                <MessageCircle className="size-2.5 sm:size-3 text-sky-400 shrink-0" />
+                <span>Liên hệ</span>
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md bg-secondary/60 text-secondary-foreground border border-border/50">
-                <Zap className="size-3 text-muted-foreground" />
-                {deliveryLabel}
+              <span className="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-medium px-1.5 sm:px-2 py-0.5 rounded-md bg-secondary/60 text-secondary-foreground border border-border/50 shrink-0">
+                <Zap className="size-2.5 sm:size-3 text-muted-foreground shrink-0" />
+                <span>{deliveryLabel}</span>
               </span>
             )}
             {duration && (
-              <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md bg-secondary/60 text-secondary-foreground border border-border/50">
-                <Clock className="size-3 text-muted-foreground" />
-                {duration}
+              <span className="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-medium px-1.5 sm:px-2 py-0.5 rounded-md bg-secondary/60 text-secondary-foreground border border-border/50 shrink-0">
+                <Clock className="size-2.5 sm:size-3 text-muted-foreground shrink-0" />
+                <span>{duration}</span>
               </span>
             )}
           </div>
 
-          {/* 2 to 3 Short Highlights */}
+          {/* 2 to 3 Short Highlights (Desktop only to prevent vertical bloating on mobile cards) */}
           {displayHighlights.length > 0 && (
-            <div className="mt-3.5 space-y-1.5 flex-1">
+            <div className="mt-3.5 space-y-1.5 flex-1 hidden sm:block">
               {displayHighlights.map((hl, hIdx) => (
                 <div
                   key={hIdx}
@@ -391,8 +391,8 @@ export function ProductCard({
 
           {/* Important Conditions / Info Popover Trigger (Clean HTML: Button is NEVER nested inside Link) */}
           {conditionList.length > 0 && (
-            <div className="relative mt-3 pt-2.5 border-t border-border/40">
-              <div className="flex flex-wrap items-center gap-1.5">
+            <div className="relative mt-2 sm:mt-3 pt-2 sm:pt-2.5 border-t border-border/40">
+              <div className="flex flex-wrap items-center gap-1 sm:gap-1.5">
                 {conditionList.map((cond, cIdx) => (
                   <button
                     key={cIdx}
@@ -403,15 +403,15 @@ export function ProductCard({
                     }}
                     aria-expanded={activeCondition?.label === cond.label}
                     aria-controls={popoverId}
-                    className={`inline-flex items-center gap-1 text-[10.5px] font-medium px-2 py-0.5 rounded-md border transition-all cursor-pointer ${
+                    className={`inline-flex items-center gap-1 text-[10px] sm:text-[10.5px] font-medium px-1.5 sm:px-2 py-0.5 rounded-md border transition-all cursor-pointer ${
                       cond.isWarning
                         ? "bg-amber-950/20 text-amber-300 border-amber-500/30 hover:bg-amber-950/40 hover:border-amber-500/50"
                         : "bg-muted/50 text-muted-foreground border-border/60 hover:text-foreground hover:bg-muted"
                     }`}
                   >
-                    {cond.isWarning && <AlertCircle className="size-3 text-amber-400 shrink-0" />}
-                    <span>{cond.label}</span>
-                    <Info className="size-2.5 opacity-60 ml-0.5" />
+                    {cond.isWarning && <AlertCircle className="size-2.5 sm:size-3 text-amber-400 shrink-0" />}
+                    <span className="truncate max-w-[110px] sm:max-w-none">{cond.label}</span>
+                    <Info className="size-2 sm:size-2.5 opacity-60 ml-0.5 shrink-0" />
                   </button>
                 ))}
               </div>
@@ -450,16 +450,18 @@ export function ProductCard({
       </div>
 
       {/* Footer: Price Display & Action Button */}
-      <div className="p-4 sm:p-5 pt-3 mt-auto border-t border-border/50 flex items-end justify-between gap-3 bg-muted/5">
-        <div className="flex flex-col min-w-0">
-          <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block">
+      <div className="p-2.5 min-[360px]:p-3 sm:p-5 pt-2 sm:pt-3 mt-auto border-t border-border/50 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2.5 sm:gap-3 bg-muted/5">
+        <div className="flex flex-col min-w-0 w-full sm:w-auto">
+          <span className="text-[9.5px] sm:text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block">
             {pricing.hasMultipleVariants ? "Giá từ" : "Giá bán"}
           </span>
 
-          <div className="flex items-baseline gap-2 flex-wrap">
+          <div className="flex items-baseline gap-1.5 sm:gap-2 flex-wrap">
             <span
-              className={`text-xl sm:text-2xl font-black tracking-tight tabular-nums ${
-                featured ? "text-caramel drop-shadow-xs" : "text-foreground"
+              className={`font-bold tracking-tight tabular-nums ${
+                featured
+                  ? "text-xl sm:text-2xl font-extrabold text-caramel drop-shadow-xs"
+                  : "text-[16px] min-[360px]:text-[18px] sm:text-2xl text-caramel sm:text-foreground"
               }`}
             >
               {pricing.priceText}
@@ -467,15 +469,15 @@ export function ProductCard({
 
             {/* Strikethrough Compare Price */}
             {pricing.comparePrice ? (
-              <span className="line-through text-xs text-muted-foreground tabular-nums">
+              <span className="line-through text-[11px] sm:text-[13px] text-muted-foreground tabular-nums font-normal">
                 {formatPrice(pricing.comparePrice)}
               </span>
             ) : null}
           </div>
 
-          {/* Savings Amount */}
+          {/* Savings Amount - hidden on mobile to avoid clutter, visible on desktop */}
           {pricing.savings ? (
-            <span className="text-[11px] font-medium text-emerald-400 tabular-nums">
+            <span className="hidden sm:inline-block text-[11px] font-medium text-emerald-400 tabular-nums">
               Tiết kiệm {formatPrice(pricing.savings)}
             </span>
           ) : null}
@@ -487,7 +489,7 @@ export function ProductCard({
             size="sm"
             asChild
             variant="outline"
-            className="text-xs h-9 px-3.5 font-bold border-sky-500/40 text-sky-400 hover:bg-sky-500/10 hover:border-sky-500/60 transition-all duration-150 shrink-0"
+            className="w-full sm:w-auto h-8.5 sm:h-9 px-3 sm:px-3.5 text-xs font-bold border-sky-500/40 text-sky-400 hover:bg-sky-500/10 hover:border-sky-500/60 transition-all duration-150 shrink-0 justify-center"
           >
             <a
               href={`https://zalo.me/${process.env.NEXT_PUBLIC_ZALO_PHONE_1 || "0356970964"}?text=${encodeURIComponent(
@@ -506,7 +508,7 @@ export function ProductCard({
             size="sm"
             asChild
             variant="outline"
-            className="text-xs h-9 px-3.5 font-medium border-amber-500/30 text-amber-300 hover:bg-amber-500/10 hover:border-amber-500/50 hover:text-amber-200 transition-all duration-150 shrink-0"
+            className="w-full sm:w-auto h-8.5 sm:h-9 px-3 sm:px-3.5 text-xs font-medium border-amber-500/30 text-amber-300 hover:bg-amber-500/10 hover:border-amber-500/50 hover:text-amber-200 transition-all duration-150 shrink-0 justify-center"
           >
             <a
               href={`https://zalo.me/${process.env.NEXT_PUBLIC_ZALO_PHONE_1 || "0356970964"}`}
@@ -525,8 +527,8 @@ export function ProductCard({
             variant={featured ? "default" : "outline"}
             className={
               featured
-                ? "text-xs h-9 px-4 font-bold bg-caramel text-espresso hover:bg-caramel-light shadow-md shadow-caramel/25 border border-caramel/60 group/btn active-bounce transition-all duration-150 shrink-0"
-                : "text-xs h-9 px-3.5 font-medium border-border/80 group/btn active-bounce group-hover:border-accent/50 group-hover:text-accent transition-all duration-150 shrink-0"
+                ? "w-full sm:w-auto h-9 sm:h-9 px-4 font-semibold bg-caramel text-espresso hover:bg-caramel-light shadow-md shadow-caramel/25 border border-caramel/60 group/btn active-bounce transition-all duration-150 shrink-0 justify-center text-xs"
+                : "w-full sm:w-auto h-8.5 sm:h-9 px-3 sm:px-3.5 font-medium border-border/80 group/btn active-bounce group-hover:border-accent/50 group-hover:text-accent transition-all duration-150 shrink-0 justify-center text-xs"
             }
           >
             <Link href={`/product/${slug}`}>

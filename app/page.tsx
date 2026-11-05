@@ -106,11 +106,11 @@ export default async function HomePage() {
         <section id="how" className="space-y-6 sm:space-y-8 pt-6 sm:pt-8 border-t border-border/70 scroll-mt-24">
           <ScrollReveal>
             <div className="text-center space-y-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-accent">Quy trình đơn giản</span>
-              <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-oat-cream">
+              <span className="text-xs font-semibold uppercase tracking-wider text-accent">Quy trình đơn giản</span>
+              <h2 className="text-[22px] sm:text-2xl md:text-[28px] font-heading font-bold tracking-tight text-oat-cream">
                 Mua Hàng Trong 4 Bước
               </h2>
-              <p className="text-xs sm:text-sm text-muted-foreground max-w-md mx-auto">
+              <p className="text-xs sm:text-sm text-muted-foreground max-w-md mx-auto font-normal">
                 Hệ thống vận hành khép kín tự động 100%, không cần chờ đợi nhân viên kích hoạt
               </p>
             </div>
@@ -156,7 +156,7 @@ export default async function HomePage() {
                   >
                     {step}
                   </span>
-                  <h3 className="font-extrabold text-sm text-foreground transition-colors duration-200 group-hover:text-caramel-light">
+                  <h3 className="font-semibold text-sm text-foreground transition-colors duration-200 group-hover:text-caramel-light">
                     {title}
                   </h3>
                   <p className="text-xs text-muted-foreground leading-relaxed group-hover:text-slate-200 transition-colors duration-200">
@@ -172,11 +172,11 @@ export default async function HomePage() {
         <section id="faq" className="space-y-6 sm:space-y-8 scroll-mt-24 pt-6 sm:pt-8 border-t border-border/70">
           <ScrollReveal>
             <div className="text-center space-y-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-accent">Giải đáp thắc mắc</span>
-              <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-oat-cream">
+              <span className="text-xs font-semibold uppercase tracking-wider text-accent">Giải đáp thắc mắc</span>
+              <h2 className="text-[22px] sm:text-2xl md:text-[28px] font-heading font-bold tracking-tight text-oat-cream">
                 Câu Hỏi Thường Gặp
               </h2>
-              <p className="text-xs sm:text-sm text-muted-foreground max-w-md mx-auto">
+              <p className="text-xs sm:text-sm text-muted-foreground max-w-md mx-auto font-normal">
                 Thông tin chi tiết về quy trình thanh toán, nhận tài khoản và chính sách bảo hành
               </p>
             </div>

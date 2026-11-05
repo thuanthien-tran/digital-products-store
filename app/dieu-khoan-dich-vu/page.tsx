@@ -40,7 +40,7 @@ export default async function TermsOfServicePage() {
             <BookOpen className="size-3.5" />
             <span>Quy chế giao dịch Thương mại điện tử theo Luật TMĐT số 122/2025/QH15</span>
           </div>
-          <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-oat-cream">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-heading font-bold tracking-tight text-oat-cream">
             Điều Khoản Dịch Vụ
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground">

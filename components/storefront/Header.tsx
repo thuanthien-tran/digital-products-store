@@ -129,7 +129,7 @@ export function Header({ initialSettings }: HeaderProps) {
               )}
             </span>
             <div className="flex flex-col">
-              <span className="font-heading font-black text-base sm:text-lg tracking-tight text-foreground transition-colors duration-200 group-hover:text-accent">
+              <span className="font-heading font-extrabold text-base sm:text-lg tracking-tight text-foreground transition-colors duration-200 group-hover:text-accent">
                 {settings.siteName}
               </span>
             </div>
@@ -180,7 +180,7 @@ export function Header({ initialSettings }: HeaderProps) {
             title="Nhắn tin Zalo hỗ trợ: 0356 970 964"
           >
             <Phone className="size-3 text-caramel group-hover:scale-110 transition-transform" />
-            <span>Hỗ trợ: <strong className="font-mono text-foreground group-hover:text-caramel-light font-semibold">0356 970 964</strong></span>
+            <span>Hỗ trợ: <strong className="font-semibold text-foreground group-hover:text-caramel-light tabular-nums">0356 970 964</strong></span>
           </a>
 
           {/* Badge Hệ Thống Tự Động Online */}
@@ -238,7 +238,7 @@ export function Header({ initialSettings }: HeaderProps) {
               <div className="flex items-center gap-2">
                 <Phone className="size-3.5 text-caramel" />
                 <span>Hỗ trợ Zalo:</span>
-                <span className="font-mono font-bold text-foreground">0356 970 964</span>
+                <span className="font-bold text-foreground tabular-nums">0356 970 964</span>
               </div>
               <span className="text-[11px] text-caramel font-semibold">Nhắn tin ↗</span>
             </a>
