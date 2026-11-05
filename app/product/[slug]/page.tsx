@@ -149,7 +149,7 @@ export default async function ProductPage({ params }: Props) {
                     <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground leading-snug">
                       {product.name}
                     </h1>
-                    <div className="flex items-center gap-2 pt-1 flex-wrap">
+                    <div className="pt-1">
                       <span
                         className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
                           product.statusOverride === "out_of_stock"
@@ -188,17 +188,6 @@ export default async function ProductPage({ params }: Props) {
                             : "Còn hàng"}
                         </span>
                       </span>
-
-                      <p className="text-xs text-muted-foreground">
-                        • Hình thức bàn giao:{" "}
-                        <span className="text-foreground font-medium">
-                          {product.deliveryType === "contact"
-                            ? "Liên hệ Zalo đặt mua & Bàn giao trực tiếp"
-                            : product.deliveryType === "serials"
-                            ? "Mã tự động hiển thị ngay sau thanh toán"
-                            : "Hỗ trợ kích hoạt trực tiếp"}
-                        </span>
-                      </p>
                     </div>
                   </div>
                 </div>

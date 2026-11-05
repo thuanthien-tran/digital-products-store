@@ -658,7 +658,7 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
 
         {/* F. Nút chính / Nút Liên Hệ Đặt Hàng */}
         {product.deliveryType === "contact" ? (
-          <div className="space-y-3 pt-1">
+          <div className="pt-1">
             <a
               href={`https://zalo.me/${process.env.NEXT_PUBLIC_ZALO_PHONE_1 || "0356970964"}?text=${encodeURIComponent(
                 `Chào shop CapyGo, mình cần đặt mua gói: ${product.name}${
@@ -672,9 +672,6 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
               <MessageCircle className="size-5" />
               <span>Liên hệ Zalo để đặt hàng ngay</span>
             </a>
-            <p className="text-xs text-center text-sky-400/90 font-medium leading-relaxed bg-sky-500/10 border border-sky-500/20 p-2.5 rounded-xl">
-              Sản phẩm này được cấp theo yêu cầu riêng. Quý khách vui lòng nhắn Zalo để nhân viên kiểm tra tình trạng kho và bàn giao trực tiếp.
-            </p>
           </div>
         ) : (
           <>
