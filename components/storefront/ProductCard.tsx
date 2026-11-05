@@ -287,8 +287,10 @@ export function ProductCard({
           {/* Product Stock Status Badge (Top-Left over Image) */}
           <div
             className={`absolute top-2.5 left-2.5 inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-0.5 rounded-full border backdrop-blur-md shadow-md pointer-events-none transition-colors ${
-              isContactOnly
-                ? "text-sky-300 bg-sky-950/80 border-sky-500/40 shadow-sky-950/30"
+              pricing.isOutOfStock
+                ? "text-rose-300 bg-rose-950/80 border-rose-500/40 shadow-rose-950/30"
+                : isContactOnly
+                ? "text-emerald-300 bg-emerald-950/80 border-emerald-500/40 shadow-emerald-950/30"
                 : pricing.hasStock
                 ? "text-emerald-300 bg-emerald-950/80 border-emerald-500/40 shadow-emerald-950/30"
                 : "text-rose-300 bg-rose-950/80 border-rose-500/40 shadow-rose-950/30"
@@ -296,14 +298,18 @@ export function ProductCard({
           >
             <span
               className={`size-1.5 rounded-full ${
-                isContactOnly
-                  ? "bg-sky-400"
-                  : pricing.hasStock
-                  ? "bg-emerald-400 animate-pulse"
-                  : "bg-rose-400"
+                pricing.isOutOfStock
+                  ? "bg-rose-400"
+                  : "bg-emerald-400 animate-pulse"
               }`}
             />
-            <span>{isContactOnly ? "Tư vấn & Đặt hàng" : pricing.hasStock ? "Còn hàng" : "Hết hàng"}</span>
+            <span>
+              {pricing.isOutOfStock
+                ? "Hết hàng"
+                : isContactOnly
+                ? "Còn hàng"
+                : "Còn hàng"}
+            </span>
           </div>
 
           {/* Discount Percentage Badge (Top-Right over Image) */}
@@ -334,16 +340,23 @@ export function ProductCard({
 
           {/* Key Attributes Row: Duration & Delivery Mode */}
           <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
+            {isContactOnly ? (
+              <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-md bg-sky-500/10 text-sky-400 border border-sky-500/30">
+                <MessageCircle className="size-3 text-sky-400" />
+                <span>Liên hệ đặt hàng</span>
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md bg-secondary/60 text-secondary-foreground border border-border/50">
+                <Zap className="size-3 text-muted-foreground" />
+                {deliveryLabel}
+              </span>
+            )}
             {duration && (
               <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md bg-secondary/60 text-secondary-foreground border border-border/50">
                 <Clock className="size-3 text-muted-foreground" />
                 {duration}
               </span>
             )}
-            <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md bg-secondary/60 text-secondary-foreground border border-border/50">
-              <Zap className="size-3 text-muted-foreground" />
-              {deliveryLabel}
-            </span>
           </div>
 
           {/* 2 to 3 Short Highlights */}
