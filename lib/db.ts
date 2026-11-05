@@ -52,6 +52,9 @@ export async function ensureDatabaseSchema(): Promise<void> {
           if (!cols.has('heroHighlightColor')) {
             await prisma.$executeRawUnsafe(`ALTER TABLE "SiteSettings" ADD COLUMN "heroHighlightColor" TEXT DEFAULT '#E6A66F';`)
           }
+          if (!cols.has('heroCtaText')) {
+            await prisma.$executeRawUnsafe(`ALTER TABLE "SiteSettings" ADD COLUMN "heroCtaText" TEXT DEFAULT 'Khám phá các gói';`)
+          }
         }
         globalForPrisma.schemaEnsured = true
       } catch (err) {

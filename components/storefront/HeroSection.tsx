@@ -77,6 +77,7 @@ export function HeroSection({ settings }: HeroSectionProps) {
     "Khám phá các gói Canva, YouTube Premium, Duolingo và những dịch vụ đang có tại cửa hàng. Chọn sản phẩm để xem giá và thông tin chi tiết."
   const titleColor = settings?.heroTitleColor || "#FAF4ED"
   const highlightColor = settings?.heroHighlightColor || "#E6A66F"
+  const heroCtaText = settings?.heroCtaText || "Khám phá các gói"
 
   const handleScrollToCatalog = (e: React.MouseEvent<HTMLAnchorElement>) => {
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
@@ -105,7 +106,7 @@ export function HeroSection({ settings }: HeroSectionProps) {
       </div>
 
       {/* Centered Headline Container */}
-      <div className="text-center space-y-2 sm:space-y-2.5 max-w-3xl mx-auto px-2">
+      <div className="text-center space-y-2.5 sm:space-y-3 max-w-4xl lg:max-w-5xl mx-auto px-2 sm:px-4">
         {/* 1. Nhãn nhỏ giới thiệu */}
         <div className="animate-fade-up">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] sm:text-xs font-medium border border-caramel/30 bg-caramel/10 text-caramel-light backdrop-blur-md shadow-sm">
@@ -119,7 +120,7 @@ export function HeroSection({ settings }: HeroSectionProps) {
 
         {/* 2. Tiêu đề H1 */}
         <h1
-          className="text-2xl sm:text-3xl md:text-[38px] lg:text-[42px] font-black tracking-tight leading-[1.18] animate-fade-up max-w-2xl mx-auto"
+          className="text-2xl sm:text-3xl md:text-[38px] lg:text-[42px] font-black tracking-tight leading-[1.18] animate-fade-up max-w-3xl sm:max-w-4xl lg:max-w-5xl mx-auto"
           style={{ animationDelay: "100ms" }}
         >
           {renderHeroTitle(heroTitle, titleColor, highlightColor)}
@@ -127,20 +128,20 @@ export function HeroSection({ settings }: HeroSectionProps) {
 
         {/* 3. Mô tả */}
         <p
-          className="text-xs sm:text-sm text-muted-foreground/90 max-w-xl mx-auto leading-relaxed animate-fade-up whitespace-pre-line"
+          className="text-xs sm:text-sm text-muted-foreground/90 max-w-2xl sm:max-w-3xl lg:max-w-4xl mx-auto leading-relaxed animate-fade-up whitespace-pre-line"
           style={{ animationDelay: "200ms" }}
         >
           {heroSubtitle}
         </p>
 
-        {/* 4. Nút chính "Khám phá các gói" */}
+        {/* 4. Nút chính CTA */}
         <div className="pt-0.5 sm:pt-1 animate-fade-up" style={{ animationDelay: "250ms" }}>
           <a
             href="#catalog-heading"
             onClick={handleScrollToCatalog}
             className="inline-flex items-center gap-2 px-5 sm:px-6 py-2 sm:py-2.5 rounded-full bg-caramel hover:bg-caramel-light active:bg-[#D9955C] text-espresso font-bold text-xs sm:text-sm shadow-md shadow-black/30 hover:shadow-caramel/25 active:scale-95 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel-light focus-visible:ring-offset-2 focus-visible:ring-offset-background group"
           >
-            <span>Khám phá các gói</span>
+            <span>{heroCtaText}</span>
             <ArrowDown className="size-4 transition-transform duration-200 group-hover:translate-y-0.5" strokeWidth={2.5} />
           </a>
         </div>

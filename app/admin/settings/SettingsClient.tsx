@@ -28,6 +28,7 @@ interface InitialSettings {
   heroSubtitle?: string | null
   heroTitleColor?: string | null
   heroHighlightColor?: string | null
+  heroCtaText?: string | null
   version: number
   updatedAt: string | null
 }
@@ -96,6 +97,7 @@ export function SettingsClient({ initialData }: { initialData: InitialSettings }
   )
   const [heroTitleColor, setHeroTitleColor] = useState(initialData.heroTitleColor || "#FAF4ED")
   const [heroHighlightColor, setHeroHighlightColor] = useState(initialData.heroHighlightColor || "#E6A66F")
+  const [heroCtaText, setHeroCtaText] = useState(initialData.heroCtaText || "Khám phá các gói")
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [localPreviewUrl, setLocalPreviewUrl] = useState<string | null>(null)
   const [isRemovingLogo, setIsRemovingLogo] = useState(false)
@@ -141,7 +143,8 @@ export function SettingsClient({ initialData }: { initialData: InitialSettings }
       (savedData.heroSubtitle ||
         "Khám phá các gói Canva, YouTube Premium, Duolingo và những dịch vụ đang có tại cửa hàng. Chọn sản phẩm để xem giá và thông tin chi tiết.").trim() ||
     heroTitleColor.trim().toLowerCase() !== (savedData.heroTitleColor || "#FAF4ED").trim().toLowerCase() ||
-    heroHighlightColor.trim().toLowerCase() !== (savedData.heroHighlightColor || "#E6A66F").trim().toLowerCase()
+    heroHighlightColor.trim().toLowerCase() !== (savedData.heroHighlightColor || "#E6A66F").trim().toLowerCase() ||
+    heroCtaText.trim() !== (savedData.heroCtaText || "Khám phá các gói").trim()
 
   const canSave = isDirty && !nameError && !isSaving
 
@@ -206,6 +209,7 @@ export function SettingsClient({ initialData }: { initialData: InitialSettings }
     )
     setHeroTitleColor(savedData.heroTitleColor || "#FAF4ED")
     setHeroHighlightColor(savedData.heroHighlightColor || "#E6A66F")
+    setHeroCtaText(savedData.heroCtaText || "Khám phá các gói")
     setIsRemovingLogo(false)
     setFeedback(null)
   }
@@ -249,6 +253,7 @@ export function SettingsClient({ initialData }: { initialData: InitialSettings }
           heroSubtitle: heroSubtitle.trim() || null,
           heroTitleColor: heroTitleColor.trim() || "#FAF4ED",
           heroHighlightColor: heroHighlightColor.trim() || "#E6A66F",
+          heroCtaText: heroCtaText.trim() || "Khám phá các gói",
           version: savedData.version,
         }),
       })
@@ -267,6 +272,7 @@ export function SettingsClient({ initialData }: { initialData: InitialSettings }
         heroSubtitle: updated.heroSubtitle || null,
         heroTitleColor: updated.heroTitleColor || "#FAF4ED",
         heroHighlightColor: updated.heroHighlightColor || "#E6A66F",
+        heroCtaText: updated.heroCtaText || "Khám phá các gói",
         version: updated.version,
         updatedAt: updated.updatedAt || new Date().toISOString(),
       }
@@ -661,12 +667,33 @@ export function SettingsClient({ initialData }: { initialData: InitialSettings }
                 />
               </div>
 
-              {/* 4. Xem trước trực tiếp Hero */}
+              {/* 4. Nội dung nút bấm (CTA) */}
+              <div className="space-y-1.5">
+                <label htmlFor="hero-cta-input" className="block text-xs font-semibold text-foreground">
+                  Nội dung nút bấm (CTA)
+                </label>
+                <div className="relative">
+                  <input
+                    id="hero-cta-input"
+                    type="text"
+                    value={heroCtaText}
+                    onChange={(e) => setHeroCtaText(e.target.value)}
+                    placeholder="Khám phá các gói"
+                    maxLength={40}
+                    className="w-full px-3.5 py-2 rounded-xl border border-border bg-background text-foreground text-xs placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-caramel transition-all font-medium"
+                  />
+                </div>
+                <p className="text-[11px] text-muted-foreground/80 leading-relaxed">
+                  Chữ hiển thị trên nút bấm màu caramel cuộn xuống danh mục sản phẩm (mặc định: &quot;Khám phá các gói&quot;).
+                </p>
+              </div>
+
+              {/* 5. Xem trước trực tiếp Hero */}
               <div className="space-y-1.5 pt-1">
                 <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block">
                   Xem trước trực tiếp phần tiêu đề &amp; mô tả:
                 </span>
-                <div className="p-4 sm:p-5 rounded-2xl bg-background border border-caramel/25 text-center space-y-2 shadow-inner">
+                <div className="p-4 sm:p-5 rounded-2xl bg-background border border-caramel/25 text-center space-y-2.5 shadow-inner">
                   <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] border border-caramel/30 bg-caramel/10 text-caramel-light">
                     <span className="size-1.5 rounded-full bg-emerald-500" />
                     <span>Cửa hàng tài khoản &amp; phần mềm</span>
@@ -677,6 +704,12 @@ export function SettingsClient({ initialData }: { initialData: InitialSettings }
                   <p className="text-[11px] text-muted-foreground/80 leading-relaxed max-w-md mx-auto whitespace-pre-line">
                     {heroSubtitle}
                   </p>
+                  <div className="pt-1">
+                    <span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-caramel text-espresso font-bold text-xs shadow-sm">
+                      <span>{heroCtaText || "Khám phá các gói"}</span>
+                      <span>↓</span>
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>

@@ -18,6 +18,7 @@ export default async function AdminSettingsPage() {
     heroSubtitle: (settings as any)?.heroSubtitle || null,
     heroTitleColor: (settings as any)?.heroTitleColor || "#FAF4ED",
     heroHighlightColor: (settings as any)?.heroHighlightColor || "#E6A66F",
+    heroCtaText: (settings as any)?.heroCtaText || "Khám phá các gói",
     version: settings?.version || 1,
     updatedAt: settings?.updatedAt ? settings.updatedAt.toISOString() : null,
   }

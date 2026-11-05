@@ -10,6 +10,7 @@ export interface SiteSettingsData {
   heroSubtitle?: string | null
   heroTitleColor?: string | null
   heroHighlightColor?: string | null
+  heroCtaText?: string | null
   updatedAt?: Date | string
   version?: number
 }
@@ -61,6 +62,7 @@ async function fetchSettingsFromDb(): Promise<SiteSettingsData> {
     const heroSubtitle = (row as any)?.heroSubtitle?.trim() || null
     const heroTitleColor = (row as any)?.heroTitleColor?.trim() || "#FAF4ED"
     const heroHighlightColor = (row as any)?.heroHighlightColor?.trim() || "#E6A66F"
+    const heroCtaText = (row as any)?.heroCtaText?.trim() || "Khám phá các gói"
 
     return {
       siteName,
@@ -71,6 +73,7 @@ async function fetchSettingsFromDb(): Promise<SiteSettingsData> {
       heroSubtitle,
       heroTitleColor,
       heroHighlightColor,
+      heroCtaText,
       updatedAt: row?.updatedAt ? row.updatedAt.toISOString() : undefined,
       version: row?.version || 1,
     }
@@ -86,6 +89,7 @@ async function fetchSettingsFromDb(): Promise<SiteSettingsData> {
       heroSubtitle: null,
       heroTitleColor: "#FAF4ED",
       heroHighlightColor: "#E6A66F",
+      heroCtaText: "Khám phá các gói",
       version: 1,
     }
   }
@@ -114,6 +118,7 @@ export async function updateSiteSettings(data: {
   heroSubtitle?: string | null
   heroTitleColor?: string | null
   heroHighlightColor?: string | null
+  heroCtaText?: string | null
   expectedVersion?: number
 }): Promise<SiteSettingsData> {
   const cleanName = data.siteName.trim()
@@ -123,6 +128,7 @@ export async function updateSiteSettings(data: {
   const cleanHeroSubtitle = data.heroSubtitle !== undefined ? (data.heroSubtitle ? data.heroSubtitle.trim() : null) : undefined
   const cleanHeroTitleColor = data.heroTitleColor !== undefined ? (data.heroTitleColor ? data.heroTitleColor.trim() : "#FAF4ED") : undefined
   const cleanHeroHighlightColor = data.heroHighlightColor !== undefined ? (data.heroHighlightColor ? data.heroHighlightColor.trim() : "#E6A66F") : undefined
+  const cleanHeroCtaText = data.heroCtaText !== undefined ? (data.heroCtaText ? data.heroCtaText.trim() : "Khám phá các gói") : undefined
 
   // Upsert settings in database
   const current = await prisma.siteSettings.findUnique({
@@ -145,6 +151,7 @@ export async function updateSiteSettings(data: {
         ...(cleanHeroSubtitle !== undefined ? { heroSubtitle: cleanHeroSubtitle } : {}),
         ...(cleanHeroTitleColor !== undefined ? { heroTitleColor: cleanHeroTitleColor } : {}),
         ...(cleanHeroHighlightColor !== undefined ? { heroHighlightColor: cleanHeroHighlightColor } : {}),
+        ...(cleanHeroCtaText !== undefined ? { heroCtaText: cleanHeroCtaText } : {}),
         version: { increment: 1 },
       },
     })
@@ -159,6 +166,7 @@ export async function updateSiteSettings(data: {
         heroSubtitle: cleanHeroSubtitle ?? null,
         heroTitleColor: cleanHeroTitleColor ?? "#FAF4ED",
         heroHighlightColor: cleanHeroHighlightColor ?? "#E6A66F",
+        heroCtaText: cleanHeroCtaText ?? "Khám phá các gói",
         version: 1,
       },
     })
@@ -184,6 +192,7 @@ export async function updateSiteSettings(data: {
     heroSubtitle: updated.heroSubtitle || null,
     heroTitleColor: updated.heroTitleColor || "#FAF4ED",
     heroHighlightColor: updated.heroHighlightColor || "#E6A66F",
+    heroCtaText: updated.heroCtaText || "Khám phá các gói",
     updatedAt: updated.updatedAt.toISOString(),
     version: updated.version,
   }

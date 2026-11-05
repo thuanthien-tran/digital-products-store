@@ -260,6 +260,7 @@ model SiteSettings {
   heroSubtitle       String?
   heroTitleColor     String?  @default("#FAF4ED")
   heroHighlightColor String?  @default("#E6A66F")
+  heroCtaText        String?  @default("Khám phá các gói")
   version            Int      @default(1)
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
