@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/db"
+import { prisma, ensureDatabaseSchema } from "@/lib/db"
 import { getSiteSettings } from "@/lib/settings"
 import { Header } from "@/components/storefront/Header"
 import { Footer } from "@/components/storefront/Footer"
@@ -13,6 +13,7 @@ export const revalidate = 0
 
 async function getStoreData() {
   try {
+    await ensureDatabaseSchema()
     const [groups, products, settings] = await Promise.all([
       prisma.productGroup.findMany({
         where: { visibility: "public" },

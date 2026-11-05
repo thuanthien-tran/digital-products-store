@@ -1,4 +1,4 @@
-import { prisma } from './db'
+import { prisma, ensureDatabaseSchema } from './db'
 import { decryptSecret } from './crypto'
 import { getProviderAdapter, SourceProductDTO } from './providers/registry'
 import { recordSourceStockUpdate, touchGlobalInventoryTimestamp } from './inventory-pipeline'
@@ -44,6 +44,7 @@ export async function syncProviderConnection(
     actorUsername?: string
   }
 ): Promise<SyncEngineResult> {
+  await ensureDatabaseSchema()
 
   const connection = await prisma.providerConnection.findUnique({
     where: { id: connectionId },

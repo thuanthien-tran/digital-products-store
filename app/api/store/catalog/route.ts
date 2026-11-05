@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
+import { prisma, ensureDatabaseSchema } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 export async function GET() {
   try {
+    await ensureDatabaseSchema()
     const [products, groups] = await Promise.all([
       prisma.product.findMany({
         where: {

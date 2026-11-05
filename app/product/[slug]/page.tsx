@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation"
 import Link from "next/link"
-import { prisma } from "@/lib/db"
+import { prisma, ensureDatabaseSchema } from "@/lib/db"
 import { getSiteSettings } from "@/lib/settings"
 import { Header } from "@/components/storefront/Header"
 import { Footer } from "@/components/storefront/Footer"
@@ -32,6 +32,7 @@ function renderFormattedText(text: string) {
 }
 
 async function getProduct(slug: string) {
+  await ensureDatabaseSchema()
   try {
     const product = await prisma.product.findUnique({
       where: { slug },

@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server"
 import { revalidatePath } from "next/cache"
-import { prisma } from "@/lib/db"
+import { prisma, ensureDatabaseSchema } from "@/lib/db"
 import { slugify } from "@/lib/utils"
 import { verifyAdminRequest } from "@/lib/auth"
 import { Prisma } from "@prisma/client"
 
 export async function GET(req: Request) {
   try {
+    await ensureDatabaseSchema()
     const auth = await verifyAdminRequest(req)
     if (!auth.authenticated) {
       return NextResponse.json({ error: "Unauthorized: Admin privileges required" }, { status: 401 })
