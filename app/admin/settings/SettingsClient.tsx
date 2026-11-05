@@ -15,15 +15,44 @@ import {
   Loader2,
   Image as ImageIcon,
   ShieldCheck,
-  X
+  X,
+  Type,
+  Palette
 } from "lucide-react"
 
 interface InitialSettings {
   siteName: string
   siteTitle?: string | null
   logoUrl: string | null
+  heroTitle?: string | null
+  heroSubtitle?: string | null
+  heroTitleColor?: string | null
+  heroHighlightColor?: string | null
   version: number
   updatedAt: string | null
+}
+
+function renderHeroPreviewTitle(rawTitle: string, titleColor: string, highlightColor: string) {
+  const parts = rawTitle.split(/(\*\*.*?\*\*)/g)
+  return parts.map((part, index) => {
+    if (part.startsWith("**") && part.endsWith("**")) {
+      const text = part.slice(2, -2)
+      return (
+        <span
+          key={index}
+          style={{ color: highlightColor }}
+          className="inline font-black"
+        >
+          {text}
+        </span>
+      )
+    }
+    return (
+      <span key={index} style={{ color: titleColor }}>
+        {part}
+      </span>
+    )
+  })
 }
 
 function computeClientInitials(name: string): string {
@@ -58,6 +87,15 @@ export function SettingsClient({ initialData }: { initialData: InitialSettings }
   const [siteName, setSiteName] = useState(initialData.siteName)
   const [siteTitle, setSiteTitle] = useState(initialData.siteTitle || "")
   const [logoUrl, setLogoUrl] = useState<string | null>(initialData.logoUrl)
+  const [heroTitle, setHeroTitle] = useState(
+    initialData.heroTitle || "Những công cụ quen thuộc, **nhiều gói để lựa chọn.**"
+  )
+  const [heroSubtitle, setHeroSubtitle] = useState(
+    initialData.heroSubtitle ||
+      "Khám phá các gói Canva, YouTube Premium, Duolingo và những dịch vụ đang có tại cửa hàng. Chọn sản phẩm để xem giá và thông tin chi tiết."
+  )
+  const [heroTitleColor, setHeroTitleColor] = useState(initialData.heroTitleColor || "#FAF4ED")
+  const [heroHighlightColor, setHeroHighlightColor] = useState(initialData.heroHighlightColor || "#E6A66F")
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [localPreviewUrl, setLocalPreviewUrl] = useState<string | null>(null)
   const [isRemovingLogo, setIsRemovingLogo] = useState(false)
@@ -97,7 +135,13 @@ export function SettingsClient({ initialData }: { initialData: InitialSettings }
     selectedFile !== null ||
     isRemovingLogo !== (savedData.logoUrl === null && isRemovingLogo) ||
     (isRemovingLogo && savedData.logoUrl !== null) ||
-    logoUrl !== savedData.logoUrl
+    logoUrl !== savedData.logoUrl ||
+    heroTitle.trim() !== (savedData.heroTitle || "Những công cụ quen thuộc, **nhiều gói để lựa chọn.**").trim() ||
+    heroSubtitle.trim() !==
+      (savedData.heroSubtitle ||
+        "Khám phá các gói Canva, YouTube Premium, Duolingo và những dịch vụ đang có tại cửa hàng. Chọn sản phẩm để xem giá và thông tin chi tiết.").trim() ||
+    heroTitleColor.trim().toLowerCase() !== (savedData.heroTitleColor || "#FAF4ED").trim().toLowerCase() ||
+    heroHighlightColor.trim().toLowerCase() !== (savedData.heroHighlightColor || "#E6A66F").trim().toLowerCase()
 
   const canSave = isDirty && !nameError && !isSaving
 
@@ -155,6 +199,13 @@ export function SettingsClient({ initialData }: { initialData: InitialSettings }
     setSiteName(savedData.siteName)
     setSiteTitle(savedData.siteTitle || "")
     setLogoUrl(savedData.logoUrl)
+    setHeroTitle(savedData.heroTitle || "Những công cụ quen thuộc, **nhiều gói để lựa chọn.**")
+    setHeroSubtitle(
+      savedData.heroSubtitle ||
+        "Khám phá các gói Canva, YouTube Premium, Duolingo và những dịch vụ đang có tại cửa hàng. Chọn sản phẩm để xem giá và thông tin chi tiết."
+    )
+    setHeroTitleColor(savedData.heroTitleColor || "#FAF4ED")
+    setHeroHighlightColor(savedData.heroHighlightColor || "#E6A66F")
     setIsRemovingLogo(false)
     setFeedback(null)
   }
@@ -194,6 +245,10 @@ export function SettingsClient({ initialData }: { initialData: InitialSettings }
           siteName: trimmedName,
           siteTitle: siteTitle.trim() || null,
           logoUrl: finalLogoUrl,
+          heroTitle: heroTitle.trim() || null,
+          heroSubtitle: heroSubtitle.trim() || null,
+          heroTitleColor: heroTitleColor.trim() || "#FAF4ED",
+          heroHighlightColor: heroHighlightColor.trim() || "#E6A66F",
           version: savedData.version,
         }),
       })
@@ -208,6 +263,10 @@ export function SettingsClient({ initialData }: { initialData: InitialSettings }
         siteName: updated.siteName,
         siteTitle: updated.siteTitle || null,
         logoUrl: updated.logoUrl,
+        heroTitle: updated.heroTitle || null,
+        heroSubtitle: updated.heroSubtitle || null,
+        heroTitleColor: updated.heroTitleColor || "#FAF4ED",
+        heroHighlightColor: updated.heroHighlightColor || "#E6A66F",
         version: updated.version,
         updatedAt: updated.updatedAt || new Date().toISOString(),
       }
@@ -454,6 +513,172 @@ export function SettingsClient({ initialData }: { initialData: InitialSettings }
                   <strong className="font-bold underline text-amber-200">{liveInitials}</strong> làm biểu tượng thương hiệu.
                 </div>
               )}
+            </div>
+
+            {/* Field C: Giao diện đầu trang (Hero Banner) */}
+            <div className="pt-6 border-t border-border/60 space-y-5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wider text-caramel font-mono flex items-center gap-1.5">
+                  <Type className="size-3.5" />
+                  TIÊU ĐỀ &amp; MÔ TẢ ĐẦU TRANG (HERO)
+                </span>
+                <span className="text-[11px] text-muted-foreground font-mono">Tùy biến chữ lớn &amp; màu sắc</span>
+              </div>
+
+              {/* 1. Tiêu đề chính (Chữ lớn) */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label htmlFor="hero-title-input" className="block text-xs font-semibold text-foreground">
+                    Tiêu đề chính (Chữ lớn)
+                  </label>
+                  <span className="text-[10px] text-caramel font-semibold">
+                    Dùng **từ khóa** để tô đậm
+                  </span>
+                </div>
+                <textarea
+                  id="hero-title-input"
+                  rows={2}
+                  value={heroTitle}
+                  onChange={(e) => setHeroTitle(e.target.value)}
+                  placeholder="Những công cụ quen thuộc, **nhiều gói để lựa chọn.**"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-foreground text-xs placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-caramel transition-all resize-none font-medium leading-relaxed"
+                />
+                <p className="text-[11px] text-muted-foreground/80 leading-relaxed">
+                  Đoạn văn bản đặt giữa cặp dấu <code className="px-1 py-0.5 rounded bg-muted text-caramel font-mono text-[10px]">**...**</code> sẽ nhận màu nổi bật. Các phần còn lại sẽ dùng màu chữ chính.
+                </p>
+              </div>
+
+              {/* 2. Màu sắc tiêu đề */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Màu chữ chính */}
+                <div className="space-y-2 p-3.5 rounded-xl border border-border/70 bg-background/50">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-foreground flex items-center gap-1">
+                      <Palette className="size-3 text-muted-foreground" />
+                      Màu chữ chính
+                    </label>
+                    <span className="font-mono text-[10px] text-muted-foreground">{heroTitleColor}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={heroTitleColor}
+                      onChange={(e) => setHeroTitleColor(e.target.value)}
+                      className="size-8 rounded-lg cursor-pointer border border-border p-0.5 bg-background shrink-0"
+                      aria-label="Chọn màu chữ chính"
+                    />
+                    <input
+                      type="text"
+                      value={heroTitleColor}
+                      onChange={(e) => setHeroTitleColor(e.target.value)}
+                      className="w-full px-2.5 py-1.5 rounded-lg border border-border bg-background text-foreground text-xs font-mono"
+                      maxLength={7}
+                    />
+                  </div>
+                  {/* Preset Swatches */}
+                  <div className="flex items-center gap-1.5 pt-1">
+                    {[
+                      { name: "Oat Cream (Mặc định)", hex: "#FAF4ED" },
+                      { name: "Trắng tinh", hex: "#FFFFFF" },
+                      { name: "Vàng Caramel", hex: "#E6A66F" },
+                      { name: "Xanh dương", hex: "#38BDF8" },
+                    ].map((c) => (
+                      <button
+                        key={c.hex}
+                        type="button"
+                        onClick={() => setHeroTitleColor(c.hex)}
+                        title={c.name}
+                        className={`size-6 rounded-md border transition-transform hover:scale-110 flex items-center justify-center cursor-pointer ${
+                          heroTitleColor.toLowerCase() === c.hex.toLowerCase() ? "ring-2 ring-caramel" : "border-border"
+                        }`}
+                        style={{ backgroundColor: c.hex }}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Màu chữ nổi bật (tô đậm) */}
+                <div className="space-y-2 p-3.5 rounded-xl border border-border/70 bg-background/50">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-foreground flex items-center gap-1">
+                      <Palette className="size-3 text-caramel" />
+                      Màu chữ nổi bật (tô đậm)
+                    </label>
+                    <span className="font-mono text-[10px] text-caramel font-semibold">{heroHighlightColor}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={heroHighlightColor}
+                      onChange={(e) => setHeroHighlightColor(e.target.value)}
+                      className="size-8 rounded-lg cursor-pointer border border-border p-0.5 bg-background shrink-0"
+                      aria-label="Chọn màu chữ nổi bật"
+                    />
+                    <input
+                      type="text"
+                      value={heroHighlightColor}
+                      onChange={(e) => setHeroHighlightColor(e.target.value)}
+                      className="w-full px-2.5 py-1.5 rounded-lg border border-border bg-background text-foreground text-xs font-mono"
+                      maxLength={7}
+                    />
+                  </div>
+                  {/* Preset Swatches */}
+                  <div className="flex items-center gap-1.5 pt-1">
+                    {[
+                      { name: "Vàng Caramel (Mặc định)", hex: "#E6A66F" },
+                      { name: "Caramel Sáng", hex: "#F2BC8E" },
+                      { name: "Cam Amber", hex: "#F59E0B" },
+                      { name: "Xanh ngọc", hex: "#34D399" },
+                      { name: "Hồng đào", hex: "#FB7185" },
+                    ].map((c) => (
+                      <button
+                        key={c.hex}
+                        type="button"
+                        onClick={() => setHeroHighlightColor(c.hex)}
+                        title={c.name}
+                        className={`size-6 rounded-md border transition-transform hover:scale-110 flex items-center justify-center cursor-pointer ${
+                          heroHighlightColor.toLowerCase() === c.hex.toLowerCase() ? "ring-2 ring-caramel" : "border-border"
+                        }`}
+                        style={{ backgroundColor: c.hex }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* 3. Mô tả phụ (Chữ nhỏ) */}
+              <div className="space-y-1.5">
+                <label htmlFor="hero-subtitle-input" className="block text-xs font-semibold text-foreground">
+                  Mô tả phụ (Chữ nhỏ)
+                </label>
+                <textarea
+                  id="hero-subtitle-input"
+                  rows={3}
+                  value={heroSubtitle}
+                  onChange={(e) => setHeroSubtitle(e.target.value)}
+                  placeholder="Khám phá các gói Canva, YouTube Premium, Duolingo và những dịch vụ đang có tại cửa hàng. Chọn sản phẩm để xem giá và thông tin chi tiết."
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-foreground text-xs placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-caramel transition-all resize-none leading-relaxed"
+                />
+              </div>
+
+              {/* 4. Xem trước trực tiếp Hero */}
+              <div className="space-y-1.5 pt-1">
+                <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block">
+                  Xem trước trực tiếp phần tiêu đề &amp; mô tả:
+                </span>
+                <div className="p-4 sm:p-5 rounded-2xl bg-background border border-caramel/25 text-center space-y-2 shadow-inner">
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] border border-caramel/30 bg-caramel/10 text-caramel-light">
+                    <span className="size-1.5 rounded-full bg-emerald-500" />
+                    <span>Cửa hàng tài khoản &amp; phần mềm</span>
+                  </div>
+                  <div className="text-base sm:text-xl font-black tracking-tight leading-snug">
+                    {renderHeroPreviewTitle(heroTitle, heroTitleColor, heroHighlightColor)}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground/80 leading-relaxed max-w-md mx-auto whitespace-pre-line">
+                    {heroSubtitle}
+                  </p>
+                </div>
+              </div>
             </div>
 
             {/* Action Bar */}

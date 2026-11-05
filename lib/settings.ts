@@ -6,6 +6,10 @@ export interface SiteSettingsData {
   siteTitle: string | null
   logoUrl: string | null
   initials: string
+  heroTitle?: string | null
+  heroSubtitle?: string | null
+  heroTitleColor?: string | null
+  heroHighlightColor?: string | null
   updatedAt?: Date | string
   version?: number
 }
@@ -53,12 +57,20 @@ async function fetchSettingsFromDb(): Promise<SiteSettingsData> {
     const siteName = row?.siteName?.trim() || fallbackName
     const siteTitle = (row as any)?.siteTitle?.trim() || null
     const logoUrl = row?.logoUrl?.trim() || null
+    const heroTitle = (row as any)?.heroTitle?.trim() || null
+    const heroSubtitle = (row as any)?.heroSubtitle?.trim() || null
+    const heroTitleColor = (row as any)?.heroTitleColor?.trim() || "#FAF4ED"
+    const heroHighlightColor = (row as any)?.heroHighlightColor?.trim() || "#E6A66F"
 
     return {
       siteName,
       siteTitle,
       logoUrl,
       initials: getInitials(siteName),
+      heroTitle,
+      heroSubtitle,
+      heroTitleColor,
+      heroHighlightColor,
       updatedAt: row?.updatedAt ? row.updatedAt.toISOString() : undefined,
       version: row?.version || 1,
     }
@@ -70,6 +82,10 @@ async function fetchSettingsFromDb(): Promise<SiteSettingsData> {
       siteTitle: null,
       logoUrl: null,
       initials: getInitials(fallbackName),
+      heroTitle: null,
+      heroSubtitle: null,
+      heroTitleColor: "#FAF4ED",
+      heroHighlightColor: "#E6A66F",
       version: 1,
     }
   }
@@ -94,11 +110,19 @@ export async function updateSiteSettings(data: {
   siteName: string
   siteTitle?: string | null
   logoUrl?: string | null
+  heroTitle?: string | null
+  heroSubtitle?: string | null
+  heroTitleColor?: string | null
+  heroHighlightColor?: string | null
   expectedVersion?: number
 }): Promise<SiteSettingsData> {
   const cleanName = data.siteName.trim()
   const cleanTitle = data.siteTitle !== undefined ? (data.siteTitle ? data.siteTitle.trim() : null) : undefined
   const cleanLogo = data.logoUrl !== undefined ? (data.logoUrl ? data.logoUrl.trim() : null) : undefined
+  const cleanHeroTitle = data.heroTitle !== undefined ? (data.heroTitle ? data.heroTitle.trim() : null) : undefined
+  const cleanHeroSubtitle = data.heroSubtitle !== undefined ? (data.heroSubtitle ? data.heroSubtitle.trim() : null) : undefined
+  const cleanHeroTitleColor = data.heroTitleColor !== undefined ? (data.heroTitleColor ? data.heroTitleColor.trim() : "#FAF4ED") : undefined
+  const cleanHeroHighlightColor = data.heroHighlightColor !== undefined ? (data.heroHighlightColor ? data.heroHighlightColor.trim() : "#E6A66F") : undefined
 
   // Upsert settings in database
   const current = await prisma.siteSettings.findUnique({
@@ -117,6 +141,10 @@ export async function updateSiteSettings(data: {
         siteName: cleanName,
         ...(cleanTitle !== undefined ? { siteTitle: cleanTitle } : {}),
         ...(cleanLogo !== undefined ? { logoUrl: cleanLogo } : {}),
+        ...(cleanHeroTitle !== undefined ? { heroTitle: cleanHeroTitle } : {}),
+        ...(cleanHeroSubtitle !== undefined ? { heroSubtitle: cleanHeroSubtitle } : {}),
+        ...(cleanHeroTitleColor !== undefined ? { heroTitleColor: cleanHeroTitleColor } : {}),
+        ...(cleanHeroHighlightColor !== undefined ? { heroHighlightColor: cleanHeroHighlightColor } : {}),
         version: { increment: 1 },
       },
     })
@@ -127,6 +155,10 @@ export async function updateSiteSettings(data: {
         siteName: cleanName,
         siteTitle: cleanTitle ?? null,
         logoUrl: cleanLogo ?? null,
+        heroTitle: cleanHeroTitle ?? null,
+        heroSubtitle: cleanHeroSubtitle ?? null,
+        heroTitleColor: cleanHeroTitleColor ?? "#FAF4ED",
+        heroHighlightColor: cleanHeroHighlightColor ?? "#E6A66F",
         version: 1,
       },
     })
@@ -148,6 +180,10 @@ export async function updateSiteSettings(data: {
     siteTitle: updated.siteTitle || null,
     logoUrl: updated.logoUrl,
     initials: getInitials(updated.siteName),
+    heroTitle: updated.heroTitle || null,
+    heroSubtitle: updated.heroSubtitle || null,
+    heroTitleColor: updated.heroTitleColor || "#FAF4ED",
+    heroHighlightColor: updated.heroHighlightColor || "#E6A66F",
     updatedAt: updated.updatedAt.toISOString(),
     version: updated.version,
   }

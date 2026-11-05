@@ -180,17 +180,10 @@ export function StorefrontCatalog({ groups, products }: StorefrontCatalogProps) 
 
   // Featured Products (Sản phẩm nổi bật)
   // Shared live stock data with zero duplicate polling
-  // Rút khỏi khu nổi bật khi hết hàng, tự xuất hiện lại khi có hàng
+  // Hiển thị cả sản phẩm còn hàng lẫn đã hết hàng theo lựa chọn của Admin
   const featuredProducts = useMemo(() => {
     return productsWithLiveStock
-      .filter((p) => {
-        if (!p.isFeatured) return false
-        if (p.statusOverride === "out_of_stock") return false
-        if (p.statusOverride === "in_stock") return true
-        if (p.deliveryType === "contact") return true
-        const pricing = calculateProductPricing(p.variants, p.statusOverride)
-        return pricing.hasStock && !pricing.isOutOfStock
-      })
+      .filter((p) => Boolean(p.isFeatured))
       .sort((a, b) => {
         const orderA = a.sortOrder ?? 0
         const orderB = b.sortOrder ?? 0

@@ -97,7 +97,7 @@ export default async function HomePage() {
       <Header initialSettings={settings} />
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 sm:px-6 pt-3 sm:pt-5 pb-10 sm:pb-14 space-y-7 sm:space-y-9">
         {/* Top Minimalist Hero Section */}
-        <HeroSection />
+        <HeroSection settings={settings} />
 
         {/* Dynamic Storefront with Search, Price Filter, Category Pills & Products */}
         <StorefrontCatalog groups={groups} products={products} />

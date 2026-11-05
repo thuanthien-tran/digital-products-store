@@ -33,6 +33,26 @@ export async function ensureDatabaseSchema(): Promise<void> {
             console.log('[AutoMigration] Successfully added isFeatured column to Product table')
           }
         }
+
+        // Check SiteSettings table
+        const settingsTableInfo = await prisma.$queryRawUnsafe<Array<{ name: string }>>(
+          `PRAGMA table_info("SiteSettings");`
+        )
+        if (Array.isArray(settingsTableInfo) && settingsTableInfo.length > 0) {
+          const cols = new Set(settingsTableInfo.map((c) => c.name))
+          if (!cols.has('heroTitle')) {
+            await prisma.$executeRawUnsafe(`ALTER TABLE "SiteSettings" ADD COLUMN "heroTitle" TEXT;`)
+          }
+          if (!cols.has('heroSubtitle')) {
+            await prisma.$executeRawUnsafe(`ALTER TABLE "SiteSettings" ADD COLUMN "heroSubtitle" TEXT;`)
+          }
+          if (!cols.has('heroTitleColor')) {
+            await prisma.$executeRawUnsafe(`ALTER TABLE "SiteSettings" ADD COLUMN "heroTitleColor" TEXT DEFAULT '#FAF4ED';`)
+          }
+          if (!cols.has('heroHighlightColor')) {
+            await prisma.$executeRawUnsafe(`ALTER TABLE "SiteSettings" ADD COLUMN "heroHighlightColor" TEXT DEFAULT '#E6A66F';`)
+          }
+        }
         globalForPrisma.schemaEnsured = true
       } catch (err) {
         console.error('[AutoMigration] Failed to verify/migrate schema:', err)

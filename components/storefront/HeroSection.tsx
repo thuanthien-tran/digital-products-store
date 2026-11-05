@@ -2,6 +2,34 @@
 
 import { Zap, ShieldCheck, Clock, QrCode, ArrowDown } from "lucide-react"
 import { PixelCapybara } from "@/components/storefront/PixelCapybara"
+import type { SiteSettingsData } from "@/lib/settings"
+
+interface HeroSectionProps {
+  settings?: SiteSettingsData | null
+}
+
+function renderHeroTitle(rawTitle: string, titleColor: string, highlightColor: string) {
+  const parts = rawTitle.split(/(\*\*.*?\*\*)/g)
+  return parts.map((part, index) => {
+    if (part.startsWith("**") && part.endsWith("**")) {
+      const text = part.slice(2, -2)
+      return (
+        <span
+          key={index}
+          style={{ color: highlightColor }}
+          className="inline font-black"
+        >
+          {text}
+        </span>
+      )
+    }
+    return (
+      <span key={index} style={{ color: titleColor }}>
+        {part}
+      </span>
+    )
+  })
+}
 
 const SLOGAN_FEATURES = [
   {
@@ -42,7 +70,14 @@ const SLOGAN_FEATURES = [
   },
 ]
 
-export function HeroSection() {
+export function HeroSection({ settings }: HeroSectionProps) {
+  const heroTitle = settings?.heroTitle || "Những công cụ quen thuộc, **nhiều gói để lựa chọn.**"
+  const heroSubtitle =
+    settings?.heroSubtitle ||
+    "Khám phá các gói Canva, YouTube Premium, Duolingo và những dịch vụ đang có tại cửa hàng. Chọn sản phẩm để xem giá và thông tin chi tiết."
+  const titleColor = settings?.heroTitleColor || "#FAF4ED"
+  const highlightColor = settings?.heroHighlightColor || "#E6A66F"
+
   const handleScrollToCatalog = (e: React.MouseEvent<HTMLAnchorElement>) => {
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
     e.preventDefault()
@@ -84,21 +119,18 @@ export function HeroSection() {
 
         {/* 2. Tiêu đề H1 */}
         <h1
-          className="text-2xl sm:text-3xl md:text-[38px] lg:text-[42px] font-black tracking-tight leading-[1.18] text-oat-cream animate-fade-up max-w-2xl mx-auto"
+          className="text-2xl sm:text-3xl md:text-[38px] lg:text-[42px] font-black tracking-tight leading-[1.18] animate-fade-up max-w-2xl mx-auto"
           style={{ animationDelay: "100ms" }}
         >
-          Những công cụ quen thuộc,{" "}
-          <span className="bg-gradient-to-r from-caramel via-caramel-light to-caramel bg-clip-text text-transparent">
-            nhiều gói để lựa chọn.
-          </span>
+          {renderHeroTitle(heroTitle, titleColor, highlightColor)}
         </h1>
 
         {/* 3. Mô tả */}
         <p
-          className="text-xs sm:text-sm text-muted-foreground/90 max-w-xl mx-auto leading-relaxed animate-fade-up"
+          className="text-xs sm:text-sm text-muted-foreground/90 max-w-xl mx-auto leading-relaxed animate-fade-up whitespace-pre-line"
           style={{ animationDelay: "200ms" }}
         >
-          Khám phá các gói Canva, YouTube Premium, Duolingo và những dịch vụ đang có tại cửa hàng. Chọn sản phẩm để xem giá và thông tin chi tiết.
+          {heroSubtitle}
         </p>
 
         {/* 4. Nút chính "Khám phá các gói" */}

@@ -14,6 +14,10 @@ export default async function AdminSettingsPage() {
     siteName: settings?.siteName || fallbackName,
     siteTitle: (settings as any)?.siteTitle || null,
     logoUrl: settings?.logoUrl || null,
+    heroTitle: (settings as any)?.heroTitle || null,
+    heroSubtitle: (settings as any)?.heroSubtitle || null,
+    heroTitleColor: (settings as any)?.heroTitleColor || "#FAF4ED",
+    heroHighlightColor: (settings as any)?.heroHighlightColor || "#E6A66F",
     version: settings?.version || 1,
     updatedAt: settings?.updatedAt ? settings.updatedAt.toISOString() : null,
   }
