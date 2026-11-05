@@ -66,7 +66,7 @@ function LoginForm() {
             {isTimeout && !error && (
               <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-500 text-xs font-semibold flex items-center gap-2">
                 <Clock className="size-4 shrink-0" />
-                <span>Phiên làm việc đã hết hạn do không có hoạt động trong 10 phút. Vui lòng đăng nhập lại.</span>
+                <span>Phiên đăng nhập hết hạn</span>
               </div>
             )}
 
