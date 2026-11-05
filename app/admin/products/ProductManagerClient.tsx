@@ -166,6 +166,7 @@ export function ProductManagerClient({ groups }: Props) {
     name: "",
     groupId: groups[0]?.id || "",
     priceCents: 50000,
+    providerPrice: 0,
     variantName: "Gói Mặc Định",
     description: "",
     imageUrl: "",
@@ -490,7 +491,7 @@ export function ProductManagerClient({ groups }: Props) {
                   name: editForm.name,
                   priceCents: editForm.priceCents,
                   compareAtPriceCents: editForm.compareAtPriceCents || null,
-                  providerPrice: mainVariant.providerPrice ?? null,
+                  providerPrice: editForm.providerPrice !== undefined ? editForm.providerPrice : (mainVariant.providerPrice ?? null),
                 },
               ]
             : undefined,
@@ -678,6 +679,7 @@ export function ProductManagerClient({ groups }: Props) {
           name: manualForm.name,
           groupId: manualForm.groupId,
           priceCents: manualForm.priceCents,
+          providerPrice: manualForm.providerPrice,
           variantName: manualForm.variantName,
           deliveryType: manualForm.deliveryType,
           description: manualForm.description,
@@ -696,6 +698,7 @@ export function ProductManagerClient({ groups }: Props) {
           name: "",
           groupId: groups[0]?.id || "",
           priceCents: 50000,
+          providerPrice: 0,
           variantName: "Gói Mặc Định",
           description: "",
           imageUrl: "",
@@ -1332,19 +1335,36 @@ export function ProductManagerClient({ groups }: Props) {
                           <label className="text-muted-foreground font-medium">
                             Giá bên đại lý (VNĐ)
                           </label>
-                          {editingProduct.variants[0]?.provider && (
+                          {editingProduct.variants[0]?.provider ? (
                             <span className="text-[10px] text-primary/80 uppercase font-semibold">
                               {editingProduct.variants[0].provider}
                             </span>
+                          ) : (
+                            <span className="text-[10px] text-muted-foreground">
+                              (Tự nhập)
+                            </span>
                           )}
                         </div>
-                        <input
-                          type="text"
-                          readOnly
-                          value={editForm.providerPrice ? `${editForm.providerPrice.toLocaleString("vi-VN")} ₫` : "0 ₫"}
-                          className="w-full p-2.5 rounded-lg border border-border bg-secondary/40 text-muted-foreground text-xs font-mono font-medium focus:outline-none cursor-not-allowed select-none"
-                          title="Giá sỉ từ nhà cung cấp / đại lý (Chỉ xem đối chiếu, không thể chỉnh sửa)"
-                        />
+                        {editingProduct.variants[0]?.provider ? (
+                          <input
+                            type="text"
+                            readOnly
+                            value={editForm.providerPrice ? `${editForm.providerPrice.toLocaleString("vi-VN")} ₫` : "0 ₫"}
+                            className="w-full p-2.5 rounded-lg border border-border bg-secondary/40 text-muted-foreground text-xs font-mono font-medium focus:outline-none cursor-not-allowed select-none"
+                            title="Giá sỉ từ nhà cung cấp / đại lý (Đồng bộ qua API, không thể sửa tay)"
+                          />
+                        ) : (
+                          <input
+                            type="number"
+                            min={0}
+                            step={1000}
+                            value={editForm.providerPrice || 0}
+                            onChange={(e) => setEditForm({ ...editForm, providerPrice: Number(e.target.value) || 0 })}
+                            className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground text-xs font-mono font-bold focus:outline-none focus:ring-1 focus:ring-primary"
+                            placeholder="Nhập giá vốn đại lý..."
+                            title="Giá vốn / giá bên đại lý để tự tính lợi nhuận"
+                          />
+                        )}
                       </div>
 
                       <div>
@@ -1718,17 +1738,33 @@ export function ProductManagerClient({ groups }: Props) {
                 </select>
               </div>
 
-              <div>
-                <label className="block text-muted-foreground font-medium mb-1">Giá bán dự kiến (VNĐ) *</label>
-                <input
-                  type="number"
-                  required
-                  value={manualForm.priceCents}
-                  onChange={(e) => setManualForm({ ...manualForm, priceCents: Number(e.target.value) })}
-                  className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground text-xs font-mono font-bold focus:outline-none focus:ring-1 focus:ring-primary"
-                  step={1000}
-                  min={0}
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-muted-foreground font-medium mb-1">Giá bên đại lý / Giá vốn (VNĐ)</label>
+                  <input
+                    type="number"
+                    value={manualForm.providerPrice || 0}
+                    onChange={(e) => setManualForm({ ...manualForm, providerPrice: Number(e.target.value) || 0 })}
+                    className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground text-xs font-mono font-bold focus:outline-none focus:ring-1 focus:ring-primary"
+                    placeholder="0"
+                    step={1000}
+                    min={0}
+                    title="Giá bạn mua từ đại lý (chỉ dùng nội bộ để tính lãi/lỗ)"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-muted-foreground font-medium mb-1">Giá bán niêm yết (VNĐ) *</label>
+                  <input
+                    type="number"
+                    required
+                    value={manualForm.priceCents}
+                    onChange={(e) => setManualForm({ ...manualForm, priceCents: Number(e.target.value) })}
+                    className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground text-xs font-mono font-bold focus:outline-none focus:ring-1 focus:ring-primary"
+                    step={1000}
+                    min={0}
+                  />
+                </div>
               </div>
 
               <div>

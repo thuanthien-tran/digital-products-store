@@ -96,6 +96,7 @@ export async function POST(req: Request) {
       groupId,
       description,
       priceCents,
+      providerPrice,
       variantName,
       deliveryType,
       serviceInstructions,
@@ -135,6 +136,7 @@ export async function POST(req: Request) {
           create: {
             name: variantName || "Mặc định",
             priceCents: parsedPrice,
+            providerPrice: providerPrice !== undefined && providerPrice !== null ? Math.max(0, parseInt(String(providerPrice), 10) || 0) : null,
           },
         },
       },
