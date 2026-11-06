@@ -31,7 +31,7 @@ export default async function SanPhamPage() {
     <div className="flex min-h-screen flex-col bg-background text-foreground selection:bg-primary/20 selection:text-primary">
       <Header initialSettings={settings} />
 
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 sm:px-6 pt-4 sm:pt-6 pb-12 sm:pb-16 space-y-6 sm:space-y-8">
+      <main className="mx-auto w-full max-w-7xl flex-1 px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-12 sm:pb-16 space-y-6 sm:space-y-8">
         {/* Breadcrumb Navigation */}
         <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <Link
@@ -75,6 +75,7 @@ export default async function SanPhamPage() {
           products={products}
           showFeatured={false}
           title=""
+          sidebarLayout={true}
         />
       </main>
 

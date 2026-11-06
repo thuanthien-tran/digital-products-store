@@ -38,6 +38,7 @@ interface StorefrontCatalogProps {
   showFeatured?: boolean
   title?: string
   subtitle?: string
+  sidebarLayout?: boolean
 }
 
 const ITEMS_PER_PAGE = 9 // 3x3 grid layout (3 rows x 3 columns on desktop)
@@ -53,6 +54,7 @@ export function StorefrontCatalog({
   showFeatured = true,
   title = "Danh mục sản phẩm",
   subtitle,
+  sidebarLayout = false,
 }: StorefrontCatalogProps) {
   const [catalogProducts, setCatalogProducts] = useState<StorefrontProduct[]>(products)
   const [catalogGroups, setCatalogGroups] = useState<StorefrontGroup[]>(groups)
@@ -63,6 +65,7 @@ export function StorefrontCatalog({
   const [currentPage, setCurrentPage] = useState<number>(1)
   const [isFilterCollapsed, setIsFilterCollapsed] = useState<boolean>(false)
   const [isSearchHidden, setIsSearchHidden] = useState<boolean>(false)
+  const [isMobileFilterOpen, setIsMobileFilterOpen] = useState<boolean>(false)
   const [liveStockMap, setLiveStockMap] = useState<Record<string, { availableStock: number; isPurchasable: boolean }>>({})
 
   // Sync state if server props change
@@ -450,6 +453,128 @@ export function StorefrontCatalog({
     name_desc: "Tên: Z – A",
   }
 
+  const renderProductGridContent = () => {
+    if (products.length === 0) {
+      return (
+        <div className="py-20 text-center rounded-2xl border border-border/60 bg-card/60 p-8 space-y-3 animate-fade-up backdrop-blur">
+          <div className="inline-flex size-12 items-center justify-center rounded-full bg-secondary text-primary mx-auto mb-1">
+            <Search className="size-6 text-muted-foreground" />
+          </div>
+          <p className="text-base font-bold text-foreground">Cửa hàng đang chuẩn bị sản phẩm mới</p>
+          <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+            Hệ thống đang cập nhật danh mục và các gói tài khoản. Quý khách vui lòng quay lại sau ít phút!
+          </p>
+        </div>
+      )
+    }
+
+    if (filteredProducts.length === 0) {
+      return (
+        <div className="py-16 text-center rounded-2xl border border-border/70 bg-card/60 p-8 space-y-3 animate-fade-up backdrop-blur">
+          <div className="inline-flex size-12 items-center justify-center rounded-full bg-secondary text-muted-foreground mx-auto">
+            <Search className="size-6 text-muted-foreground/70" />
+          </div>
+          <h3 className="text-base font-bold text-foreground">Chưa tìm thấy sản phẩm phù hợp</h3>
+          <p className="text-xs text-muted-foreground max-w-md mx-auto leading-relaxed">
+            Thử tìm bằng từ khóa khác hoặc xóa bộ lọc để xem toàn bộ danh mục sản phẩm đang kinh doanh.
+          </p>
+          <div className="pt-2">
+            <Button
+              size="sm"
+              onClick={handleResetFilters}
+              className="text-xs h-9 px-4 font-semibold active-bounce bg-accent text-accent-foreground hover:opacity-90"
+            >
+              <RefreshCw className="size-3.5 mr-1.5" />
+              <span>Xem toàn bộ sản phẩm</span>
+            </Button>
+          </div>
+        </div>
+      )
+    }
+
+    return (
+      <div className="space-y-6 sm:space-y-8">
+        <div className="grid grid-cols-1 min-[360px]:grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-6 items-stretch">
+          {paginatedProducts.map((p, idx) => (
+            <div
+              key={`${selectedGroup}-${p.id}`}
+              style={{ animationDelay: `${idx * 40}ms` }}
+              className="animate-fade-up h-full flex flex-col min-w-0"
+            >
+              <ProductCard
+                id={p.id}
+                name={p.name}
+                slug={p.slug}
+                description={p.description}
+                images={p.images}
+                groupId={p.groupId}
+                groupName={p.groupName}
+                deliveryType={p.deliveryType}
+                statusOverride={p.statusOverride}
+                highlights={p.highlights}
+                warrantyTerms={p.warrantyTerms}
+                noticeNotes={p.noticeNotes}
+                variants={p.variants}
+              />
+            </div>
+          ))}
+        </div>
+
+        {/* Grid Tabs / Pagination Switcher (3x3 Grid Navigation) */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center pt-4 sm:pt-6 border-t border-border/60">
+            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap justify-center" role="navigation" aria-label="Phân trang danh mục sản phẩm">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handlePageChange(validPage - 1)}
+                disabled={validPage <= 1}
+                className="h-9 px-2.5 sm:px-3 text-xs font-medium border-border/80 hover:bg-secondary disabled:opacity-35 disabled:cursor-not-allowed"
+                aria-label="Trang trước"
+              >
+                <ChevronLeft className="size-4 sm:mr-1" />
+                <span className="hidden sm:inline">Trang trước</span>
+              </Button>
+
+              <div className="flex items-center gap-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                  const isActive = page === validPage
+                  return (
+                    <button
+                      key={page}
+                      type="button"
+                      onClick={() => handlePageChange(page)}
+                      aria-current={isActive ? "page" : undefined}
+                      className={`size-9 rounded-lg text-xs font-semibold transition-all duration-150 flex items-center justify-center border ${
+                        isActive
+                          ? "bg-caramel text-black border-caramel shadow-sm shadow-caramel/25 font-bold scale-105"
+                          : "bg-secondary/60 text-muted-foreground hover:text-foreground hover:bg-secondary border-border/70"
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  )
+                })}
+              </div>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handlePageChange(validPage + 1)}
+                disabled={validPage >= totalPages}
+                className="h-9 px-2.5 sm:px-3 text-xs font-medium border-border/80 hover:bg-secondary disabled:opacity-35 disabled:cursor-not-allowed"
+                aria-label="Trang sau"
+              >
+                <span className="hidden sm:inline">Trang sau</span>
+                <ChevronRight className="size-4 sm:ml-1" />
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
     <section id="products" className="scroll-mt-24 pt-6 sm:pt-8 border-t border-border/70">
       {/* Khu "Sản phẩm nổi bật" (Chỉ hiển thị khi có sản phẩm thỏa điều kiện bán) */}
@@ -584,419 +709,450 @@ export function StorefrontCatalog({
         <div id="catalog-heading" className="scroll-mt-24" />
       )}
 
-      {/* Sticky & Collapsible Search Bar, Price Filter & Sort Controls */}
-      {!isSearchHidden && (
-        <div
-          className={`sticky top-[72px] sm:top-[80px] z-30 transition-all duration-200 rounded-2xl border border-border/80 bg-card/95 backdrop-blur-xl shadow-lg shadow-black/25 mt-3 sm:mt-4 ${
-            isFilterCollapsed
-              ? "p-2 sm:p-2.5"
-              : "p-3.5 sm:p-5 space-y-3 sm:space-y-3.5"
-          }`}
-        >
-          {isFilterCollapsed ? (
-            /* Chế độ thu gọn (Compact Mode): 1 dòng siêu mỏng cao ~38px, không che sản phẩm khi lướt */
-            <div className="flex items-center gap-2">
-              {/* Search Input nhỏ gọn */}
-              <div className="relative flex-1 min-w-0">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
+      {sidebarLayout ? (
+        /* ========================================================================= */
+        /* BỐ CỤC CHUYÊN NGHIỆP: BỘ LỌC CỐ ĐỊNH BÊN TRÁI + TÌM KIẾM & SẢN PHẨM BÊN PHẢI */
+        /* ========================================================================= */
+        <div className="flex flex-col lg:flex-row items-start gap-6 lg:gap-8 pt-2">
+          {/* Nút mở/đóng bộ lọc trên thiết bị di động (< lg) */}
+          <div className="lg:hidden w-full">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsMobileFilterOpen(!isMobileFilterOpen)}
+              className="w-full h-11 flex items-center justify-between px-4 rounded-2xl border-border/80 bg-card/90 text-xs font-semibold text-foreground shadow-xs active-bounce"
+            >
+              <div className="flex items-center gap-2">
+                <SlidersHorizontal className="size-4 text-caramel" />
+                <span>Bộ lọc & Danh mục</span>
+                {selectedGroup !== "all" && (
+                  <span className="px-2 py-0.5 rounded-full bg-caramel/15 text-caramel-light text-[11px] font-bold">
+                    {currentGroupName}
+                  </span>
+                )}
+              </div>
+              <ChevronDown className={`size-4 text-muted-foreground transition-transform duration-200 ${isMobileFilterOpen ? "rotate-180" : ""}`} />
+            </Button>
+          </div>
+
+          {/* CỘT TRÁI: BỘ LỌC CỐ ĐỊNH THEO MÀN HÌNH (STICKY SIDEBAR) */}
+          <aside className={`w-full lg:w-64 xl:w-72 shrink-0 lg:sticky lg:top-[90px] sm:lg:top-[104px] self-start lg:max-h-[calc(100vh-124px)] lg:overflow-y-auto no-scrollbar space-y-4 ${isMobileFilterOpen ? "block" : "hidden lg:block"}`}>
+            <div className="rounded-2xl border border-border/80 bg-card/90 backdrop-blur-xl p-4 sm:p-5 space-y-5 shadow-sm">
+              {/* Header Bộ Lọc */}
+              <div className="flex items-center justify-between pb-3 border-b border-border/60">
+                <div className="flex items-center gap-2">
+                  <SlidersHorizontal className="size-4 text-caramel" />
+                  <h3 className="font-heading font-bold text-sm text-foreground tracking-tight">
+                    Bộ lọc sản phẩm
+                  </h3>
+                </div>
+                {hasActiveFilters && (
+                  <button
+                    type="button"
+                    onClick={handleResetFilters}
+                    className="text-xs text-caramel hover:text-caramel-light hover:underline font-semibold flex items-center gap-1 active-bounce"
+                  >
+                    <RefreshCw className="size-3" />
+                    <span>Đặt lại</span>
+                  </button>
+                )}
+              </div>
+
+              {/* 1. Danh Mục Sản Phẩm (Dạng danh sách dọc đẹp mắt) */}
+              <div className="space-y-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/90 block">
+                  Danh mục sản phẩm
+                </span>
+                <div className="space-y-1">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedGroup("all")}
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all duration-150 active-bounce ${
+                      selectedGroup === "all"
+                        ? "bg-caramel/15 text-caramel-light border border-caramel/35 font-bold shadow-xs"
+                        : "text-muted-foreground hover:text-foreground hover:bg-secondary/70 border border-transparent"
+                    }`}
+                  >
+                    <span>Tất cả sản phẩm</span>
+                    <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold tabular-nums ${
+                      selectedGroup === "all" ? "bg-caramel text-black font-bold" : "bg-secondary text-muted-foreground"
+                    }`}>
+                      {products.length}
+                    </span>
+                  </button>
+
+                  {activeGroups.map((g) => {
+                    const isSelected = selectedGroup === g.id
+                    return (
+                      <button
+                        key={g.id}
+                        type="button"
+                        onClick={() => setSelectedGroup(g.id)}
+                        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all duration-150 active-bounce ${
+                          isSelected
+                            ? "bg-caramel/15 text-caramel-light border border-caramel/35 font-bold shadow-xs"
+                            : "text-muted-foreground hover:text-foreground hover:bg-secondary/70 border border-transparent"
+                        }`}
+                      >
+                        <span className="truncate pr-2">{g.name}</span>
+                        <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold tabular-nums shrink-0 ${
+                          isSelected ? "bg-caramel text-black font-bold" : "bg-secondary text-muted-foreground"
+                        }`}>
+                          {g.count}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* 2. Khoảng Giá */}
+              <div className="space-y-2 pt-3 border-t border-border/60">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/90 block">
+                  Khoảng giá
+                </span>
+                <div className="space-y-1">
+                  {(
+                    [
+                      { key: "all", label: "Tất cả mức giá" },
+                      { key: "under_50k", label: "Dưới 50.000 ₫" },
+                      { key: "50k_100k", label: "50.000 ₫ – 100.000 ₫" },
+                      { key: "100k_200k", label: "100.000 ₫ – 200.000 ₫" },
+                      { key: "above_200k", label: "Trên 200.000 ₫" },
+                    ] as const
+                  ).map((opt) => {
+                    const isSelected = priceRange === opt.key
+                    return (
+                      <button
+                        key={opt.key}
+                        type="button"
+                        onClick={() => setPriceRange(opt.key)}
+                        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all duration-150 active-bounce ${
+                          isSelected
+                            ? "bg-caramel/15 text-caramel-light border border-caramel/35 font-bold shadow-xs"
+                            : "text-muted-foreground hover:text-foreground hover:bg-secondary/70 border border-transparent"
+                        }`}
+                      >
+                        <span>{opt.label}</span>
+                        {isSelected && (
+                          <span className="size-2 rounded-full bg-caramel shadow-[0_0_6px_rgba(230,166,111,0.8)]" />
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* 3. Sắp Xếp Sản Phẩm */}
+              <div className="space-y-2 pt-3 border-t border-border/60">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/90 block">
+                  Sắp xếp theo
+                </span>
+                <div className="relative">
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as SortOptionKey)}
+                    aria-label="Sắp xếp sản phẩm"
+                    className="w-full h-10 pl-3 pr-8 rounded-xl bg-background/90 border border-border/80 text-foreground text-xs font-medium focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/30 transition-all cursor-pointer appearance-none shadow-inner"
+                  >
+                    <option value="default">Sắp xếp mặc định</option>
+                    <option value="price_asc">Giá: Thấp đến cao</option>
+                    <option value="price_desc">Giá: Cao đến thấp</option>
+                    <option value="name_asc">Tên: A – Z</option>
+                    <option value="name_desc">Tên: Z – A</option>
+                  </select>
+                  <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
+                </div>
+              </div>
+            </div>
+          </aside>
+
+          {/* CỘT PHẢI: DUY NHẤT THANH TÌM KIẾM + LƯỚI SẢN PHẨM 3x3 */}
+          <div className="flex-1 min-w-0 space-y-4 sm:space-y-5 w-full">
+            {/* DUY NHẤT THANH TÌM KIẾM (Gọn gàng, thanh mảnh, cố định khi cuộn) */}
+            <div className="sticky top-[90px] sm:top-[104px] z-20 py-1">
+              <div className="relative w-full">
                 <input
                   type="search"
                   autoComplete="off"
-                  placeholder="Tìm kiếm sản phẩm hoặc gói…"
+                  placeholder="Tìm kiếm theo tên sản phẩm hoặc gói dịch vụ…"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full h-9 pl-9 pr-8 rounded-xl bg-background/90 border border-border/80 text-foreground text-xs placeholder:text-muted-foreground/70 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/30 transition-all shadow-inner"
+                  className="w-full h-11 sm:h-12 pl-11 pr-10 rounded-2xl bg-card/95 backdrop-blur-xl border border-border/90 text-foreground text-sm placeholder:text-muted-foreground/75 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all shadow-xl shadow-black/40"
+                />
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-caramel pointer-events-none z-10" />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    aria-label="Xóa từ khóa tìm kiếm"
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 rounded-full hover:bg-secondary transition-colors z-10"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Context Bar */}
+            {(hasActiveFilters || currentGroupName) && (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-border/60">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {currentGroupName && (
+                    <div className="flex items-center gap-2">
+                      <Layers className="size-4 text-accent" aria-hidden="true" />
+                      <span className="text-sm font-bold text-foreground">
+                        Danh mục: {currentGroupName}
+                      </span>
+                      <span className="text-xs text-muted-foreground font-medium tabular-nums">
+                        ({filteredProducts.length} sản phẩm)
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Active Filter Chips */}
+                {hasActiveFilters && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {trimmedQuery && (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-accent/10 text-accent border border-accent/30">
+                        <span>Từ khóa: “{trimmedQuery}”</span>
+                        <button
+                          type="button"
+                          onClick={() => setSearchQuery("")}
+                          aria-label="Xóa từ khóa"
+                          className="hover:opacity-75"
+                        >
+                          <X className="size-3" />
+                        </button>
+                      </span>
+                    )}
+
+                    {priceRange !== "all" && (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-secondary text-foreground border border-border">
+                        <span>Giá: {priceRangeLabels[priceRange]}</span>
+                        <button
+                          type="button"
+                          onClick={() => setPriceRange("all")}
+                          aria-label="Bỏ lọc giá"
+                          className="hover:opacity-75"
+                        >
+                          <X className="size-3" />
+                        </button>
+                      </span>
+                    )}
+
+                    {sortBy !== "default" && (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-secondary text-foreground border border-border">
+                        <span>{sortOptionLabels[sortBy]}</span>
+                        <button
+                          type="button"
+                          onClick={() => setSortBy("default")}
+                          aria-label="Đặt lại sắp xếp"
+                          className="hover:opacity-75"
+                        >
+                          <X className="size-3" />
+                        </button>
+                      </span>
+                    )}
+
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleResetFilters}
+                      className="text-[11px] h-6 px-2 text-muted-foreground hover:text-foreground flex items-center gap-1"
+                    >
+                      <RefreshCw className="size-2.5" />
+                      <span>Xóa bộ lọc</span>
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Product Grid / Empty State */}
+            {renderProductGridContent()}
+          </div>
+        </div>
+      ) : (
+        /* GIAO DIỆN MẶC ĐỊNH CHO TRANG CHỦ (THANH NGANG) */
+        <>
+          <div className="p-4 sm:p-5 rounded-2xl border border-border/80 bg-card/70 backdrop-blur space-y-3.5 shadow-xs mt-4 sm:mt-5">
+            <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2.5">
+              <div className="relative flex-1">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
+                <input
+                  type="search"
+                  autoComplete="off"
+                  placeholder="Tìm tên sản phẩm hoặc gói…"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full h-11 pl-10 pr-9 rounded-xl bg-background/80 border border-border/80 text-foreground text-sm placeholder:text-muted-foreground/70 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all shadow-inner"
                 />
                 {searchQuery && (
                   <button
                     type="button"
                     onClick={() => setSearchQuery("")}
                     aria-label="Xóa từ khóa tìm kiếm"
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5 rounded transition-colors"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5 rounded transition-colors"
                   >
-                    <X className="size-3" />
+                    <X className="size-3.5" />
                   </button>
                 )}
               </div>
 
-              {/* Tag danh mục đang chọn (nếu có) */}
-              {currentGroupName && (
-                <span className="hidden sm:inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-accent/15 text-accent border border-accent/30 shrink-0">
-                  {currentGroupName}
-                </span>
-              )}
-
-              {/* Nút mở rộng lại toàn bộ bộ lọc */}
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setIsFilterCollapsed(false)}
-                className="h-9 px-2.5 sm:px-3 text-xs font-semibold border-caramel/40 bg-caramel/10 text-caramel-light hover:bg-caramel/20 hover:text-foreground shrink-0 flex items-center gap-1.5 active-bounce"
-                title="Mở rộng danh mục & bộ lọc giá"
-              >
-                <SlidersHorizontal className="size-3.5" />
-                <span>Bộ lọc</span>
-                <ChevronDown className="size-3" />
-              </Button>
-
-              {/* Nút ẩn thanh tìm kiếm nếu muốn xem sản phẩm 100% không vướng */}
-              <button
-                type="button"
-                onClick={() => setIsSearchHidden(true)}
-                className="size-9 flex items-center justify-center rounded-xl text-muted-foreground hover:text-foreground hover:bg-secondary/80 border border-border/60 transition-colors shrink-0"
-                title="Thu gọn hoàn toàn (nút nổi)"
-                aria-label="Thu gọn thanh tìm kiếm"
-              >
-                <EyeOff className="size-3.5" />
-              </button>
-            </div>
-          ) : (
-            /* Chế độ mở rộng (Expanded Mode): Hiển thị đầy đủ ô tìm kiếm + lọc giá + sắp xếp + tab danh mục */
-            <>
-              {/* Row 1: Search Input & Filter Dropdowns & Collapse Button */}
-              <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2.5">
-                {/* Search Input */}
-                <div className="relative flex-1">
-                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
-                  <input
-                    type="search"
-                    autoComplete="off"
-                    placeholder="Tìm tên sản phẩm hoặc gói…"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full h-11 pl-10 pr-9 rounded-xl bg-background/80 border border-border/80 text-foreground text-sm placeholder:text-muted-foreground/70 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all shadow-inner"
-                  />
-                  {searchQuery && (
-                    <button
-                      type="button"
-                      onClick={() => setSearchQuery("")}
-                      aria-label="Xóa từ khóa tìm kiếm"
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5 rounded transition-colors"
-                    >
-                      <X className="size-3.5" />
-                    </button>
-                  )}
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1 sm:flex-initial">
+                  <select
+                    value={priceRange}
+                    onChange={(e) => setPriceRange(e.target.value as PriceRangeKey)}
+                    aria-label="Lọc theo mức giá"
+                    className="w-full sm:w-auto h-11 pl-3 pr-8 rounded-xl bg-background/80 border border-border/80 text-foreground text-xs font-medium focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all cursor-pointer appearance-none shadow-inner"
+                  >
+                    <option value="all">Tất cả mức giá</option>
+                    <option value="under_50k">Dưới 50.000 ₫</option>
+                    <option value="50k_100k">50.000 ₫ - 100.000 ₫</option>
+                    <option value="100k_200k">100.000 ₫ - 200.000 ₫</option>
+                    <option value="above_200k">Trên 200.000 ₫</option>
+                  </select>
+                  <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
                 </div>
 
-                {/* Controls: Price Range Filter & Sort & Thu gọn Button */}
-                <div className="flex items-center gap-2">
-                  {/* Price Filter */}
-                  <div className="relative flex-1 sm:flex-initial">
-                    <select
-                      value={priceRange}
-                      onChange={(e) => setPriceRange(e.target.value as PriceRangeKey)}
-                      aria-label="Lọc theo mức giá"
-                      className="w-full sm:w-auto h-11 pl-3 pr-8 rounded-xl bg-background/80 border border-border/80 text-foreground text-xs font-medium focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all cursor-pointer appearance-none shadow-inner"
-                    >
-                      <option value="all">Tất cả mức giá</option>
-                      <option value="under_50k">Dưới 50.000 ₫</option>
-                      <option value="50k_100k">50.000 ₫ - 100.000 ₫</option>
-                      <option value="100k_200k">100.000 ₫ - 200.000 ₫</option>
-                      <option value="above_200k">Trên 200.000 ₫</option>
-                    </select>
-                    <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
-                  </div>
-
-                  {/* Price Sort Order */}
-                  <div className="relative flex-1 sm:flex-initial">
-                    <select
-                      value={sortBy}
-                      onChange={(e) => setSortBy(e.target.value as SortOptionKey)}
-                      aria-label="Sắp xếp sản phẩm"
-                      className="w-full sm:w-auto h-11 pl-3 pr-8 rounded-xl bg-background/80 border border-border/80 text-foreground text-xs font-medium focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all cursor-pointer appearance-none shadow-inner"
-                    >
-                      <option value="default">Sắp xếp mặc định</option>
-                      <option value="price_asc">Giá: Thấp đến cao</option>
-                      <option value="price_desc">Giá: Cao đến thấp</option>
-                      <option value="name_asc">Tên: A – Z</option>
-                      <option value="name_desc">Tên: Z – A</option>
-                    </select>
-                    <SlidersHorizontal className="absolute right-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
-                  </div>
-
-                  {/* Nút Thu gọn */}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setIsFilterCollapsed(true)}
-                    className="h-11 px-3 text-xs font-semibold border-border/80 hover:bg-secondary text-muted-foreground hover:text-foreground shrink-0 flex items-center gap-1 active-bounce"
-                    title="Thu gọn thanh tìm kiếm & bộ lọc"
+                <div className="relative flex-1 sm:flex-initial">
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as SortOptionKey)}
+                    aria-label="Sắp xếp sản phẩm"
+                    className="w-full sm:w-auto h-11 pl-3 pr-8 rounded-xl bg-background/80 border border-border/80 text-foreground text-xs font-medium focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all cursor-pointer appearance-none shadow-inner"
                   >
-                    <ChevronUp className="size-3.5 text-caramel" />
-                    <span className="hidden sm:inline">Thu gọn</span>
+                    <option value="default">Sắp xếp mặc định</option>
+                    <option value="price_asc">Giá: Thấp đến cao</option>
+                    <option value="price_desc">Giá: Cao đến thấp</option>
+                    <option value="name_asc">Tên: A – Z</option>
+                    <option value="name_desc">Tên: Z – A</option>
+                  </select>
+                  <SlidersHorizontal className="absolute right-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
+                </div>
+              </div>
+            </div>
+
+            <div
+              role="tablist"
+              aria-label="Danh mục sản phẩm"
+              className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 no-scrollbar text-xs"
+            >
+              <button
+                role="tab"
+                aria-selected={selectedGroup === "all"}
+                onClick={() => setSelectedGroup("all")}
+                className={`px-3.5 py-1.5 rounded-full font-medium transition-all duration-150 active-bounce whitespace-nowrap border shrink-0 ${
+                  selectedGroup === "all"
+                    ? "bg-accent/15 text-accent border-accent/40 font-semibold shadow-xs"
+                    : "bg-secondary/60 hover:bg-secondary text-muted-foreground hover:text-foreground border-border/70 hover:border-border"
+                }`}
+              >
+                Tất cả ({products.length})
+              </button>
+
+              {activeGroups.map((g) => {
+                const isSelected = selectedGroup === g.id
+                return (
+                  <button
+                    key={g.id}
+                    role="tab"
+                    aria-selected={isSelected}
+                    onClick={() => setSelectedGroup(g.id)}
+                    className={`px-3.5 py-1.5 rounded-full font-medium transition-all duration-150 active-bounce whitespace-nowrap border shrink-0 ${
+                      isSelected
+                        ? "bg-accent/15 text-accent border-accent/40 font-semibold shadow-xs"
+                        : "bg-secondary/60 hover:bg-secondary text-muted-foreground hover:text-foreground border-border/70 hover:border-border"
+                    }`}
+                  >
+                    {g.name} ({g.count})
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {(hasActiveFilters || currentGroupName) && (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-border/60 mt-4">
+              <div className="flex items-center gap-2 flex-wrap">
+                {currentGroupName && (
+                  <div className="flex items-center gap-2">
+                    <Layers className="size-4 text-accent" aria-hidden="true" />
+                    <span className="text-sm sm:text-base font-bold text-foreground">
+                      Danh mục: {currentGroupName}
+                    </span>
+                    <span className="text-xs text-muted-foreground font-medium tabular-nums">
+                      ({filteredProducts.length} sản phẩm)
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {hasActiveFilters && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  {trimmedQuery && (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-accent/10 text-accent border border-accent/30">
+                      <span>Từ khóa: “{trimmedQuery}”</span>
+                      <button
+                        type="button"
+                        onClick={() => setSearchQuery("")}
+                        aria-label="Xóa từ khóa"
+                        className="hover:opacity-75"
+                      >
+                        <X className="size-3" />
+                      </button>
+                    </span>
+                  )}
+
+                  {priceRange !== "all" && (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-secondary text-foreground border border-border">
+                      <span>Giá: {priceRangeLabels[priceRange]}</span>
+                      <button
+                        type="button"
+                        onClick={() => setPriceRange("all")}
+                        aria-label="Bỏ lọc giá"
+                        className="hover:opacity-75"
+                      >
+                        <X className="size-3" />
+                      </button>
+                    </span>
+                  )}
+
+                  {sortBy !== "default" && (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-secondary text-foreground border border-border">
+                      <span>{sortOptionLabels[sortBy]}</span>
+                      <button
+                        type="button"
+                        onClick={() => setSortBy("default")}
+                        aria-label="Đặt lại sắp xếp"
+                        className="hover:opacity-75"
+                      >
+                        <X className="size-3" />
+                      </button>
+                    </span>
+                  )}
+
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleResetFilters}
+                    className="text-[11px] h-6 px-2 text-muted-foreground hover:text-foreground flex items-center gap-1"
+                  >
+                    <RefreshCw className="size-2.5" />
+                    <span>Xóa bộ lọc</span>
                   </Button>
                 </div>
-              </div>
-
-              {/* Row 2: Category Filter Pills */}
-              <div
-                role="tablist"
-                aria-label="Danh mục sản phẩm"
-                className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 no-scrollbar text-xs"
-              >
-                <button
-                  role="tab"
-                  aria-selected={selectedGroup === "all"}
-                  onClick={() => setSelectedGroup("all")}
-                  className={`px-3.5 py-1.5 rounded-full font-medium transition-all duration-150 active-bounce whitespace-nowrap border shrink-0 ${
-                    selectedGroup === "all"
-                      ? "bg-accent/15 text-accent border-accent/40 font-semibold shadow-xs"
-                      : "bg-secondary/60 hover:bg-secondary text-muted-foreground hover:text-foreground border-border/70 hover:border-border"
-                  }`}
-                >
-                  Tất cả ({products.length})
-                </button>
-
-                {activeGroups.map((g) => {
-                  const isSelected = selectedGroup === g.id
-                  return (
-                    <button
-                      key={g.id}
-                      role="tab"
-                      aria-selected={isSelected}
-                      onClick={() => setSelectedGroup(g.id)}
-                      className={`px-3.5 py-1.5 rounded-full font-medium transition-all duration-150 active-bounce whitespace-nowrap border shrink-0 ${
-                        isSelected
-                          ? "bg-accent/15 text-accent border-accent/40 font-semibold shadow-xs"
-                          : "bg-secondary/60 hover:bg-secondary text-muted-foreground hover:text-foreground border-border/70 hover:border-border"
-                      }`}
-                    >
-                      {g.name} ({g.count})
-                    </button>
-                  )
-                })}
-              </div>
-            </>
-          )}
-        </div>
-      )}
-
-      {/* Nút nổi mở lại tìm kiếm & bộ lọc khi đã chọn ẩn hoàn toàn */}
-      {isSearchHidden && (
-        <div className="fixed bottom-6 right-6 z-40 animate-fade-up">
-          <button
-            type="button"
-            onClick={() => {
-              setIsSearchHidden(false)
-              setIsFilterCollapsed(false)
-            }}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-card/95 hover:bg-card border border-caramel/50 text-foreground text-xs font-semibold shadow-2xl shadow-black/60 backdrop-blur-md active-bounce hover:border-caramel transition-all group"
-            aria-label="Mở thanh tìm kiếm và bộ lọc"
-          >
-            <Search className="size-4 text-caramel group-hover:scale-110 transition-transform" />
-            <span>Tìm kiếm & Bộ lọc</span>
-            {searchQuery && (
-              <span className="max-w-[100px] truncate px-1.5 py-0.5 rounded bg-caramel/15 text-caramel text-[11px]">
-                "{searchQuery}"
-              </span>
-            )}
-          </button>
-        </div>
-      )}
-
-      {/* Context Bar */}
-      {(hasActiveFilters || currentGroupName) && (
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-border/60">
-          <div className="flex items-center gap-2 flex-wrap">
-            {currentGroupName && (
-              <div className="flex items-center gap-2">
-                <Layers className="size-4 text-accent" aria-hidden="true" />
-                <span className="text-sm sm:text-base font-bold text-foreground">
-                  Danh mục: {currentGroupName}
-                </span>
-                <span className="text-xs text-muted-foreground font-medium tabular-nums">
-                  ({filteredProducts.length} sản phẩm)
-                </span>
-              </div>
-            )}
-          </div>
-
-          {/* Active Filter Chips */}
-          {hasActiveFilters && (
-          <div className="flex items-center gap-2 flex-wrap">
-            {trimmedQuery && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-accent/10 text-accent border border-accent/30">
-                <span>Từ khóa: “{trimmedQuery}”</span>
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery("")}
-                  aria-label="Xóa từ khóa"
-                  className="hover:opacity-75"
-                >
-                  <X className="size-3" />
-                </button>
-              </span>
-            )}
-
-            {currentGroupName && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-secondary text-foreground border border-border">
-                <span>{currentGroupName}</span>
-                <button
-                  type="button"
-                  onClick={() => setSelectedGroup("all")}
-                  aria-label="Bỏ chọn danh mục"
-                  className="hover:opacity-75"
-                >
-                  <X className="size-3" />
-                </button>
-              </span>
-            )}
-
-            {priceRange !== "all" && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-secondary text-foreground border border-border">
-                <span>Giá: {priceRangeLabels[priceRange]}</span>
-                <button
-                  type="button"
-                  onClick={() => setPriceRange("all")}
-                  aria-label="Bỏ lọc giá"
-                  className="hover:opacity-75"
-                >
-                  <X className="size-3" />
-                </button>
-              </span>
-            )}
-
-            {sortBy !== "default" && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-secondary text-foreground border border-border">
-                <span>{sortOptionLabels[sortBy]}</span>
-                <button
-                  type="button"
-                  onClick={() => setSortBy("default")}
-                  aria-label="Đặt lại sắp xếp"
-                  className="hover:opacity-75"
-                >
-                  <X className="size-3" />
-                </button>
-              </span>
-            )}
-
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleResetFilters}
-              className="text-[11px] h-6 px-2 text-muted-foreground hover:text-foreground flex items-center gap-1"
-            >
-              <RefreshCw className="size-2.5" />
-              <span>Xóa bộ lọc</span>
-            </Button>
-          </div>
-        )}
-      </div>
-      )}
-
-      {/* Product Grid / Empty State */}
-      {products.length === 0 ? (
-        <div className="py-20 text-center rounded-2xl border border-border/60 bg-card/60 p-8 space-y-3 animate-fade-up backdrop-blur">
-          <div className="inline-flex size-12 items-center justify-center rounded-full bg-secondary text-primary mx-auto mb-1">
-            <Search className="size-6 text-muted-foreground" />
-          </div>
-          <p className="text-base font-bold text-foreground">Cửa hàng đang chuẩn bị sản phẩm mới</p>
-          <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-            Hệ thống đang cập nhật danh mục và các gói tài khoản. Quý khách vui lòng quay lại sau ít phút!
-          </p>
-        </div>
-      ) : filteredProducts.length === 0 ? (
-        <div className="py-16 text-center rounded-2xl border border-border/70 bg-card/60 p-8 space-y-3 animate-fade-up backdrop-blur">
-          <div className="inline-flex size-12 items-center justify-center rounded-full bg-secondary text-muted-foreground mx-auto">
-            <Search className="size-6 text-muted-foreground/70" />
-          </div>
-          <h3 className="text-base font-bold text-foreground">Chưa tìm thấy sản phẩm phù hợp</h3>
-          <p className="text-xs text-muted-foreground max-w-md mx-auto leading-relaxed">
-            Thử tìm bằng từ khóa khác hoặc xóa bộ lọc để xem toàn bộ danh mục sản phẩm đang kinh doanh.
-          </p>
-          <div className="pt-2">
-            <Button
-              size="sm"
-              onClick={handleResetFilters}
-              className="text-xs h-9 px-4 font-semibold active-bounce bg-accent text-accent-foreground hover:opacity-90"
-            >
-              <RefreshCw className="size-3.5 mr-1.5" />
-              <span>Xem toàn bộ sản phẩm</span>
-            </Button>
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-6 sm:space-y-8">
-          <div className="grid grid-cols-1 min-[360px]:grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-6 items-stretch">
-            {paginatedProducts.map((p, idx) => (
-              <div
-                key={`${selectedGroup}-${p.id}`}
-                style={{ animationDelay: `${idx * 40}ms` }}
-                className="animate-fade-up h-full flex flex-col min-w-0"
-              >
-                <ProductCard
-                  id={p.id}
-                  name={p.name}
-                  slug={p.slug}
-                  description={p.description}
-                  images={p.images}
-                  groupId={p.groupId}
-                  groupName={p.groupName}
-                  deliveryType={p.deliveryType}
-                  statusOverride={p.statusOverride}
-                  highlights={p.highlights}
-                  warrantyTerms={p.warrantyTerms}
-                  noticeNotes={p.noticeNotes}
-                  variants={p.variants}
-                />
-              </div>
-            ))}
-          </div>
-
-          {/* Grid Tabs / Pagination Switcher (3x3 Grid Navigation) */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-center pt-4 sm:pt-6 border-t border-border/60">
-              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap justify-center" role="navigation" aria-label="Phân trang danh mục sản phẩm">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handlePageChange(validPage - 1)}
-                  disabled={validPage <= 1}
-                  className="h-9 px-2.5 sm:px-3 text-xs font-medium border-border/80 hover:bg-secondary disabled:opacity-35 disabled:cursor-not-allowed"
-                  aria-label="Trang trước"
-                >
-                  <ChevronLeft className="size-4 sm:mr-1" />
-                  <span className="hidden sm:inline">Trang trước</span>
-                </Button>
-
-                <div className="flex items-center gap-1">
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
-                    const isActive = page === validPage
-                    return (
-                      <button
-                        key={page}
-                        type="button"
-                        onClick={() => handlePageChange(page)}
-                        aria-current={isActive ? "page" : undefined}
-                        className={`size-9 rounded-lg text-xs font-semibold transition-all duration-150 flex items-center justify-center border ${
-                          isActive
-                            ? "bg-caramel text-black border-caramel shadow-sm shadow-caramel/25 font-bold scale-105"
-                            : "bg-secondary/60 text-muted-foreground hover:text-foreground hover:bg-secondary border-border/70"
-                        }`}
-                      >
-                        {page}
-                      </button>
-                    )
-                  })}
-                </div>
-
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handlePageChange(validPage + 1)}
-                  disabled={validPage >= totalPages}
-                  className="h-9 px-2.5 sm:px-3 text-xs font-medium border-border/80 hover:bg-secondary disabled:opacity-35 disabled:cursor-not-allowed"
-                  aria-label="Trang sau"
-                >
-                  <span className="hidden sm:inline">Trang sau</span>
-                  <ChevronRight className="size-4 sm:ml-1" />
-                </Button>
-              </div>
+              )}
             </div>
           )}
-        </div>
+
+          <div className="mt-6">
+            {renderProductGridContent()}
+          </div>
+        </>
       )}
     </section>
   )
