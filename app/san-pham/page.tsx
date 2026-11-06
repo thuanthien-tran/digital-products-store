@@ -74,7 +74,7 @@ export default async function SanPhamPage() {
           groups={groups}
           products={products}
           showFeatured={false}
-          title="Danh mục sản phẩm & gói"
+          title=""
         />
       </main>
 
