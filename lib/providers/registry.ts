@@ -114,6 +114,7 @@ async function safeFetchJson(
   options: RequestInit & {
     timeoutMs?: number
     validateHostFn: (u: string) => { valid: boolean; error?: string }
+    isRetry?: boolean
   }
 ): Promise<SafeFetchResult> {
   const hostCheck = options.validateHostFn(url)
@@ -199,7 +200,14 @@ async function safeFetchJson(
       return await parseResponse(res2)
     }
 
-    return await parseResponse(res)
+    const parsed = await parseResponse(res)
+    // Tự động thử lại 1 lần sau 1.5 giây đối với lỗi gián đoạn tạm thời từ Cloudflare/Origin (5xx/530)
+    if (!parsed.ok && res.status >= 500 && !options.isRetry) {
+      await new Promise((r) => setTimeout(r, 1500))
+      return await safeFetchJson(url, { ...options, isRetry: true })
+    }
+
+    return parsed
   } catch (err: unknown) {
     if (err instanceof Error && err.name === 'AbortError') {
       return { ok: false, status: 408, isNetworkOrTimeout: true, error: `Quá thời gian kết nối tới API đại lý (Timeout ${Math.round(timeoutMs / 1000)}s)` }
