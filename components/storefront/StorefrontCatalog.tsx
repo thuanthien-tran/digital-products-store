@@ -35,20 +35,32 @@ export interface StorefrontGroup {
 interface StorefrontCatalogProps {
   groups: StorefrontGroup[]
   products: StorefrontProduct[]
+  showFeatured?: boolean
+  title?: string
+  subtitle?: string
 }
+
+const ITEMS_PER_PAGE = 9 // 3x3 grid layout (3 rows x 3 columns on desktop)
 
 type PriceRangeKey = "all" | "under_50k" | "50k_100k" | "100k_200k" | "above_200k"
 type SortOptionKey = "default" | "price_asc" | "price_desc" | "name_asc" | "name_desc"
 
 const viCollator = new Intl.Collator("vi", { sensitivity: "base", numeric: true })
 
-export function StorefrontCatalog({ groups, products }: StorefrontCatalogProps) {
+export function StorefrontCatalog({
+  groups,
+  products,
+  showFeatured = true,
+  title = "Danh mục sản phẩm",
+  subtitle,
+}: StorefrontCatalogProps) {
   const [catalogProducts, setCatalogProducts] = useState<StorefrontProduct[]>(products)
   const [catalogGroups, setCatalogGroups] = useState<StorefrontGroup[]>(groups)
   const [selectedGroup, setSelectedGroup] = useState<string>("all")
   const [searchQuery, setSearchQuery] = useState("")
   const [priceRange, setPriceRange] = useState<PriceRangeKey>("all")
   const [sortBy, setSortBy] = useState<SortOptionKey>("default")
+  const [currentPage, setCurrentPage] = useState<number>(1)
   const [liveStockMap, setLiveStockMap] = useState<Record<string, { availableStock: number; isPurchasable: boolean }>>({})
 
   // Sync state if server props change
@@ -381,6 +393,32 @@ export function StorefrontCatalog({ groups, products }: StorefrontCatalogProps) 
     setSelectedGroup("all")
     setPriceRange("all")
     setSortBy("default")
+    setCurrentPage(1)
+  }
+
+  // Reset to page 1 whenever any filter or search changes
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [selectedGroup, searchQuery, priceRange, sortBy])
+
+  // Pagination for 3x3 layout
+  const totalPages = Math.ceil(filteredProducts.length / ITEMS_PER_PAGE) || 1
+  const validPage = Math.min(Math.max(1, currentPage), totalPages)
+
+  const paginatedProducts = useMemo(() => {
+    const start = (validPage - 1) * ITEMS_PER_PAGE
+    return filteredProducts.slice(start, start + ITEMS_PER_PAGE)
+  }, [filteredProducts, validPage])
+
+  const handlePageChange = (page: number) => {
+    if (page < 1 || page > totalPages || page === validPage) return
+    setCurrentPage(page)
+    const target = document.getElementById("catalog-heading")
+    if (target) {
+      target.scrollIntoView({
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+      })
+    }
   }
 
   // Selected group name
@@ -413,7 +451,7 @@ export function StorefrontCatalog({ groups, products }: StorefrontCatalogProps) 
   return (
     <section id="products" className="scroll-mt-24 pt-6 sm:pt-8 border-t border-border/70">
       {/* Khu "Sản phẩm nổi bật" (Chỉ hiển thị khi có sản phẩm thỏa điều kiện bán) */}
-      {featuredProducts.length > 0 && (
+      {showFeatured && featuredProducts.length > 0 && (
         <div className="relative mb-8 sm:mb-12 p-3.5 sm:p-7 rounded-2xl sm:rounded-3xl bg-gradient-to-b from-caramel/[0.08] via-card/65 to-card/45 border-2 border-caramel/35 shadow-2xl shadow-black/35 ring-1 ring-caramel/20 overflow-hidden">
           {/* Ambient Warm Spotlight Glow */}
           <div
@@ -529,13 +567,15 @@ export function StorefrontCatalog({ groups, products }: StorefrontCatalogProps) 
       )}
 
       {/* 1. Tiêu đề H2 Danh mục sản phẩm */}
-      <div id="catalog-heading" className={`space-y-1 text-left scroll-mt-24 ${featuredProducts.length > 0 ? "pt-1 sm:pt-2" : ""}`}>
+      <div id="catalog-heading" className={`space-y-1 text-left scroll-mt-24 ${showFeatured && featuredProducts.length > 0 ? "pt-1 sm:pt-2" : ""}`}>
         <h2 className="text-[22px] sm:text-2xl md:text-[28px] font-heading font-bold tracking-tight text-foreground">
-          Danh mục sản phẩm
+          {title}
         </h2>
-        <p className="text-xs sm:text-sm text-muted-foreground font-normal">
-          Khám phá và lựa chọn các gói dịch vụ, tài khoản bản quyền phù hợp với bạn
-        </p>
+        {subtitle && (
+          <p className="text-xs sm:text-sm text-muted-foreground font-normal">
+            {subtitle}
+          </p>
+        )}
       </div>
 
       {/* Search Bar, Price Filter & Sort Controls */}
@@ -644,19 +684,24 @@ export function StorefrontCatalog({ groups, products }: StorefrontCatalogProps) 
       </div>
 
       {/* Context Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-border/60">
-        <div className="flex items-center gap-2">
-          <Layers className="size-4 text-accent" aria-hidden="true" />
-          <span className="text-sm sm:text-base font-bold text-foreground">
-            {currentGroupName ? `Danh mục: ${currentGroupName}` : "Danh sách sản phẩm"}
-          </span>
-          <span className="text-xs text-muted-foreground font-medium tabular-nums">
-            ({filteredProducts.length} sản phẩm)
-          </span>
-        </div>
+      {(hasActiveFilters || currentGroupName) && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-border/60">
+          <div className="flex items-center gap-2 flex-wrap">
+            {currentGroupName && (
+              <div className="flex items-center gap-2">
+                <Layers className="size-4 text-accent" aria-hidden="true" />
+                <span className="text-sm sm:text-base font-bold text-foreground">
+                  Danh mục: {currentGroupName}
+                </span>
+                <span className="text-xs text-muted-foreground font-medium tabular-nums">
+                  ({filteredProducts.length} sản phẩm)
+                </span>
+              </div>
+            )}
+          </div>
 
-        {/* Active Filter Chips */}
-        {hasActiveFilters && (
+          {/* Active Filter Chips */}
+          {hasActiveFilters && (
           <div className="flex items-center gap-2 flex-wrap">
             {trimmedQuery && (
               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-accent/10 text-accent border border-accent/30">
@@ -726,6 +771,7 @@ export function StorefrontCatalog({ groups, products }: StorefrontCatalogProps) 
           </div>
         )}
       </div>
+      )}
 
       {/* Product Grid / Empty State */}
       {products.length === 0 ? (
@@ -759,30 +805,84 @@ export function StorefrontCatalog({ groups, products }: StorefrontCatalogProps) 
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 min-[360px]:grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-6 items-stretch">
-          {filteredProducts.map((p, idx) => (
-            <div
-              key={`${selectedGroup}-${p.id}`}
-              style={{ animationDelay: `${idx * 40}ms` }}
-              className="animate-fade-up h-full flex flex-col min-w-0"
-            >
-              <ProductCard
-                id={p.id}
-                name={p.name}
-                slug={p.slug}
-                description={p.description}
-                images={p.images}
-                groupId={p.groupId}
-                groupName={p.groupName}
-                deliveryType={p.deliveryType}
-                statusOverride={p.statusOverride}
-                highlights={p.highlights}
-                warrantyTerms={p.warrantyTerms}
-                noticeNotes={p.noticeNotes}
-                variants={p.variants}
-              />
+        <div className="space-y-6 sm:space-y-8">
+          <div className="grid grid-cols-1 min-[360px]:grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-6 items-stretch">
+            {paginatedProducts.map((p, idx) => (
+              <div
+                key={`${selectedGroup}-${p.id}`}
+                style={{ animationDelay: `${idx * 40}ms` }}
+                className="animate-fade-up h-full flex flex-col min-w-0"
+              >
+                <ProductCard
+                  id={p.id}
+                  name={p.name}
+                  slug={p.slug}
+                  description={p.description}
+                  images={p.images}
+                  groupId={p.groupId}
+                  groupName={p.groupName}
+                  deliveryType={p.deliveryType}
+                  statusOverride={p.statusOverride}
+                  highlights={p.highlights}
+                  warrantyTerms={p.warrantyTerms}
+                  noticeNotes={p.noticeNotes}
+                  variants={p.variants}
+                />
+              </div>
+            ))}
+          </div>
+
+          {/* Grid Tabs / Pagination Switcher (3x3 Grid Navigation) */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center pt-4 sm:pt-6 border-t border-border/60">
+              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap justify-center" role="navigation" aria-label="Phân trang danh mục sản phẩm">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(validPage - 1)}
+                  disabled={validPage <= 1}
+                  className="h-9 px-2.5 sm:px-3 text-xs font-medium border-border/80 hover:bg-secondary disabled:opacity-35 disabled:cursor-not-allowed"
+                  aria-label="Trang trước"
+                >
+                  <ChevronLeft className="size-4 sm:mr-1" />
+                  <span className="hidden sm:inline">Trang trước</span>
+                </Button>
+
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                    const isActive = page === validPage
+                    return (
+                      <button
+                        key={page}
+                        type="button"
+                        onClick={() => handlePageChange(page)}
+                        aria-current={isActive ? "page" : undefined}
+                        className={`size-9 rounded-lg text-xs font-semibold transition-all duration-150 flex items-center justify-center border ${
+                          isActive
+                            ? "bg-caramel text-black border-caramel shadow-sm shadow-caramel/25 font-bold scale-105"
+                            : "bg-secondary/60 text-muted-foreground hover:text-foreground hover:bg-secondary border-border/70"
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    )
+                  })}
+                </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(validPage + 1)}
+                  disabled={validPage >= totalPages}
+                  className="h-9 px-2.5 sm:px-3 text-xs font-medium border-border/80 hover:bg-secondary disabled:opacity-35 disabled:cursor-not-allowed"
+                  aria-label="Trang sau"
+                >
+                  <span className="hidden sm:inline">Trang sau</span>
+                  <ChevronRight className="size-4 sm:ml-1" />
+                </Button>
+              </div>
             </div>
-          ))}
+          )}
         </div>
       )}
     </section>

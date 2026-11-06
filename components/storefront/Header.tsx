@@ -3,14 +3,14 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Menu, X, ShoppingBag, BookOpen, HelpCircle, Phone } from "lucide-react"
+import { Menu, X, ShoppingBag, BookOpen, HelpCircle, Phone, Home } from "lucide-react"
 
 interface HeaderProps {
   initialSettings?: {
     siteName: string
     logoUrl: string | null
     initials: string
-  }
+  } | null
 }
 
 export function Header({ initialSettings }: HeaderProps) {
@@ -76,6 +76,15 @@ export function Header({ initialSettings }: HeaderProps) {
     setMobileMenuOpen(false)
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
 
+    if (href === "/" && pathname === "/") {
+      e.preventDefault()
+      window.scrollTo({
+        top: 0,
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+      })
+      return
+    }
+
     if (href.startsWith("/#")) {
       const targetId = href.replace("/#", "")
       if (pathname === "/") {
@@ -92,7 +101,8 @@ export function Header({ initialSettings }: HeaderProps) {
   }
 
   const navLinks = [
-    { href: "/#products", label: "Sản phẩm & Gói", icon: ShoppingBag },
+    { href: "/", label: "Trang chủ", icon: Home },
+    { href: "/san-pham", label: "Sản phẩm & Gói", icon: ShoppingBag },
     { href: "/#how", label: "Hướng dẫn mua hàng", icon: BookOpen },
     { href: "/#faq", label: "Hỗ trợ & FAQ", icon: HelpCircle },
   ]
@@ -142,7 +152,7 @@ export function Header({ initialSettings }: HeaderProps) {
           aria-label="Điều hướng chính"
         >
           {navLinks.map((link) => {
-            const isActive = pathname === link.href
+            const isActive = link.href === "/" ? pathname === "/" : pathname.startsWith(link.href)
             return (
               <Link
                 key={link.href}
@@ -215,14 +225,19 @@ export function Header({ initialSettings }: HeaderProps) {
 
           {navLinks.map((link) => {
             const Icon = link.icon
+            const isActive = link.href === "/" ? pathname === "/" : pathname.startsWith(link.href)
             return (
               <Link
                 key={link.href}
                 href={link.href}
                 onClick={(e) => handleNavClick(e, link.href)}
-                className="flex items-center gap-3 px-3.5 py-2.5 text-sm font-medium rounded-xl text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                className={`flex items-center gap-3 px-3.5 py-2.5 text-sm font-medium rounded-xl transition-colors ${
+                  isActive
+                    ? "bg-caramel/15 text-caramel-light font-semibold border border-caramel/25"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+                }`}
               >
-                <Icon className="size-4 text-accent" strokeWidth={1.75} />
+                <Icon className={`size-4 ${isActive ? "text-caramel" : "text-accent"}`} strokeWidth={1.75} />
                 <span>{link.label}</span>
               </Link>
             )

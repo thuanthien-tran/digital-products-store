@@ -13,7 +13,7 @@ interface FooterProps {
     siteName: string
     logoUrl: string | null
     initials: string
-  }
+  } | null
 }
 
 export function Footer({ initialSettings }: FooterProps) {
@@ -99,11 +99,10 @@ export function Footer({ initialSettings }: FooterProps) {
           {/* Nhóm bên phải: Điều hướng & Nút Zalo */}
           <div className="flex flex-wrap items-center gap-x-5 sm:gap-x-6 gap-y-3 pt-2 lg:pt-0">
             <Link
-              href="/#products"
-              onClick={(e) => handleNavScroll(e, "products")}
+              href="/san-pham"
               className="text-xs sm:text-sm font-medium text-muted-foreground hover:text-caramel-light focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel-light focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-md transition-colors duration-150"
             >
-              Sản phẩm
+              Sản phẩm & Gói
             </Link>
 
             <Link

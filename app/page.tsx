@@ -1,5 +1,4 @@
-import { prisma, ensureDatabaseSchema } from "@/lib/db"
-import { getSiteSettings } from "@/lib/settings"
+import { getStoreData } from "@/lib/store-data"
 import { Header } from "@/components/storefront/Header"
 import { Footer } from "@/components/storefront/Footer"
 import { HeroSection } from "@/components/storefront/HeroSection"
@@ -10,84 +9,6 @@ import { FaqAccordion } from "@/components/storefront/FaqAccordion"
 
 export const dynamic = "force-dynamic"
 export const revalidate = 0
-
-async function getStoreData() {
-  try {
-    await ensureDatabaseSchema()
-    const [groups, products, settings] = await Promise.all([
-      prisma.productGroup.findMany({
-        where: { visibility: "public" },
-        orderBy: { sortOrder: "asc" },
-      }),
-      prisma.product.findMany({
-        where: { 
-          visibility: "public",
-          editorialStatus: "published",
-        },
-        orderBy: [{ sortOrder: "asc" }, { updatedAt: "desc" }],
-        include: {
-          group: true,
-          variants: {
-            orderBy: { sortOrder: "asc" },
-            include: {
-              _count: {
-                select: { serials: { where: { status: "available" } } },
-              },
-            },
-          },
-        },
-      }),
-      getSiteSettings(),
-    ])
-
-    return {
-      settings,
-      groups: groups.map((g) => ({
-        id: g.id,
-        name: g.name,
-        badgeText: g.badgeText,
-        badgeColor: g.badgeColor,
-      })),
-      products: products.map((p) => {
-        let parsedImages: string[] = []
-        try {
-          parsedImages = JSON.parse(p.images || "[]")
-        } catch {
-          parsedImages = []
-        }
-
-        return {
-          id: p.id,
-          name: p.name,
-          slug: p.slug,
-          isFeatured: p.isFeatured,
-          sortOrder: p.sortOrder ?? 0,
-          description: p.description,
-          images: parsedImages,
-          groupId: p.groupId,
-          groupName: p.group?.name || "Chưa phân loại",
-          deliveryType: p.deliveryType,
-          statusOverride: p.statusOverride,
-          warrantyTerms: p.warrantyTerms,
-          noticeNotes: p.noticeNotes,
-          variants: p.variants.map((v) => ({
-            id: v.id,
-            name: v.name,
-            priceCents: v.priceCents,
-            compareAtPriceCents: v.compareAtPriceCents,
-            availableStock:
-              v.provider || p.deliveryType === "fatcat" || p.deliveryType === "dino"
-                ? (v.providerStock ?? 0) + v._count.serials
-                : v._count.serials,
-            providerStock: v.providerStock,
-          })),
-        }
-      }),
-    }
-  } catch {
-    return { groups: [], products: [] }
-  }
-}
 
 export default async function HomePage() {
   const { groups, products, settings } = await getStoreData()
@@ -110,9 +31,6 @@ export default async function HomePage() {
               <h2 className="text-[22px] sm:text-2xl md:text-[28px] font-heading font-bold tracking-tight text-oat-cream">
                 Mua Hàng Trong 4 Bước
               </h2>
-              <p className="text-xs sm:text-sm text-muted-foreground max-w-md mx-auto font-normal">
-                Hệ thống vận hành khép kín tự động 100%, không cần chờ đợi nhân viên kích hoạt
-              </p>
             </div>
           </ScrollReveal>
 
@@ -176,9 +94,6 @@ export default async function HomePage() {
               <h2 className="text-[22px] sm:text-2xl md:text-[28px] font-heading font-bold tracking-tight text-oat-cream">
                 Câu Hỏi Thường Gặp
               </h2>
-              <p className="text-xs sm:text-sm text-muted-foreground max-w-md mx-auto font-normal">
-                Thông tin chi tiết về quy trình thanh toán, nhận tài khoản và chính sách bảo hành
-              </p>
             </div>
           </ScrollReveal>
 
