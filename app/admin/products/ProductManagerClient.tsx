@@ -1016,7 +1016,7 @@ export function ProductManagerClient({ groups }: Props) {
       {/* Products Table */}
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-xs text-left">
+          <table className="w-full text-xs text-left min-w-[1080px]">
             <thead className="bg-secondary/40 text-muted-foreground border-b border-border uppercase font-semibold text-[10px] tracking-wider">
               <tr>
                 <th className="py-3 px-3 w-10 text-center">
@@ -1041,13 +1041,13 @@ export function ProductManagerClient({ groups }: Props) {
                     <span>Nổi bật</span>
                   </div>
                 </th>
-                <th className="py-3 px-4">Sản phẩm</th>
-                <th className="py-3 px-4">Danh mục</th>
-                <th className="py-3 px-4">Giá đại lý</th>
-                <th className="py-3 px-4">Giá bán</th>
-                <th className="py-3 px-4 text-center">Tồn kho</th>
-                <th className="py-3 px-4 text-center">Trạng thái</th>
-                <th className="py-3 px-4 text-right">Thao tác</th>
+                <th className="py-3 px-4 min-w-[260px]">Sản phẩm</th>
+                <th className="py-3 px-4 whitespace-nowrap">Danh mục</th>
+                <th className="py-3 px-4 whitespace-nowrap">Giá đại lý</th>
+                <th className="py-3 px-4 whitespace-nowrap">Giá bán</th>
+                <th className="py-3 px-4 text-center whitespace-nowrap">Tồn kho</th>
+                <th className="py-3 px-4 text-center whitespace-nowrap">Trạng thái</th>
+                <th className="py-3 px-4 text-right whitespace-nowrap min-w-[170px]">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -1218,14 +1218,14 @@ export function ProductManagerClient({ groups }: Props) {
                       </td>
 
                       {/* Group */}
-                      <td className="py-3 px-4">
+                      <td className="py-3 px-4 whitespace-nowrap">
                         <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-secondary text-secondary-foreground border border-border">
                           {p.groupName}
                         </span>
                       </td>
 
                       {/* Provider Wholesale Price (Giá đại lý) */}
-                      <td className="py-3 px-4 tabular-nums">
+                      <td className="py-3 px-4 tabular-nums whitespace-nowrap">
                         {mainVariant?.providerPrice ? (
                           <div>
                             <span className="font-semibold text-muted-foreground block text-xs">
@@ -1243,7 +1243,7 @@ export function ProductManagerClient({ groups }: Props) {
                       </td>
 
                       {/* Price */}
-                      <td className="py-3 px-4 tabular-nums">
+                      <td className="py-3 px-4 tabular-nums whitespace-nowrap">
                         <span className="font-bold text-foreground block">
                           {formatMoney(mainVariant?.priceCents || 0)}
                         </span>
@@ -1255,7 +1255,7 @@ export function ProductManagerClient({ groups }: Props) {
                       </td>
 
                       {/* Stock */}
-                      <td className="py-3 px-4 text-center tabular-nums">
+                      <td className="py-3 px-4 text-center tabular-nums whitespace-nowrap">
                         <span
                           className={`px-1.5 py-0.5 rounded text-[11px] font-bold ${
                             totalStock > 0
@@ -1268,7 +1268,7 @@ export function ProductManagerClient({ groups }: Props) {
                       </td>
 
                       {/* Editorial Status */}
-                      <td className="py-3 px-4 text-center">
+                      <td className="py-3 px-4 text-center whitespace-nowrap">
                         <span
                           className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
                             p.editorialStatus === "published" && p.visibility === "public"
@@ -1287,8 +1287,8 @@ export function ProductManagerClient({ groups }: Props) {
                       </td>
 
                       {/* Actions */}
-                      <td className="py-3 px-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
+                      <td className="py-3 px-4 text-right whitespace-nowrap">
+                        <div className="flex items-center justify-end gap-1.5 flex-nowrap">
                           <button
                             type="button"
                             onClick={() => openEditor(p)}

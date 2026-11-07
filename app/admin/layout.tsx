@@ -97,8 +97,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 p-6 md:p-8 overflow-y-auto">
-        <div className="max-w-5xl mx-auto space-y-6">
+      <main className="flex-1 p-4 md:p-8 overflow-y-auto">
+        <div className="max-w-7xl 2xl:max-w-[1440px] mx-auto space-y-6">
           <div className="flex items-center justify-between pb-2 border-b border-border/50">
             <span className="text-xs text-muted-foreground font-semibold tracking-wider">BẢNG ĐIỀU KHIỂN HỆ THỐNG</span>
             <div className="flex items-center gap-2 sm:gap-3">
