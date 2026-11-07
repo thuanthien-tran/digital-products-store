@@ -1043,6 +1043,7 @@ export function ProductManagerClient({ groups }: Props) {
                 </th>
                 <th className="py-3 px-4">Sản phẩm</th>
                 <th className="py-3 px-4">Danh mục</th>
+                <th className="py-3 px-4">Giá đại lý</th>
                 <th className="py-3 px-4">Giá bán</th>
                 <th className="py-3 px-4 text-center">Tồn kho</th>
                 <th className="py-3 px-4 text-center">Trạng thái</th>
@@ -1052,13 +1053,13 @@ export function ProductManagerClient({ groups }: Props) {
             <tbody className="divide-y divide-border">
               {loading ? (
                 <tr>
-                  <td colSpan={9} className="py-12 text-center text-muted-foreground">
+                  <td colSpan={10} className="py-12 text-center text-muted-foreground">
                     Đang tải danh sách sản phẩm...
                   </td>
                 </tr>
               ) : products.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-12 text-center text-muted-foreground">
+                  <td colSpan={10} className="py-12 text-center text-muted-foreground">
                     Không có sản phẩm nào trong mục này.
                   </td>
                 </tr>
@@ -1221,6 +1222,24 @@ export function ProductManagerClient({ groups }: Props) {
                         <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-secondary text-secondary-foreground border border-border">
                           {p.groupName}
                         </span>
+                      </td>
+
+                      {/* Provider Wholesale Price (Giá đại lý) */}
+                      <td className="py-3 px-4 tabular-nums">
+                        {mainVariant?.providerPrice ? (
+                          <div>
+                            <span className="font-semibold text-muted-foreground block text-xs">
+                              {formatMoney(mainVariant.providerPrice)}
+                            </span>
+                            {mainVariant.priceCents > mainVariant.providerPrice && (
+                              <span className="text-[10px] text-emerald-400 font-medium block">
+                                Lãi: +{formatMoney(mainVariant.priceCents - mainVariant.providerPrice)}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground/50 text-xs">—</span>
+                        )}
                       </td>
 
                       {/* Price */}
