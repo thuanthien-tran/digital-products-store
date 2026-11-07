@@ -8,29 +8,6 @@ interface HeroSectionProps {
   settings?: SiteSettingsData | null
 }
 
-function renderHeroTitle(rawTitle: string, titleColor: string, highlightColor: string) {
-  const parts = rawTitle.split(/(\*\*.*?\*\*)/g)
-  return parts.map((part, index) => {
-    if (part.startsWith("**") && part.endsWith("**")) {
-      const text = part.slice(2, -2)
-      return (
-        <span
-          key={index}
-          style={{ color: highlightColor }}
-          className="inline font-extrabold"
-        >
-          {text}
-        </span>
-      )
-    }
-    return (
-      <span key={index} style={{ color: titleColor }}>
-        {part}
-      </span>
-    )
-  })
-}
-
 const SLOGAN_FEATURES = [
   {
     icon: Zap,
@@ -71,12 +48,6 @@ const SLOGAN_FEATURES = [
 ]
 
 export function HeroSection({ settings }: HeroSectionProps) {
-  const heroTitle = settings?.heroTitle || "Những công cụ quen thuộc, **nhiều gói để lựa chọn.**"
-  const heroSubtitle =
-    settings?.heroSubtitle ||
-    "Khám phá các gói Canva, YouTube Premium, Duolingo và những dịch vụ đang có tại cửa hàng. Chọn sản phẩm để xem giá và thông tin chi tiết."
-  const titleColor = settings?.heroTitleColor || "#FAF4ED"
-  const highlightColor = settings?.heroHighlightColor || "#E6A66F"
   const heroCtaText = settings?.heroCtaText || "Khám phá các gói"
 
   const handleScrollToCatalog = (e: React.MouseEvent<HTMLAnchorElement>) => {
@@ -105,41 +76,13 @@ export function HeroSection({ settings }: HeroSectionProps) {
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-2/3 h-[1px] bg-gradient-to-r from-transparent via-caramel/40 to-transparent" />
       </div>
 
-      {/* Centered Headline Container */}
-      <div className="text-center space-y-2.5 sm:space-y-3 max-w-4xl lg:max-w-5xl mx-auto px-2 sm:px-4">
-        {/* 1. Nhãn nhỏ giới thiệu */}
+      {/* Centered CTA Button */}
+      <div className="text-center pt-1 pb-1 max-w-4xl mx-auto px-2 sm:px-4">
         <div className="animate-fade-up">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] sm:text-xs font-medium border border-caramel/30 bg-caramel/10 text-caramel-light backdrop-blur-md shadow-sm">
-            <span className="relative flex size-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
-            </span>
-            <span>Cửa hàng tài khoản &amp; phần mềm</span>
-          </div>
-        </div>
-
-        {/* 2. Tiêu đề H1 */}
-        <h1
-          className="font-heading text-[28px] sm:text-[34px] md:text-[40px] lg:text-[46px] font-extrabold tracking-tight leading-[1.25] animate-fade-up max-w-3xl sm:max-w-4xl lg:max-w-5xl mx-auto"
-          style={{ animationDelay: "100ms" }}
-        >
-          {renderHeroTitle(heroTitle, titleColor, highlightColor)}
-        </h1>
-
-        {/* 3. Mô tả */}
-        <p
-          className="font-sans font-normal text-[15px] sm:text-base text-muted-foreground/90 max-w-2xl sm:max-w-3xl lg:max-w-4xl mx-auto leading-[1.6] animate-fade-up whitespace-pre-line"
-          style={{ animationDelay: "200ms" }}
-        >
-          {heroSubtitle}
-        </p>
-
-        {/* 4. Nút chính CTA */}
-        <div className="pt-0.5 sm:pt-1 animate-fade-up" style={{ animationDelay: "250ms" }}>
           <a
             href="#catalog-heading"
             onClick={handleScrollToCatalog}
-            className="inline-flex items-center gap-2 px-5 sm:px-6 py-2.5 sm:py-3 rounded-full bg-caramel hover:bg-caramel-light active:bg-[#D9955C] text-espresso font-semibold text-sm sm:text-[15px] shadow-md shadow-black/30 hover:shadow-caramel/25 active:scale-95 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel-light focus-visible:ring-offset-2 focus-visible:ring-offset-background group"
+            className="inline-flex items-center gap-2 px-6 sm:px-7 py-2.5 sm:py-3 rounded-full bg-caramel hover:bg-caramel-light active:bg-[#D9955C] text-espresso font-semibold text-sm sm:text-[15px] shadow-md shadow-black/30 hover:shadow-caramel/25 active:scale-95 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel-light focus-visible:ring-offset-2 focus-visible:ring-offset-background group"
           >
             <span>{heroCtaText}</span>
             <ArrowDown className="size-4 transition-transform duration-200 group-hover:translate-y-0.5" strokeWidth={2.5} />
