@@ -31,7 +31,7 @@ interface RawVariant {
   connectionId?: string | null
   connection?: { name: string } | null
   sourceProductId?: string | null
-  sourceProduct?: { externalId: string } | null
+  sourceProduct?: { externalId?: string; sourceName?: string } | null
 }
 
 interface RawProduct {
@@ -53,11 +53,14 @@ interface RawProduct {
   draftSnapshot?: string | null
   statusOverride?: string
   isFeatured?: boolean
+  isCustomized?: boolean
+  customizedAt?: string | null
   sortOrder?: number
   createdAt: string
   sourceProduct?: {
     id: string
     externalId: string
+    sourceName?: string
     hasChangeAlert: boolean
     changeAlertDetails: string | null
     sourcePrice: number
@@ -90,6 +93,8 @@ interface ProductItem {
   draftSnapshot: string | null
   statusOverride?: string
   isFeatured: boolean
+  isCustomized: boolean
+  customizedAt?: string | null
   createdAt: string
   hasChangeAlert?: boolean
   changeAlertDetails?: string | null
@@ -112,6 +117,7 @@ interface ProductItem {
     connectionName?: string | null
     sourceProductId?: string | null
     sourceExternalId?: string | null
+    sourceProductName?: string | null
   }>
 }
 
@@ -133,11 +139,11 @@ function notifyCatalogChange() {
 
 export function ProductManagerClient({ groups }: Props) {
   const [products, setProducts] = useState<ProductItem[]>([])
-  const [activeTab, setActiveTab] = useState<"published" | "draft" | "hidden" | "all">("published")
+  const [activeTab, setActiveTab] = useState<"published" | "draft" | "hidden" | "customized" | "all">("published")
   const [search, setSearch] = useState("")
   const [loading, setLoading] = useState(true)
   const [refreshTrigger, setRefreshTrigger] = useState(0)
-  const [counts, setCounts] = useState({ all: 0, draft: 0, published: 0, hidden: 0, featured: 0 })
+  const [counts, setCounts] = useState({ all: 0, draft: 0, published: 0, hidden: 0, featured: 0, customized: 0 })
   const [featuredFilter, setFeaturedFilter] = useState<"all" | "featured">("all")
   const [savingFeaturedIds, setSavingFeaturedIds] = useState<Set<string>>(new Set())
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null)
@@ -288,6 +294,8 @@ export function ProductManagerClient({ groups }: Props) {
               draftSnapshot: p.draftSnapshot || null,
               statusOverride: p.statusOverride || "auto",
               isFeatured: Boolean(p.isFeatured),
+              isCustomized: Boolean(p.isCustomized),
+              customizedAt: p.customizedAt || null,
               createdAt: p.createdAt,
               hasChangeAlert: Boolean(p.sourceProduct?.hasChangeAlert),
               changeAlertDetails: p.sourceProduct?.changeAlertDetails || null,
@@ -320,6 +328,7 @@ export function ProductManagerClient({ groups }: Props) {
                 connectionName: v.connection?.name || null,
                 sourceProductId: v.sourceProductId,
                 sourceExternalId: v.sourceProduct?.externalId || null,
+                sourceProductName: v.sourceProduct?.sourceName || p.sourceProduct?.sourceName || null,
               })),
             }
           })
@@ -560,6 +569,7 @@ export function ProductManagerClient({ groups }: Props) {
           highlights: cleanHighlights,
           action: actionType,
           confirmBelowCost,
+          isCustomized: true,
           variants: mainVariant
             ? [
                 {
@@ -568,6 +578,8 @@ export function ProductManagerClient({ groups }: Props) {
                   priceCents: editForm.priceCents,
                   compareAtPriceCents: editForm.compareAtPriceCents || null,
                   providerPrice: editForm.providerPrice !== undefined ? editForm.providerPrice : (mainVariant.providerPrice ?? null),
+                  connectionId: mainVariant.connectionId || undefined,
+                  sourceProductId: mainVariant.sourceProductId || undefined,
                 },
               ]
             : undefined,
@@ -878,6 +890,18 @@ export function ProductManagerClient({ groups }: Props) {
               Tạm ẩn ({counts.hidden})
             </button>
             <button
+              onClick={() => setActiveTab("customized")}
+              className={`px-3 py-1.5 rounded-lg font-medium transition-colors flex items-center gap-1.5 ${
+                activeTab === "customized"
+                  ? "bg-purple-600 text-white shadow-sm font-semibold"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+              title="Lọc các sản phẩm đã được biên tập hoặc chỉnh sửa thông tin"
+            >
+              <Edit3 className="size-3 text-purple-400" />
+              <span>Đã chỉnh sửa ({counts.customized || 0})</span>
+            </button>
+            <button
               onClick={() => setActiveTab("all")}
               className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
                 activeTab === "all"
@@ -1053,6 +1077,8 @@ export function ProductManagerClient({ groups }: Props) {
                           ? "bg-amber-500/5 hover:bg-amber-500/10 border-l-2 border-l-amber-500"
                           : isSelected
                           ? "bg-primary/5 hover:bg-primary/10"
+                          : p.isCustomized
+                          ? "bg-purple-500/[0.04] hover:bg-purple-500/[0.08] border-l-2 border-l-purple-500/70"
                           : "hover:bg-secondary/20"
                       }`}
                     >
@@ -1141,6 +1167,15 @@ export function ProductManagerClient({ groups }: Props) {
                               <span className="font-bold text-foreground text-sm truncate max-w-xs block">
                                 {p.name}
                               </span>
+                              {p.isCustomized && (
+                                <span
+                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-500/15 text-purple-300 border border-purple-500/30"
+                                  title="Thông tin sản phẩm đã được chỉnh sửa (tồn kho & giá nhập vẫn tự động đồng bộ từ đại lý)"
+                                >
+                                  <Edit3 className="size-2.5 text-purple-400" />
+                                  <span>Đã chỉnh sửa</span>
+                                </span>
+                              )}
                               {hasDraft && (
                                 <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30">
                                   Bản nháp chờ công bố
@@ -1153,9 +1188,17 @@ export function ProductManagerClient({ groups }: Props) {
                                 </span>
                               )}
                             </div>
-                            <span className="text-[11px] text-muted-foreground block truncate">
-                              /{p.slug}
-                            </span>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-[11px] text-muted-foreground truncate">
+                                /{p.slug}
+                              </span>
+                              {(mainVariant?.connectionName || mainVariant?.provider) && (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-400/90 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                                  <span className="size-1 rounded-full bg-emerald-400" />
+                                  Đồng bộ: {mainVariant.connectionName || mainVariant.provider}
+                                </span>
+                              )}
+                            </div>
                             {p.sourceAlert && p.sourceAlert.details.length > 0 && (
                               <div className="pt-1 flex flex-col gap-0.5">
                                 {p.sourceAlert.details.map((detail, idx) => (
@@ -1290,13 +1333,34 @@ export function ProductManagerClient({ groups }: Props) {
             {/* Header */}
             <div className="p-4 border-b border-border flex items-center justify-between bg-secondary/30">
               <div>
-                <h3 className="font-bold text-sm text-foreground">
-                  Biên Tập Chi Tiết Sản Phẩm: {editingProduct.name}
-                </h3>
-                <span className="text-[11px] text-muted-foreground">
-                  Trạng thái: <strong className="text-foreground uppercase">{editingProduct.editorialStatus}</strong>
-                  {editingProduct.hasPendingChanges && " · (Đang có thay đổi nháp chờ công bố)"}
-                </span>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="font-bold text-sm text-foreground">
+                    Biên Tập Chi Tiết Sản Phẩm: {editingProduct.name}
+                  </h3>
+                  {editingProduct.isCustomized ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40">
+                      <Edit3 className="size-2.5" /> Đã tùy chỉnh thông tin
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-blue-500/20 text-blue-300 border border-blue-500/40">
+                      Đồng bộ gốc từ đại lý
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 text-[11px] text-muted-foreground mt-0.5 flex-wrap">
+                  <span>
+                    Trạng thái: <strong className="text-foreground uppercase">{editingProduct.editorialStatus}</strong>
+                  </span>
+                  {editingProduct.hasPendingChanges && (
+                    <span className="text-amber-400 font-medium">· (Đang có thay đổi nháp chờ công bố)</span>
+                  )}
+                  {(editingProduct.variants[0]?.connectionName || editingProduct.variants[0]?.provider) && (
+                    <span className="text-emerald-400 font-medium flex items-center gap-1">
+                      · <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      Đại lý: <strong className="text-foreground font-semibold">{editingProduct.variants[0].connectionName || editingProduct.variants[0].provider}</strong>
+                    </span>
+                  )}
+                </div>
               </div>
               <button
                 onClick={() => setEditingProduct(null)}
@@ -1311,6 +1375,32 @@ export function ProductManagerClient({ groups }: Props) {
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
                 {/* Form Controls: lg:col-span-7 */}
                 <div className="lg:col-span-7 space-y-4">
+                  {/* Provider Sync & Customization Status Banner */}
+                  <div className="p-3 rounded-xl border border-purple-500/30 bg-purple-500/5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <div className="size-2 rounded-full bg-purple-400 animate-pulse shrink-0" />
+                      <div className="text-[11.5px] text-foreground font-medium">
+                        {editingProduct.isCustomized ? (
+                          <span className="text-purple-300 font-bold">Sản phẩm này đã được bạn tùy chỉnh thông tin.</span>
+                        ) : (
+                          <span className="text-blue-300 font-bold">Sản phẩm đang hiển thị thông tin gốc từ đại lý.</span>
+                        )}
+                        {editingProduct.variants[0]?.connectionName ? (
+                          <span className="text-muted-foreground ml-1.5">
+                            Tồn kho & giá nhập vẫn tự động đồng bộ thời gian thực từ <strong className="text-foreground">{editingProduct.variants[0].connectionName}</strong>.
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground ml-1.5">Sản phẩm do shop tự quản lý.</span>
+                        )}
+                      </div>
+                    </div>
+                    {editingProduct.isCustomized && (
+                      <span className="text-[10px] uppercase font-bold text-purple-400 bg-purple-500/20 px-2 py-0.5 rounded border border-purple-500/30 whitespace-nowrap">
+                        Đã highlight tùy chỉnh
+                      </span>
+                    )}
+                  </div>
+
                   {/* 1. Cover Image 16:9 */}
                   <div className="p-3.5 rounded-xl border border-border bg-secondary/20 space-y-3">
                     <div className="flex items-center justify-between">
@@ -1410,6 +1500,18 @@ export function ProductManagerClient({ groups }: Props) {
                         onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
                         className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground text-xs focus:outline-none focus:ring-1 focus:ring-primary font-semibold"
                       />
+                      {editingProduct.variants[0]?.sourceProductName && editingProduct.variants[0].sourceProductName !== editForm.name && (
+                        <div className="mt-1 flex items-center justify-between text-[10.5px] text-muted-foreground">
+                          <span className="truncate">Gốc đại lý: <strong className="text-foreground/80 font-mono">"{editingProduct.variants[0].sourceProductName}"</strong></span>
+                          <button
+                            type="button"
+                            onClick={() => setEditForm({ ...editForm, name: editingProduct.variants[0]?.sourceProductName || editForm.name })}
+                            className="text-primary hover:underline shrink-0 ml-1.5"
+                          >
+                            Khôi phục
+                          </button>
+                        </div>
+                      )}
                     </div>
 
                     <div className="sm:col-span-3">

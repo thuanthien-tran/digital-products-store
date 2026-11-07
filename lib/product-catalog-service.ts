@@ -19,6 +19,7 @@ export interface UpdateProductInput {
   deliveryType?: string
   statusOverride?: string
   images?: string[]
+  isCustomized?: boolean
   variants?: Array<{
     id?: string
     name: string
@@ -188,6 +189,8 @@ export async function updateProductDetails(
   const updatedData: Record<string, unknown> = {
     hasPendingChanges: false,
     draftSnapshot: null,
+    isCustomized: input.isCustomized !== undefined ? input.isCustomized : true,
+    customizedAt: input.isCustomized === false ? null : new Date(),
   }
 
   if (input.name !== undefined) updatedData.name = input.name.trim()

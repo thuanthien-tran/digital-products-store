@@ -17,6 +17,7 @@ export async function GET(req: Request) {
     const tab = searchParams.get("tab") || "all"
     const search = (searchParams.get("search") || "").trim()
     const featuredOnly = searchParams.get("featured") === "true"
+    const customizedOnly = searchParams.get("customized") === "true"
 
     const where: Prisma.ProductWhereInput = {}
 
@@ -31,7 +32,9 @@ export async function GET(req: Request) {
       where.isFeatured = true
     }
 
-    if (tab === "draft") {
+    if (customizedOnly || tab === "customized") {
+      where.isCustomized = true
+    } else if (tab === "draft") {
       where.editorialStatus = "draft"
     } else if (tab === "published") {
       where.editorialStatus = "published"
@@ -43,7 +46,7 @@ export async function GET(req: Request) {
       ]
     }
 
-    const [products, total, draftCount, publishedCount, hiddenCount, featuredCount] = await Promise.all([
+    const [products, total, draftCount, publishedCount, hiddenCount, featuredCount, customizedCount] = await Promise.all([
       prisma.product.findMany({
         where,
         orderBy: [{ sortOrder: "asc" }, { updatedAt: "desc" }],
@@ -63,7 +66,7 @@ export async function GET(req: Request) {
             },
           },
           sourceProduct: {
-            select: { id: true, externalId: true, hasChangeAlert: true, changeAlertDetails: true, sourcePrice: true, sourceStatus: true },
+            select: { id: true, externalId: true, sourceName: true, hasChangeAlert: true, changeAlertDetails: true, sourcePrice: true, sourceStatus: true },
           },
         },
       }),
@@ -72,6 +75,7 @@ export async function GET(req: Request) {
       prisma.product.count({ where: { editorialStatus: "published", visibility: "public" } }),
       prisma.product.count({ where: { OR: [{ editorialStatus: "hidden" }, { visibility: "hidden", editorialStatus: { not: "draft" } }] } }),
       prisma.product.count({ where: { isFeatured: true } }),
+      prisma.product.count({ where: { isCustomized: true } }),
     ])
 
     return NextResponse.json({
@@ -84,6 +88,7 @@ export async function GET(req: Request) {
         published: publishedCount,
         hidden: hiddenCount,
         featured: featuredCount,
+        customized: customizedCount,
       },
     })
   } catch (err: unknown) {

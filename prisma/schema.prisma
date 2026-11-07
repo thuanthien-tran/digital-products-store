@@ -43,6 +43,8 @@ model Product {
   statusOverride      String         @default("auto") // "auto" | "in_stock" | "out_of_stock"
   badgeOverride       String         @default("auto")
   isFeatured          Boolean        @default(false)
+  isCustomized        Boolean        @default(false)
+  customizedAt        DateTime?
   createdAt           DateTime       @default(now())
   updatedAt           DateTime       @updatedAt
   variants            Variant[]
