@@ -13,6 +13,8 @@ export interface UpdateProductInput {
   name?: string
   groupId?: string | null
   description?: string
+  highlights?: string[]
+  isFeatured?: boolean
   warrantyTerms?: string | null
   usageInstructions?: string | null
   noticeNotes?: string | null
@@ -205,6 +207,8 @@ export async function updateProductDetails(
   if (input.deliveryType !== undefined) updatedData.deliveryType = input.deliveryType
   if (input.statusOverride !== undefined) updatedData.statusOverride = input.statusOverride
   if (input.images !== undefined) updatedData.images = JSON.stringify(input.images)
+  if (input.highlights !== undefined) updatedData.highlights = JSON.stringify(input.highlights)
+  if (input.isFeatured !== undefined) updatedData.isFeatured = Boolean(input.isFeatured)
 
   if (input.action === 'publish_now') {
     updatedData.visibility = 'public'

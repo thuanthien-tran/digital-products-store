@@ -41,6 +41,7 @@ interface RawProduct {
   groupId: string | null
   group?: { name: string } | null
   description: string | null
+  highlights?: string | string[] | null
   images?: string | string[]
   warrantyTerms?: string | null
   usageInstructions?: string | null
@@ -82,6 +83,7 @@ interface ProductItem {
   groupId: string | null
   groupName: string
   description: string
+  highlights?: string[]
   images: string[]
   warrantyTerms?: string | null
   usageInstructions?: string | null
@@ -166,6 +168,7 @@ export function ProductManagerClient({ groups }: Props) {
     notes: "",
     deliveryType: "serials",
     statusOverride: "auto",
+    isFeatured: false,
     sortOrder: 1,
   })
   const [saving, setSaving] = useState(false)
@@ -275,6 +278,17 @@ export function ProductManagerClient({ groups }: Props) {
               parsedImages = p.images
             }
 
+            let parsedHighlights: string[] = []
+            if (typeof p.highlights === "string") {
+              try {
+                parsedHighlights = JSON.parse(p.highlights)
+              } catch {
+                parsedHighlights = []
+              }
+            } else if (Array.isArray(p.highlights)) {
+              parsedHighlights = p.highlights
+            }
+
             return {
               id: p.id,
               name: p.name,
@@ -283,6 +297,7 @@ export function ProductManagerClient({ groups }: Props) {
               groupId: p.groupId,
               groupName: p.group?.name || "Chưa phân loại",
               description: p.description || "",
+              highlights: parsedHighlights,
               images: parsedImages,
               warrantyTerms: p.warrantyTerms || "",
               usageInstructions: p.usageInstructions || p.serviceInstructions || "",
@@ -438,6 +453,10 @@ export function ProductManagerClient({ groups }: Props) {
     let initialWarranty = prod.warrantyTerms || ""
     let initialNotes = prod.noticeNotes || ""
 
+    if (prod.highlights && prod.highlights.length > 0) {
+      initialHighlights = prod.highlights.join("\n")
+    }
+
     // Cleanly extract sections if prod.description was combined with markdown headers
     const desc = prod.description || ""
     const bMatch = desc.match(/\*\*(?:Thông tin & Quyền lợi|Quyền lợi|Đặc quyền)[^*]*\*\*([\s\S]*?)(?=\*\*(?:Hướng dẫn|Chính sách|Lưu ý|Bảo hành)|$)/i)
@@ -510,6 +529,7 @@ export function ProductManagerClient({ groups }: Props) {
       notes: initialNotes,
       deliveryType: prod.deliveryType || "serials",
       statusOverride: prod.statusOverride || "auto",
+      isFeatured: Boolean(prod.isFeatured),
       sortOrder: prod.sortOrder || 1,
     })
     setConfirmBelowCost(false)
@@ -567,6 +587,7 @@ export function ProductManagerClient({ groups }: Props) {
           noticeNotes: editForm.notes,
           images: imageList,
           highlights: cleanHighlights,
+          isFeatured: editForm.isFeatured,
           action: actionType,
           confirmBelowCost,
           isCustomized: true,
@@ -1728,9 +1749,12 @@ export function ProductManagerClient({ groups }: Props) {
 
                   {/* 4. Highlights on Card */}
                   <div className="p-3.5 rounded-xl border border-border bg-secondary/20 space-y-2">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-primary block">
-                      Điểm nổi bật trên thẻ (2 - 3 ý chính)
-                    </label>
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-bold uppercase tracking-wider text-primary block">
+                        Điểm nổi bật trên thẻ (2 - 3 ý chính)
+                      </label>
+                      <span className="text-[10px] text-muted-foreground">Tối đa 3 gạch đầu dòng</span>
+                    </div>
                     <textarea
                       rows={3}
                       placeholder={"Kích hoạt chính chủ trên email cá nhân\nKhông cần thẻ thanh toán quốc tế\nHỗ trợ đổi mới trong thời gian bảo hành"}
@@ -1741,6 +1765,30 @@ export function ProductManagerClient({ groups }: Props) {
                     <p className="text-[10.5px] text-muted-foreground">
                       Mỗi dòng là 1 gạch đầu dòng nổi bật hiển thị trực tiếp trên thẻ sản phẩm ở trang chủ (tối đa 3 dòng).
                     </p>
+                  </div>
+
+                  {/* 4.1 Featured Product Toggle */}
+                  <div className="flex items-center justify-between p-3 rounded-xl border border-border bg-secondary/20 hover:border-caramel/40 transition-colors">
+                    <div className="flex items-center gap-2.5">
+                      <div className="size-8 rounded-lg bg-caramel/10 border border-caramel/25 flex items-center justify-center shrink-0">
+                        <Star className={`size-4 ${editForm.isFeatured ? "fill-caramel text-caramel" : "text-muted-foreground"}`} />
+                      </div>
+                      <div>
+                        <label htmlFor="modal-is-featured" className="text-xs font-semibold text-foreground cursor-pointer block">
+                          Sản phẩm Nổi bật trên trang chủ
+                        </label>
+                        <p className="text-[10.5px] text-muted-foreground">
+                          Ghim sản phẩm vào khu vực "Sản phẩm nổi bật" ở đầu trang chủ (tối đa 6 sản phẩm).
+                        </p>
+                      </div>
+                    </div>
+                    <input
+                      id="modal-is-featured"
+                      type="checkbox"
+                      checked={editForm.isFeatured}
+                      onChange={(e) => setEditForm({ ...editForm, isFeatured: e.target.checked })}
+                      className="size-4.5 rounded border-border bg-card text-caramel focus:ring-1 focus:ring-caramel cursor-pointer accent-caramel"
+                    />
                   </div>
 
                   {/* 5. Standardized 4 Sections */}

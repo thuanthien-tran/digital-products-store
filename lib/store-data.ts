@@ -46,6 +46,13 @@ export async function getStoreData() {
           parsedImages = []
         }
 
+        let parsedHighlights: string[] = []
+        try {
+          parsedHighlights = JSON.parse(p.highlights || "[]")
+        } catch {
+          parsedHighlights = []
+        }
+
         return {
           id: p.id,
           name: p.name,
@@ -53,6 +60,7 @@ export async function getStoreData() {
           isFeatured: p.isFeatured,
           sortOrder: p.sortOrder ?? 0,
           description: p.description,
+          highlights: parsedHighlights,
           images: parsedImages,
           groupId: p.groupId,
           groupName: p.group?.name || "Chưa phân loại",
