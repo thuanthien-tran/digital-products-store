@@ -2,19 +2,24 @@ import { prisma } from "@/lib/db"
 import { formatPrice } from "@/lib/utils"
 import { DollarSign, ShoppingCart, KeyRound, AlertTriangle, ArrowUpRight } from "lucide-react"
 import Link from "next/link"
+import { AdminRefreshButton } from "./AdminRefreshButton"
 
+export const dynamic = "force-dynamic"
+export const revalidate = 0
 
 export default async function AdminDashboardPage() {
   const [totalOrders, paidOrders, totalSerials, availableSerials, recentOrders, lowStockVariants] = await Promise.all([
     prisma.order.count(),
     prisma.order.findMany({
-      where: { status: "paid" },
-      select: { totalCents: true },
+      where: {
+        status: { in: ["paid", "processing"] },
+      },
+      select: { totalCents: true, status: true },
     }),
     prisma.serial.count(),
     prisma.serial.count({ where: { status: "available" } }),
     prisma.order.findMany({
-      take: 5,
+      take: 6,
       orderBy: { createdAt: "desc" },
       include: {
         items: {
@@ -43,7 +48,7 @@ export default async function AdminDashboardPage() {
     {
       title: "Tổng Doanh Thu",
       value: formatPrice(totalRevenue),
-      desc: `${paidOrders.length} đơn hoàn tất`,
+      desc: `${paidOrders.length} đơn hoàn tất / đã thanh toán`,
       icon: DollarSign,
       color: "text-emerald-400",
       bg: "bg-emerald-500/10 border-emerald-500/20",
@@ -76,9 +81,12 @@ export default async function AdminDashboardPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-black tracking-tight text-foreground">Bảng Điều Khiển</h1>
-        <p className="text-xs text-muted-foreground">Theo dõi dòng tiền, đơn hàng và tình trạng tồn kho tự động</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-black tracking-tight text-foreground">Bảng Điều Khiển</h1>
+          <p className="text-xs text-muted-foreground">Theo dõi dòng tiền, đơn hàng và tình trạng tồn kho tự động (Dữ liệu thời gian thực)</p>
+        </div>
+        <AdminRefreshButton />
       </div>
 
       {/* Stats Grid */}
@@ -153,27 +161,42 @@ export default async function AdminDashboardPage() {
             {recentOrders.length === 0 ? (
               <p className="text-xs text-muted-foreground py-4 text-center">Chưa có đơn hàng nào.</p>
             ) : (
-              recentOrders.map((order) => (
-                <div key={order.id} className="flex items-center justify-between p-3 rounded-xl border border-border/60 bg-background/50 text-xs">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono font-bold text-foreground">{order.code}</span>
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                        order.status === "paid" ? "bg-emerald-500/10 text-emerald-400" : "bg-amber-500/10 text-amber-400"
-                      }`}>
-                        {order.status === "paid" ? "Đã thanh toán" : "Chờ thanh toán"}
-                      </span>
+              recentOrders.map((order) => {
+                const isPaid = order.status === "paid" || order.status === "processing"
+                const isCancelled = order.status === "cancelled" || order.status === "refunded"
+                
+                return (
+                  <div key={order.id} className="flex items-center justify-between p-3 rounded-xl border border-border/60 bg-background/50 text-xs">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-bold text-foreground">{order.code}</span>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                          isPaid
+                            ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                            : isCancelled
+                            ? "bg-red-500/10 text-red-400 border border-red-500/20"
+                            : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                        }`}>
+                          {order.status === "paid"
+                            ? "Đã thanh toán"
+                            : order.status === "processing"
+                            ? "Đang xử lý"
+                            : isCancelled
+                            ? "Đã hủy"
+                            : "Chờ thanh toán"}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">{order.email}</p>
                     </div>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">{order.email}</p>
+                    <div className="text-right">
+                      <p className="font-bold text-primary tabular-nums">{formatPrice(order.totalCents)}</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {new Date(order.createdAt).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}
+                      </p>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-bold text-primary tabular-nums">{formatPrice(order.totalCents)}</p>
-                    <p className="text-[10px] text-muted-foreground">
-                      {new Date(order.createdAt).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}
-                    </p>
-                  </div>
-                </div>
-              ))
+                )
+              })
             )}
           </div>
         </div>

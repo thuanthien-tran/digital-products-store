@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { revalidatePath } from "next/cache"
 import crypto from "crypto"
 import { prisma } from "@/lib/db"
 import { fulfillOrder } from "@/lib/fulfillment"
@@ -253,6 +254,11 @@ export async function POST(req: Request) {
 
     // Safe non-blocking Telegram notification
     notifyTelegram(order.code, currentTransferAmount, order.email, isFullyPaid ? "paid" : "partially_paid").catch(() => {})
+
+    try {
+      revalidatePath("/admin")
+      revalidatePath("/admin/orders")
+    } catch {}
 
     return NextResponse.json({
       success: true,
