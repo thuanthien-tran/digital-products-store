@@ -296,8 +296,21 @@ export async function POST(req: Request) {
       const itemTotal = variant.priceCents * item.quantity
       totalCents += itemTotal
 
-      const isBuffVariant = variant.product.fulfillmentType === "buff" || variant.tokenAmountB != null
-      const tokenAmountB = variant.tokenAmountB || (isBuffVariant ? 1 : null)
+      const isBuffVariant =
+        variant.product.fulfillmentType === "buff" ||
+        variant.tokenAmountB != null ||
+        /buff/i.test(`${variant.product.name} ${variant.name}`)
+
+      let tokenAmountB = variant.tokenAmountB
+      if (tokenAmountB == null && variant.name) {
+        const bMatch = variant.name.match(/(\d+)\s*b\b/i)
+        if (bMatch) {
+          tokenAmountB = parseInt(bMatch[1], 10)
+        }
+      }
+      if (tokenAmountB == null && isBuffVariant) {
+        tokenAmountB = 1
+      }
       const wholesaleCost = variant.providerPrice || (tokenAmountB ? calculateExpectedBuffCost(tokenAmountB) : null)
 
       itemsToCreate.push({

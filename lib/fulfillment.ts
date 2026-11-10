@@ -125,7 +125,14 @@ export async function fulfillOrder(
         continue
       }
 
-      const baseB = item.tokenAmountB || item.variant?.tokenAmountB || 1
+      let baseB = item.tokenAmountB || item.variant?.tokenAmountB || null
+      if (baseB == null) {
+        const bMatch = (item.variantName || '').match(/(\d+)\s*b\b/i)
+        if (bMatch) {
+          baseB = parseInt(bMatch[1], 10)
+        }
+      }
+      if (baseB == null) baseB = 1
       const tokenAmountB = baseB * (item.quantity || 1)
       let inviteCode = (item.inviteCode || order.inviteCode || '').trim().toUpperCase()
       if (!inviteCode) {
