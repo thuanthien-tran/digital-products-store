@@ -233,6 +233,11 @@ export async function POST(req: Request) {
     }
 
     const accessToken = generateAccessToken()
+    const orderNote = body.note
+      ? String(body.note).trim()
+      : body.inviteCode
+      ? `Mã mời: ${String(body.inviteCode).trim()}`
+      : null
 
     const order = await prisma.order.create({
       data: {
@@ -241,6 +246,7 @@ export async function POST(req: Request) {
         totalCents,
         status: "pending",
         accessToken,
+        note: orderNote,
         items: {
           create: itemsToCreate,
         },

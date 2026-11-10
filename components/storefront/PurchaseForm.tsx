@@ -84,6 +84,8 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [consentAgreed, setConsentAgreed] = useState(false)
   const [consentError, setConsentError] = useState(false)
+  const [inviteCode, setInviteCode] = useState("")
+  const [inviteCodeError, setInviteCodeError] = useState<string | null>(null)
 
   const isSubmittingRef = useRef(false)
   const radioRefs = useRef<Map<string, HTMLDivElement>>(new Map())
@@ -248,6 +250,15 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
       return
     }
 
+    if (isBuffProduct) {
+      const cleanCode = inviteCode.trim().toUpperCase()
+      if (!cleanCode || cleanCode.length !== 6) {
+        setInviteCodeError("Mã mời phải đúng chính xác 6 ký tự chữ hoặc số.")
+        setSubmitError("Vui lòng nhập chính xác mã mời 6 ký tự để hệ thống nạp token tự động.")
+        return
+      }
+    }
+
     // Guard against double submission
     if (isSubmittingRef.current || loading) return
     isSubmittingRef.current = true
@@ -261,6 +272,8 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
           email: email.trim().toLowerCase(),
           consentAccepted: true,
           consentTimestamp: new Date().toISOString(),
+          note: isBuffProduct && inviteCode ? `Mã mời: ${inviteCode.trim().toUpperCase()}` : undefined,
+          inviteCode: isBuffProduct && inviteCode ? inviteCode.trim().toUpperCase() : undefined,
           items: [
             {
               productId: product.id,
@@ -303,6 +316,7 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
   }
 
   // Detect critical condition notes
+  const isBuffProduct = /buff/i.test(`${product.name} ${selectedVariant?.name || ""}`)
   const isKBH = /kbh|không bảo hành/i.test(`${selectedVariant?.name || ""} ${product.name}`)
   const isVPN = /vpn|ấn độ|india/i.test(`${selectedVariant?.name || ""} ${product.noticeNotes || ""}`)
 
@@ -510,6 +524,42 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
             </p>
           )}
         </div>
+
+        {/* Trường nhập Mã Mời (Invite Code) dành riêng cho các gói Buff Token */}
+        {isBuffProduct && (
+          <div>
+            <label htmlFor="customer-invite-code" className="block text-xs font-semibold text-foreground mb-1.5">
+              Mã mời Muse AI của bạn (Invite Code) <span className="text-red-400">*</span>
+            </label>
+            <input
+              id="customer-invite-code"
+              type="text"
+              maxLength={6}
+              placeholder="VD: 0FBALX (Đúng 6 ký tự)"
+              value={inviteCode}
+              onChange={(e) => {
+                const val = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "")
+                setInviteCode(val)
+                if (inviteCodeError && val.length === 6) setInviteCodeError(null)
+              }}
+              className={`w-full h-11 px-3.5 rounded-xl border bg-secondary/40 text-foreground font-mono text-sm tracking-widest uppercase placeholder:text-muted-foreground/50 transition-all focus:outline-none ${
+                inviteCodeError
+                  ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20"
+                  : "border-border hover:border-border/90 focus:border-caramel focus:ring-2 focus:ring-caramel/20"
+              }`}
+            />
+            {inviteCodeError ? (
+              <p className="text-xs text-red-400 font-medium mt-1 flex items-center gap-1">
+                <AlertCircle className="size-3.5 shrink-0" />
+                <span>{inviteCodeError}</span>
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                Nhập mã mời tài khoản của bạn để hệ thống tự động kích hoạt nạp token thẳng vào tài khoản ngay sau khi thanh toán.
+              </p>
+            )}
+          </div>
+        )}
 
         {/* D. Số lượng (chỉ hiện khi gói cho phép mua nhiều) */}
         {allowMultiQuantity && (

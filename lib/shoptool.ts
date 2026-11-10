@@ -320,6 +320,7 @@ export async function buyShopToolAccount(
         Accept: "application/json",
       },
       body: JSON.stringify({
+        code: params.product_code,
         product_code: params.product_code,
         quantity: params.quantity,
       }),
