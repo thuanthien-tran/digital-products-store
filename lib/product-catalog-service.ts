@@ -257,9 +257,9 @@ export async function updateProductDetails(
         continue
       }
 
-      // Auto-extract tokenAmountB from variant name if not provided (e.g. "Buff Token 10B" -> 10)
+      // Auto-extract tokenAmountB from variant name (e.g. "Buff Token 20B" -> 20, "Buff Token 30B" -> 30)
       let resolvedTokenB = vInput.tokenAmountB !== undefined ? vInput.tokenAmountB : null
-      if (!resolvedTokenB && vInput.name) {
+      if (vInput.name) {
         const match = vInput.name.match(/(\d+)\s*b\b/i)
         if (match) {
           resolvedTokenB = parseInt(match[1], 10)

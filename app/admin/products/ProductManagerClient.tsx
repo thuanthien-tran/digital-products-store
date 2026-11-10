@@ -1857,8 +1857,18 @@ export function ProductManagerClient({ groups }: Props) {
                                     value={v.name}
                                     placeholder="Tên gói (VD: Nạp 10B Token Muse AI)"
                                     onChange={(e) => {
+                                      const newName = e.target.value
                                       const updated = [...editForm.variants]
-                                      updated[vIdx] = { ...v, name: e.target.value }
+                                      const matchB = newName.match(/(\d+)\s*b\b/i)
+                                      const autoB = matchB ? parseInt(matchB[1], 10) : v.tokenAmountB
+                                      const autoCost = autoB ? calculateExpectedBuffCost(autoB) : (v.providerPrice || 0)
+                                      const shouldUpdateCost = !v.providerPrice || v.providerPrice === calculateExpectedBuffCost(v.tokenAmountB || 0)
+                                      updated[vIdx] = {
+                                        ...v,
+                                        name: newName,
+                                        tokenAmountB: autoB,
+                                        providerPrice: shouldUpdateCost ? autoCost : v.providerPrice,
+                                      }
                                       setEditForm({ ...editForm, variants: updated })
                                     }}
                                     className="w-full sm:max-w-xs p-1.5 rounded-lg border border-border bg-background text-foreground text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-primary"

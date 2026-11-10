@@ -555,11 +555,18 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
                           {v.name}
                         </span>
 
-                        {v.tokenAmountB && (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-caramel/20 text-caramel border border-caramel/40">
-                            ⚡ Nạp {v.tokenAmountB}B Token (~{v.tokenAmountB} tỷ Tokens)
-                          </span>
-                        )}
+                        {(() => {
+                          let displayB = v.tokenAmountB
+                          const match = v.name.match(/(\d+)\s*b\b/i)
+                          if (match) {
+                            displayB = parseInt(match[1], 10)
+                          }
+                          return displayB ? (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-caramel/20 text-caramel border border-caramel/40">
+                              ⚡ Nạp {displayB}B Token (~{displayB} tỷ Tokens)
+                            </span>
+                          ) : null
+                        })()}
 
                         {conditionBadge && (
                           <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-300 border border-amber-500/30">
