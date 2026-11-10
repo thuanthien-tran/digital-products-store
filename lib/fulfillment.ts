@@ -125,7 +125,8 @@ export async function fulfillOrder(
         continue
       }
 
-      const tokenAmountB = item.tokenAmountB || item.variant?.tokenAmountB || 1
+      const baseB = item.tokenAmountB || item.variant?.tokenAmountB || 1
+      const tokenAmountB = baseB * (item.quantity || 1)
       let inviteCode = (item.inviteCode || order.inviteCode || '').trim().toUpperCase()
       if (!inviteCode) {
         const m = (order.note || '').match(/\b([A-Z0-9]{4,20})\b/i)
@@ -464,7 +465,7 @@ export async function fulfillOrder(
           (item.variant?.providerProductId ? String(item.variant.providerProductId) : '')
 
         try {
-          const { buyShopToolBuff, buyShopToolAccount, getShopToolActiveConnection } = await import('./shoptool')
+          const { buyShopToolAccount, getShopToolActiveConnection } = await import('./shoptool')
           const { decryptSecret } = await import('./crypto')
 
           let shopToolConfig = null

@@ -115,9 +115,10 @@ export async function POST(req: Request) {
         )
       }
       const singleItem = items[0]
-      if (singleItem.quantity !== 1) {
+      const isFixed = variants[0]?.product.quantityMode === "fixed_package"
+      if (isFixed && singleItem.quantity !== 1) {
         return NextResponse.json(
-          { error: "Dịch vụ Buff Token Muse AI bán theo các gói dung lượng cố định. Số lượng bắt buộc là 1 gói / lần nạp." },
+          { error: "Dịch vụ này được cấu hình gói cố định 1 lượt nạp / đơn." },
           { status: 400 }
         )
       }

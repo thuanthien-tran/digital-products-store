@@ -41,6 +41,7 @@ export interface PurchaseFormProps {
     fulfillmentType?: string
     quantityMode?: string
     requiresInviteCode?: boolean
+    statusOverride?: string | null
     noticeNotes?: string | null
     warrantyTerms?: string | null
   }
@@ -168,26 +169,25 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
   }, [pollAvailability])
 
   const selectedVariant = variants.find((v) => v.id === selectedVariantId)
-  const effectiveStock = selectedVariant ? getEffectiveStock(selectedVariant) : 0
-  const isOutOfStock = !selectedVariant || effectiveStock <= 0
-
   const isBuffProduct =
     product.fulfillmentType === "buff" ||
     product.deliveryType === "buff" ||
+    product.deliveryType === "service" ||
     Boolean(selectedVariant?.tokenAmountB) ||
+    variants.some((v) => Boolean(v.tokenAmountB)) ||
     /buff/i.test(`${product.name} ${selectedVariant?.name || ""}`)
-  const isFixedPackage = product.quantityMode === "fixed_package" || isBuffProduct
 
-  // Quantity limits: Buff and fixed package are strictly locked to 1
+  const isFixedPackage = product.quantityMode === "fixed_package"
+  const rawStock = selectedVariant ? getEffectiveStock(selectedVariant) : 0
+  const effectiveStock = selectedVariant
+    ? (isBuffProduct ? Math.max(rawStock, 999) : rawStock)
+    : 0
+  const isOutOfStock = !selectedVariant || (isBuffProduct ? (selectedVariant.isActive === false) : effectiveStock <= 0)
+
+  // Quantity limits
   const maxAllowedQuantity = isFixedPackage
     ? 1
-    : Math.min(selectedVariant?.maxQuantity || 50, effectiveStock || 1)
-  const allowMultiQuantity = Boolean(
-    !isFixedPackage &&
-    selectedVariant &&
-    (selectedVariant.maxQuantity === undefined || selectedVariant.maxQuantity === null || selectedVariant.maxQuantity > 1) &&
-    effectiveStock > 1
-  )
+    : Math.min(selectedVariant?.maxQuantity || 50, isBuffProduct ? 50 : Math.max(1, effectiveStock))
 
   // Price calculations
   const unitPrice = selectedVariant?.priceCents || 0
@@ -497,7 +497,8 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
             {variants.map((v, idx) => {
               const isSelected = selectedVariantId === v.id
               const vStock = getEffectiveStock(v)
-              const outOfStock = vStock <= 0
+              const isBuffVariant = isBuffProduct || Boolean(v.tokenAmountB) || /buff|\d+b/i.test(v.name)
+              const outOfStock = isBuffVariant ? (v.isActive === false) : vStock <= 0
               const durationTag = detectDurationTag(v.name)
               const conditionBadge = detectVariantBadge(v.name)
               const hasDiscount = Boolean(v.compareAtPriceCents && v.compareAtPriceCents > v.priceCents)
@@ -699,45 +700,53 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
           </div>
         )}
 
-        {/* D. Số lượng (chỉ hiện khi gói cho phép mua nhiều) */}
-        {allowMultiQuantity && (
-          <div className="flex items-center justify-between p-3.5 rounded-xl border border-border/80 bg-secondary/30">
-            <div>
-              <span className="text-xs font-bold text-foreground uppercase tracking-wider block">
-                Số lượng mua
-              </span>
-              <span className="text-[11px] text-muted-foreground">
-                Tối đa {maxAllowedQuantity} tài khoản / đơn
-              </span>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setQuantity((prev) => Math.max(1, prev - 1))}
-                disabled={quantity <= 1}
-                aria-label="Giảm số lượng"
-                className="size-8 rounded-lg border border-border bg-secondary hover:bg-secondary/80 flex items-center justify-center text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-              >
-                <Minus className="size-3.5" />
-              </button>
-
-              <span className="w-9 text-center font-bold text-sm text-foreground tabular-nums">
-                {quantity}
-              </span>
-
-              <button
-                type="button"
-                onClick={() => setQuantity((prev) => Math.min(maxAllowedQuantity, prev + 1))}
-                disabled={quantity >= maxAllowedQuantity}
-                aria-label="Tăng số lượng"
-                className="size-8 rounded-lg border border-border bg-secondary hover:bg-secondary/80 flex items-center justify-center text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-              >
-                <Plus className="size-3.5" />
-              </button>
-            </div>
+        {/* D. Số lượng mua */}
+        <div className="flex items-center justify-between p-3.5 rounded-xl border border-border/80 bg-secondary/30">
+          <div>
+            <span className="text-xs font-bold text-foreground uppercase tracking-wider block">
+              Số lượng mua
+            </span>
+            <span className="text-[11px] text-muted-foreground">
+              {isFixedPackage
+                ? "Gói cố định 1 lượt nạp / đơn"
+                : `Tối đa ${maxAllowedQuantity} ${isBuffProduct ? "gói" : "tài khoản"} / đơn`}
+            </span>
           </div>
-        )}
+
+          <div className="flex items-center gap-2">
+            {!isFixedPackage ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setQuantity((prev) => Math.max(1, prev - 1))}
+                  disabled={quantity <= 1}
+                  aria-label="Giảm số lượng"
+                  className="size-8 rounded-lg border border-border bg-secondary hover:bg-secondary/80 flex items-center justify-center text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                >
+                  <Minus className="size-3.5" />
+                </button>
+
+                <span className="w-9 text-center font-bold text-sm text-foreground tabular-nums">
+                  {quantity}
+                </span>
+
+                <button
+                  type="button"
+                  onClick={() => setQuantity((prev) => Math.min(maxAllowedQuantity, prev + 1))}
+                  disabled={quantity >= maxAllowedQuantity}
+                  aria-label="Tăng số lượng"
+                  className="size-8 rounded-lg border border-border bg-secondary hover:bg-secondary/80 flex items-center justify-center text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                >
+                  <Plus className="size-3.5" />
+                </button>
+              </>
+            ) : (
+              <span className="px-3 py-1 rounded-lg border border-border bg-secondary/60 font-bold text-sm text-foreground tabular-nums">
+                1
+              </span>
+            )}
+          </div>
+        </div>
 
         {/* Condition notice if KBH or VPN is required */}
         {(isKBH || isVPN) && (

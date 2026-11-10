@@ -15,18 +15,10 @@ import {
   PauseCircle,
   PlayCircle,
   History,
-  AlertTriangle,
   AlertCircle,
-  CheckCircle2,
   X,
-  Calendar,
-  Layers,
-  Percent,
-  DollarSign,
-  HelpCircle,
   FileText,
   User,
-  ShieldAlert,
 } from "lucide-react"
 
 interface CatalogVariant {

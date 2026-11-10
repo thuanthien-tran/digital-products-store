@@ -6,7 +6,7 @@
 export function generateVietQRUrl({
   bankCode,
   accountNumber,
-  accountName,
+  accountName: _accountName,
   amount,
   description,
   template = 'qr_only',

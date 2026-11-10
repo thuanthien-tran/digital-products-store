@@ -65,17 +65,26 @@ export default async function ProductPage({ params }: Props) {
   ])
   if (!product) notFound()
 
+  const isBuffOrService =
+    product.fulfillmentType === "buff" ||
+    product.deliveryType === "service" ||
+    product.deliveryType === "buff" ||
+    /buff/i.test(product.name)
+
   const variantsWithStock = product.variants.map((v) => {
-    let stock =
-      v.provider || product.deliveryType === "fatcat" || product.deliveryType === "dino"
-        ? (v.providerStock ?? 0) + v._count.serials
-        : v._count.serials
+    const isBuffVariant = isBuffOrService || Boolean(v.tokenAmountB) || /buff|\d+b/i.test(v.name)
+
+    let stock = isBuffVariant
+      ? (v.providerStock || 999)
+      : (v.provider || product.deliveryType === "fatcat" || product.deliveryType === "dino"
+          ? (v.providerStock ?? 0) + v._count.serials
+          : v._count.serials)
 
     // Respect product level status override and contact mode
-    if (product.statusOverride === "in_stock" || product.deliveryType === "contact") {
-      stock = Math.max(stock, 999)
-    } else if (product.statusOverride === "out_of_stock") {
+    if (v.isActive === false || product.statusOverride === "out_of_stock") {
       stock = 0
+    } else if (product.statusOverride === "in_stock" || product.deliveryType === "contact" || isBuffVariant) {
+      stock = Math.max(stock, 999)
     }
 
     return {
@@ -86,6 +95,8 @@ export default async function ProductPage({ params }: Props) {
       availableStock: stock,
       minQuantity: v.minQuantity,
       maxQuantity: v.maxQuantity,
+      tokenAmountB: v.tokenAmountB,
+      isActive: v.isActive,
     }
   })
 
@@ -260,6 +271,10 @@ export default async function ProductPage({ params }: Props) {
                 id: product.id,
                 name: product.name,
                 deliveryType: product.deliveryType,
+                fulfillmentType: product.fulfillmentType,
+                quantityMode: product.quantityMode,
+                requiresInviteCode: product.requiresInviteCode,
+                statusOverride: product.statusOverride,
                 noticeNotes: product.noticeNotes,
                 warrantyTerms: product.warrantyTerms,
               }}

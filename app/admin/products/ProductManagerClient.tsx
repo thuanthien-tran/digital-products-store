@@ -1800,7 +1800,7 @@ export function ProductManagerClient({ groups }: Props) {
                         <button
                           type="button"
                           onClick={() => {
-                            const isBuff = editForm.fulfillmentType === "buff"
+                            const isBuff = editForm.fulfillmentType === "buff" || /buff/i.test(`${editForm.name} ${editingProduct.name}`)
                             const nextOrder = editForm.variants.filter((v) => !v._delete).length + 1
                             const defaultB = isBuff ? 10 : null
                             const expectedCost = defaultB ? calculateExpectedBuffCost(defaultB) : 0

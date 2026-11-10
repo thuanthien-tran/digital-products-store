@@ -257,7 +257,17 @@ export async function updateProductDetails(
         continue
       }
 
-      const expectedBuffCost = vInput.tokenAmountB ? calculateExpectedBuffCost(vInput.tokenAmountB) : null
+      // Auto-extract tokenAmountB from variant name if not provided (e.g. "Buff Token 10B" -> 10)
+      let resolvedTokenB = vInput.tokenAmountB !== undefined ? vInput.tokenAmountB : null
+      if (!resolvedTokenB && vInput.name) {
+        const match = vInput.name.match(/(\d+)\s*b\b/i)
+        if (match) {
+          resolvedTokenB = parseInt(match[1], 10)
+        }
+      }
+
+      const isBuffVariant = isBuff || Boolean(resolvedTokenB) || /buff|\d+b/i.test(`${product.name} ${vInput.name}`)
+      const expectedBuffCost = resolvedTokenB ? calculateExpectedBuffCost(resolvedTokenB) : null
       const providerPrice = vInput.providerPrice !== undefined
         ? (vInput.providerPrice ? Math.max(0, Math.floor(vInput.providerPrice)) : null)
         : expectedBuffCost
@@ -270,12 +280,13 @@ export async function updateProductDetails(
             priceCents: Math.max(0, Math.floor(vInput.priceCents)),
             compareAtPriceCents: vInput.compareAtPriceCents ? Math.max(0, Math.floor(vInput.compareAtPriceCents)) : null,
             providerPrice,
+            providerStock: isBuffVariant ? 999 : undefined,
             minQuantity: vInput.minQuantity || 1,
             maxQuantity: vInput.maxQuantity || null,
-            connectionId: vInput.connectionId !== undefined ? vInput.connectionId : (isBuff && defaultSource ? defaultSource.connectionId : undefined),
-            sourceProductId: vInput.sourceProductId !== undefined ? vInput.sourceProductId : (isBuff && defaultSource ? defaultSource.id : undefined),
-            provider: isBuff ? 'shoptool' : undefined,
-            tokenAmountB: vInput.tokenAmountB !== undefined ? vInput.tokenAmountB : null,
+            connectionId: vInput.connectionId !== undefined ? vInput.connectionId : (isBuffVariant && defaultSource ? defaultSource.connectionId : undefined),
+            sourceProductId: vInput.sourceProductId !== undefined ? vInput.sourceProductId : (isBuffVariant && defaultSource ? defaultSource.id : undefined),
+            provider: isBuffVariant ? 'shoptool' : undefined,
+            tokenAmountB: resolvedTokenB,
             isActive: vInput.isActive !== undefined ? Boolean(vInput.isActive) : true,
             sortOrder: vInput.sortOrder !== undefined ? vInput.sortOrder : idx,
           },
@@ -289,12 +300,13 @@ export async function updateProductDetails(
             priceCents: Math.max(0, Math.floor(vInput.priceCents)),
             compareAtPriceCents: vInput.compareAtPriceCents ? Math.max(0, Math.floor(vInput.compareAtPriceCents)) : null,
             providerPrice,
+            providerStock: isBuffVariant ? 999 : 0,
             minQuantity: vInput.minQuantity || 1,
             maxQuantity: vInput.maxQuantity || null,
-            connectionId: vInput.connectionId || (isBuff && defaultSource ? defaultSource.connectionId : null),
-            sourceProductId: vInput.sourceProductId || (isBuff && defaultSource ? defaultSource.id : null),
-            provider: isBuff ? 'shoptool' : null,
-            tokenAmountB: vInput.tokenAmountB || null,
+            connectionId: vInput.connectionId || (isBuffVariant && defaultSource ? defaultSource.connectionId : null),
+            sourceProductId: vInput.sourceProductId || (isBuffVariant && defaultSource ? defaultSource.id : null),
+            provider: isBuffVariant ? 'shoptool' : null,
+            tokenAmountB: resolvedTokenB,
             isActive: vInput.isActive !== undefined ? Boolean(vInput.isActive) : true,
             sortOrder: vInput.sortOrder !== undefined ? vInput.sortOrder : idx,
           },

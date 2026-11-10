@@ -7,6 +7,8 @@ scripts/
 *.bak*
 prisma/*.bak*
 *.sqlite*
+*.tsbuildinfo
+AGENTS.md
 
 # Local environment files (configured via Vercel dashboard env vars)
 .env*

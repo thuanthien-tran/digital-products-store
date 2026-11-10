@@ -173,6 +173,33 @@ export function evaluateVariantPurchasability(params: {
     }
   }
 
+  // 1.5 Buff & Service Products: Virtual infinite/wallet capacity
+  const isBuffOrService =
+    product.deliveryType === "service" ||
+    product.deliveryType === "buff" ||
+    (product as any).fulfillmentType === "buff" ||
+    Boolean((variant as any).tokenAmountB) ||
+    /buff|\d+b/i.test(`${product.name} ${variant.name}`)
+
+  if (isBuffOrService) {
+    const isAvailable = product.statusOverride !== "out_of_stock"
+    return {
+      variantId: variant.id,
+      productId: product.id,
+      productName: product.name,
+      variantName: variant.name,
+      isPurchasable: isAvailable,
+      reason: isAvailable ? "available" : "out_of_stock",
+      displayStatus: isAvailable ? "in_stock" : "out_of_stock",
+      availableStock: isAvailable ? (variant.providerStock || 999) : 0,
+      localStock,
+      providerStock: variant.providerStock || 999,
+      minQuantity,
+      maxQuantity,
+      unitPriceCents: variant.priceCents,
+    }
+  }
+
   // 2. Evaluate Provider Stock Validity
   const isProviderBacked = Boolean(
     variant.provider ||
@@ -261,6 +288,7 @@ export async function getLivePurchasabilityByVariantIds(
           editorialStatus: true,
           statusOverride: true,
           deliveryType: true,
+          fulfillmentType: true,
         },
       },
       connection: {
