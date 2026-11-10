@@ -97,7 +97,14 @@ export async function fulfillOrder(
       item.variant?.provider === 'dino' ||
       item.variant?.connection?.provider === 'dino' ||
       item.variant?.sourceProduct?.provider === 'dino'
-    const isSerialDelivery = item.product.deliveryType === 'serials' || isFatcat || isDino
+    const isShopTool =
+      item.variant?.provider === 'shoptool' ||
+      item.variant?.provider === 'shoptoolgiare' ||
+      item.variant?.connection?.provider === 'shoptool' ||
+      item.variant?.connection?.provider === 'shoptoolgiare' ||
+      item.variant?.sourceProduct?.provider === 'shoptool' ||
+      item.variant?.sourceProduct?.provider === 'shoptoolgiare'
+    const isSerialDelivery = item.product.deliveryType === 'serials' || isFatcat || isDino || isShopTool
     const alreadyDelivered = item.serials.length
     const needed = isSerialDelivery ? Math.max(0, item.quantity - alreadyDelivered) : 0
     totalNeeded += item.quantity
@@ -313,6 +320,148 @@ export async function fulfillOrder(
             totalDelivered += alreadyDelivered + localDelivered
           }
         } else {
+          totalDelivered += alreadyDelivered + localDelivered
+        }
+      } else if (isShopTool && remainingNeeded > 0) {
+        // 4. ShopTool live purchase / buff execution
+        const shopToolCode =
+          item.variant?.sourceProduct?.externalId ||
+          (item.variant?.providerProductId ? String(item.variant.providerProductId) : '')
+
+        try {
+          const { buyShopToolBuff, buyShopToolAccount, getShopToolActiveConnection } = await import('./shoptool')
+          const { decryptSecret } = await import('./crypto')
+
+          let shopToolConfig = null
+          if (item.variant?.connection?.isEnabled && item.variant.connection.apiKeyEncrypted) {
+            try {
+              shopToolConfig = {
+                baseUrl: item.variant.connection.baseUrl.trim().replace(/\/+$/, ''),
+                apiKey: decryptSecret(item.variant.connection.apiKeyEncrypted),
+              }
+            } catch {
+              // fallback to active connection
+            }
+          }
+
+          if (!shopToolConfig) {
+            const activeConn = await getShopToolActiveConnection()
+            shopToolConfig = activeConn.config
+          }
+
+          if (!shopToolConfig) {
+            await db.order.update({
+              where: { id: orderId },
+              data: {
+                note: '[Kênh giao hàng ShopTool chưa kết nối]: Chưa tìm thấy cấu hình đại lý ShopTool Giá Rẻ hợp lệ.',
+              },
+            })
+            totalDelivered += alreadyDelivered + localDelivered
+            continue
+          }
+
+          const isBuffService = shopToolCode.startsWith('buff_') || shopToolCode === 'buff_muse'
+
+          if (isBuffService) {
+            // Check invite code from order note or customer note
+            const rawNote = (order.note || '').trim()
+            const match = rawNote.match(/\b([A-Z0-9]{6})\b/i)
+            const inviteCode = match ? match[1].toUpperCase() : rawNote.replace(/[^A-Za-z0-9]/g, '').slice(0, 6).toUpperCase()
+
+            if (inviteCode && inviteCode.length === 6) {
+              const buffRes = await buyShopToolBuff(shopToolConfig, {
+                invite_code: inviteCode,
+                quantity: remainingNeeded,
+                mode: 'auto',
+              })
+
+              if (buffRes.success) {
+                const deliveryNote = `[ShopTool #${buffRes.order_code}]: Đã kích hoạt lệnh Buff ${remainingNeeded}B Token thành công vào mã mời [${inviteCode}] qua (${buffRes.used_method === 'credit' ? 'Credit 0đ' : 'Ví VND'}). Hệ thống đang chạy tự động!`
+                await db.serial.create({
+                  data: {
+                    variantId: item.variantId,
+                    orderItemId: item.id,
+                    content: deliveryNote,
+                    status: 'sold',
+                  },
+                })
+                totalDelivered += alreadyDelivered + localDelivered + remainingNeeded
+                await db.order.update({
+                  where: { id: orderId },
+                  data: {
+                    note: `[Đã gửi lệnh Buff sang ShopTool thành công]: Mã đơn: ${buffRes.order_code}, Mã mời: ${inviteCode}`,
+                  },
+                })
+              } else {
+                const noteMsg = buffRes.isInsufficientBalance || buffRes.isInsufficientCredits
+                  ? `[NGOẠI LỆ NGUỒN HÀNG SHOPTOOL]: Ví hoặc Credit của bạn không đủ để buff (${buffRes.error}). Vui lòng nạp tiền vào ShopTool và bấm Giao Lại đơn hàng.`
+                  : `[NGOẠI LỆ NGUỒN HÀNG SHOPTOOL]: Đại lý báo lỗi "${buffRes.error}". Chờ đối soát thủ công.`
+
+                await db.order.update({
+                  where: { id: orderId },
+                  data: { note: noteMsg },
+                })
+                totalDelivered += alreadyDelivered + localDelivered
+              }
+            } else {
+              // Missing or invalid invite code
+              const deliveryNote = `[Chờ khách cung cấp mã mời]: Đơn hàng Buff Token cần Mã mời (Invite code 6 ký tự). Vui lòng nhắn tin mã mời qua CSKH hoặc cập nhật ghi chú đơn hàng để hệ thống tự động kích hoạt.`
+              await db.serial.create({
+                data: {
+                  variantId: item.variantId,
+                  orderItemId: item.id,
+                  content: deliveryNote,
+                  status: 'sold',
+                },
+              })
+              totalDelivered += alreadyDelivered + localDelivered + remainingNeeded
+              await db.order.update({
+                where: { id: orderId },
+                data: {
+                  note: `[Cần Mã Mời (Invite Code)]: Khách chưa cung cấp mã mời 6 ký tự để buff tự động.`,
+                },
+              })
+            }
+          } else {
+            // Ready-made account buy
+            const buyRes = await buyShopToolAccount(shopToolConfig, {
+              product_code: shopToolCode,
+              quantity: remainingNeeded,
+            })
+
+            if (buyRes.success && buyRes.credentials && buyRes.credentials.length > 0) {
+              for (const cred of buyRes.credentials) {
+                await db.serial.create({
+                  data: {
+                    variantId: item.variantId,
+                    orderItemId: item.id,
+                    content: cred,
+                    status: 'sold',
+                  },
+                })
+              }
+              totalDelivered += alreadyDelivered + localDelivered + buyRes.credentials.length
+              await db.order.update({
+                where: { id: orderId },
+                data: {
+                  note: `[Đã mua tài khoản từ ShopTool thành công]: Mã đơn: ${buyRes.order_code}`,
+                },
+              })
+            } else {
+              const noteMsg = buyRes.isInsufficientBalance
+                ? `[NGOẠI LỆ NGUỒN HÀNG SHOPTOOL]: Số dư ví ShopTool không đủ để mua tài khoản (${buyRes.error}). Vui lòng nạp tiền vào ShopTool và bấm Giao Lại đơn hàng.`
+                : `[NGOẠI LỆ NGUỒN HÀNG SHOPTOOL]: Đại lý báo lỗi "${buyRes.error || 'Mua thất bại'}".`
+
+              await db.order.update({
+                where: { id: orderId },
+                data: { note: noteMsg },
+              })
+              totalDelivered += alreadyDelivered + localDelivered
+            }
+          }
+        } catch (shopToolErr) {
+          const msg = shopToolErr instanceof Error ? shopToolErr.message : 'ShopTool API Exception'
+          console.error('[Fulfillment ShopTool Exception]', msg)
           totalDelivered += alreadyDelivered + localDelivered
         }
       } else {

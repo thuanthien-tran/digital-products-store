@@ -935,9 +935,142 @@ export const customAdapter: ProviderAdapter = {
   },
 }
 
+/**
+ * ShopTool Giá Rẻ API Adapter Implementation
+ * Uses:
+ * - GET /api/v1/account
+ * - GET /api/v1/products
+ */
+export const shoptoolAdapter: ProviderAdapter = {
+  id: 'shoptool',
+  name: 'ShopTool Giá Rẻ (Buff Token & Bot API)',
+
+  validateHost(urlStr: string) {
+    return validateGeneralHttpsHost(urlStr)
+  },
+
+  async testConnection(config: ProviderConnectionConfig): Promise<TestConnectionResult> {
+    const hostCheck = this.validateHost(config.baseUrl)
+    if (!hostCheck.valid) return { ok: false, error: hostCheck.error }
+    if (!config.apiKey) return { ok: false, error: 'Thiếu API Token' }
+
+    const base = config.baseUrl.trim().replace(/\/+$/, '')
+    const accountUrl = base.endsWith('/api/v1') ? `${base}/account` : `${base}/api/v1/account`
+
+    const res = await safeFetchJson(accountUrl, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${config.apiKey.trim()}`,
+        Accept: 'application/json',
+      },
+      timeoutMs: config.timeoutMs || 8000,
+      validateHostFn: (u) => this.validateHost(u),
+    })
+
+    if (res.ok) {
+      const data = res.data
+      const user = data?.user || data?.data || data
+      const balanceVnd = typeof user?.balance === 'number' ? user.balance : 0
+      const credits = typeof user?.buff_credits === 'number' ? user.buff_credits : 0
+
+      return {
+        ok: true,
+        balanceVnd,
+        balanceUsdt: credits,
+        balanceStatus: 'supported',
+      }
+    }
+
+    return {
+      ok: false,
+      error: res.error || 'Không thể kết nối đến máy chủ ShopTool Giá Rẻ',
+    }
+  },
+
+  async fetchCatalog(config: ProviderConnectionConfig): Promise<FetchCatalogResult> {
+    const hostCheck = this.validateHost(config.baseUrl)
+    if (!hostCheck.valid) return { ok: false, error: hostCheck.error }
+    if (!config.apiKey) return { ok: false, error: 'Chưa cấu hình API Token' }
+
+    const base = config.baseUrl.trim().replace(/\/+$/, '')
+    const productsUrl = base.endsWith('/api/v1') ? `${base}/products` : `${base}/api/v1/products`
+
+    const res = await safeFetchJson(productsUrl, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${config.apiKey.trim()}`,
+        Accept: 'application/json',
+      },
+      timeoutMs: config.timeoutMs || 10000,
+      validateHostFn: (u) => this.validateHost(u),
+    })
+
+    if (!res.ok) {
+      return {
+        ok: false,
+        statusCode: res.status,
+        isNetworkOrTimeout: res.isNetworkOrTimeout,
+        error: res.error,
+      }
+    }
+
+    const data = res.data
+    const rawItems = Array.isArray(data?.products)
+      ? data.products
+      : Array.isArray(data?.items)
+      ? data.items
+      : Array.isArray(data)
+      ? data
+      : []
+
+    const products: SourceProductDTO[] = []
+    for (const item of rawItems) {
+      const extId = String(item.code || item.id || item.product_id || '').trim()
+      if (!extId) continue
+
+      const isBuff = Boolean(item.is_buff)
+      const stock =
+        isBuff || item.stock_available === 'unlimited'
+          ? 999
+          : typeof item.stock_available === 'number'
+          ? item.stock_available
+          : typeof item.stock === 'number'
+          ? item.stock
+          : 0
+
+      const priceVnd =
+        typeof item.price === 'number'
+          ? item.price
+          : typeof item.price_vnd === 'number'
+          ? item.price_vnd
+          : typeof item.unit_price === 'number'
+          ? item.unit_price
+          : 0
+
+      const regPrice = item.tiered_pricing?.regular_price || item.regular_price || null
+
+      products.push({
+        externalId: extId,
+        sourceName: item.name || `Sản phẩm #${extId}`,
+        sourceDescription: item.description || '',
+        sourcePrice: priceVnd,
+        sourceRegularPrice: typeof regPrice === 'number' ? regPrice : null,
+        saleQty: null,
+        sourceStock: stock,
+        maxQuantity: typeof item.max_quantity === 'number' ? item.max_quantity : null,
+        rawJson: JSON.stringify(item),
+      })
+    }
+
+    return { ok: true, products }
+  },
+}
+
 const adapters: Record<string, ProviderAdapter> = {
   fatcat: fatcatAdapter,
   dino: dinoAdapter,
+  shoptool: shoptoolAdapter,
+  shoptoolgiare: shoptoolAdapter,
   custom: customAdapter,
 }
 
