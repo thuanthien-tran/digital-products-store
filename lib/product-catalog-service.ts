@@ -1,6 +1,7 @@
 import { prisma } from './db'
 import { slugify } from './utils'
 import { normalizeDescription } from './description-normalizer'
+import { calculateExpectedBuffCost } from './buff-pricing'
 
 export interface AddToStoreResult {
   success: boolean
@@ -19,6 +20,9 @@ export interface UpdateProductInput {
   usageInstructions?: string | null
   noticeNotes?: string | null
   deliveryType?: string
+  fulfillmentType?: string
+  quantityMode?: string
+  requiresInviteCode?: boolean
   statusOverride?: string
   images?: string[]
   isCustomized?: boolean
@@ -32,6 +36,10 @@ export interface UpdateProductInput {
     maxQuantity?: number | null
     connectionId?: string | null
     sourceProductId?: string | null
+    tokenAmountB?: number | null
+    isActive?: boolean
+    sortOrder?: number
+    _delete?: boolean
   }>
   action?: 'save_draft' | 'publish_now'
   visibility?: string
@@ -205,6 +213,9 @@ export async function updateProductDetails(
   }
   if (input.noticeNotes !== undefined) updatedData.noticeNotes = input.noticeNotes
   if (input.deliveryType !== undefined) updatedData.deliveryType = input.deliveryType
+  if (input.fulfillmentType !== undefined) updatedData.fulfillmentType = input.fulfillmentType
+  if (input.quantityMode !== undefined) updatedData.quantityMode = input.quantityMode
+  if (input.requiresInviteCode !== undefined) updatedData.requiresInviteCode = Boolean(input.requiresInviteCode)
   if (input.statusOverride !== undefined) updatedData.statusOverride = input.statusOverride
   if (input.images !== undefined) updatedData.images = JSON.stringify(input.images)
   if (input.highlights !== undefined) updatedData.highlights = JSON.stringify(input.highlights)
@@ -230,19 +241,62 @@ export async function updateProductDetails(
 
   // Update variants if provided
   if (Array.isArray(input.variants)) {
-    for (const vInput of input.variants) {
+    const isBuff = input.fulfillmentType === 'buff' || product.fulfillmentType === 'buff'
+    const defaultSource = await prisma.sourceProduct.findFirst({
+      where: { externalId: 'buff_muse', provider: 'shoptool' },
+      select: { id: true, connectionId: true, provider: true },
+    })
+
+    for (const [idx, vInput] of input.variants.entries()) {
+      if (vInput._delete && vInput.id) {
+        // Only delete if there are other variants remaining
+        const remainingCount = await prisma.variant.count({ where: { productId } })
+        if (remainingCount > 1) {
+          await prisma.variant.delete({ where: { id: vInput.id } })
+        }
+        continue
+      }
+
+      const expectedBuffCost = vInput.tokenAmountB ? calculateExpectedBuffCost(vInput.tokenAmountB) : null
+      const providerPrice = vInput.providerPrice !== undefined
+        ? (vInput.providerPrice ? Math.max(0, Math.floor(vInput.providerPrice)) : null)
+        : expectedBuffCost
+
       if (vInput.id) {
         await prisma.variant.update({
           where: { id: vInput.id },
           data: {
-            name: vInput.name,
+            name: vInput.name.trim(),
             priceCents: Math.max(0, Math.floor(vInput.priceCents)),
             compareAtPriceCents: vInput.compareAtPriceCents ? Math.max(0, Math.floor(vInput.compareAtPriceCents)) : null,
-            providerPrice: vInput.providerPrice !== undefined ? (vInput.providerPrice ? Math.max(0, Math.floor(vInput.providerPrice)) : null) : undefined,
+            providerPrice,
             minQuantity: vInput.minQuantity || 1,
             maxQuantity: vInput.maxQuantity || null,
-            connectionId: vInput.connectionId || undefined,
-            sourceProductId: vInput.sourceProductId || undefined,
+            connectionId: vInput.connectionId !== undefined ? vInput.connectionId : (isBuff && defaultSource ? defaultSource.connectionId : undefined),
+            sourceProductId: vInput.sourceProductId !== undefined ? vInput.sourceProductId : (isBuff && defaultSource ? defaultSource.id : undefined),
+            provider: isBuff ? 'shoptool' : undefined,
+            tokenAmountB: vInput.tokenAmountB !== undefined ? vInput.tokenAmountB : null,
+            isActive: vInput.isActive !== undefined ? Boolean(vInput.isActive) : true,
+            sortOrder: vInput.sortOrder !== undefined ? vInput.sortOrder : idx,
+          },
+        })
+      } else if (vInput.name && vInput.priceCents >= 0) {
+        // Create new variant
+        await prisma.variant.create({
+          data: {
+            productId,
+            name: vInput.name.trim(),
+            priceCents: Math.max(0, Math.floor(vInput.priceCents)),
+            compareAtPriceCents: vInput.compareAtPriceCents ? Math.max(0, Math.floor(vInput.compareAtPriceCents)) : null,
+            providerPrice,
+            minQuantity: vInput.minQuantity || 1,
+            maxQuantity: vInput.maxQuantity || null,
+            connectionId: vInput.connectionId || (isBuff && defaultSource ? defaultSource.connectionId : null),
+            sourceProductId: vInput.sourceProductId || (isBuff && defaultSource ? defaultSource.id : null),
+            provider: isBuff ? 'shoptool' : null,
+            tokenAmountB: vInput.tokenAmountB || null,
+            isActive: vInput.isActive !== undefined ? Boolean(vInput.isActive) : true,
+            sortOrder: vInput.sortOrder !== undefined ? vInput.sortOrder : idx,
           },
         })
       }
@@ -283,7 +337,7 @@ export async function publishProductToStore(
 
   // Below cost validation
   for (const v of product.variants) {
-    const wholesale = v.providerPrice || v.sourceProduct?.sourcePrice || 0
+    const wholesale = v.providerPrice || v.sourceProduct?.sourcePrice || (v.tokenAmountB ? calculateExpectedBuffCost(v.tokenAmountB) : 0)
     if (wholesale > 0 && v.priceCents < wholesale && !options?.confirmBelowCost) {
       throw new Error(
         `CẢNH BÁO: Giá bán gói "${v.name}" (${v.priceCents.toLocaleString('vi-VN')} đ) thấp hơn giá sỉ đại lý (${wholesale.toLocaleString('vi-VN')} đ). Vui lòng xác nhận để tiếp tục.`

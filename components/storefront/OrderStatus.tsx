@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { CheckCircle2, Copy, Check, AlertCircle, AlertTriangle, Loader2, Clock, ArrowLeft, RefreshCw } from "lucide-react"
+import { CheckCircle2, Copy, Check, AlertCircle, AlertTriangle, Loader2, Clock, ArrowLeft, RefreshCw, Zap } from "lucide-react"
 import { formatPrice } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
@@ -29,6 +29,16 @@ interface OrderStatusProps {
     variantName: string
     priceCents: number
     quantity?: number
+    tokenAmountB?: number | null
+    inviteCode?: string | null
+    buffFulfillment?: {
+      status: string
+      tokenAmountB: number
+      completedB?: number | null
+      providerOrderCode?: string | null
+      inviteCode?: string | null
+      errorMessage?: string | null
+    } | null
     serials?: string[]
     serial?: string | null
     serviceInstructions: string | null
@@ -215,7 +225,67 @@ export function OrderStatus({
                   <span className="text-sm font-bold text-foreground">{formatPrice(item.priceCents)}</span>
                 </div>
 
-                {serialList.length > 0 ? (
+                {/* Buff Token Muse AI Status Display */}
+                {(item.buffFulfillment || item.tokenAmountB) ? (
+                  <div className="space-y-3 p-4 rounded-xl border border-caramel/30 bg-caramel/5">
+                    <div className="flex items-center justify-between pb-2 border-b border-caramel/20">
+                      <span className="text-xs font-bold text-caramel uppercase tracking-wider flex items-center gap-1.5">
+                        <Zap className="size-3.5" />
+                        Tiến trình nạp Token Muse AI
+                      </span>
+                      <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                        item.buffFulfillment?.status === 'succeeded'
+                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                          : item.buffFulfillment?.status === 'failed'
+                          ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                          : 'bg-caramel/20 text-caramel border border-caramel/40 animate-pulse'
+                      }`}>
+                        {item.buffFulfillment?.status === 'succeeded'
+                          ? '✓ Đã hoàn tất'
+                          : item.buffFulfillment?.status === 'failed'
+                          ? 'Cần hỗ trợ'
+                          : 'Đang xử lý tự động'}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+                      <div className="p-2.5 rounded-lg bg-secondary/50 border border-border">
+                        <span className="text-muted-foreground block text-[11px]">Gói nạp:</span>
+                        <strong className="text-foreground text-sm font-bold">
+                          {item.tokenAmountB || item.buffFulfillment?.tokenAmountB}B Token (~{(item.tokenAmountB || item.buffFulfillment?.tokenAmountB || 1)} tỷ Token)
+                        </strong>
+                      </div>
+
+                      <div className="p-2.5 rounded-lg bg-secondary/50 border border-border">
+                        <span className="text-muted-foreground block text-[11px]">Mã mời (Invite Code):</span>
+                        <strong className="text-caramel font-mono text-sm tracking-wider">
+                          {item.inviteCode || item.buffFulfillment?.inviteCode || 'N/A'}
+                        </strong>
+                      </div>
+                    </div>
+
+                    {item.buffFulfillment?.providerOrderCode && (
+                      <div className="text-[11px] text-muted-foreground flex items-center justify-between pt-1">
+                        <span>Mã vận đơn đại lý:</span>
+                        <span className="font-mono text-foreground font-semibold">#{item.buffFulfillment.providerOrderCode}</span>
+                      </div>
+                    )}
+
+                    {item.buffFulfillment?.status === 'succeeded' ? (
+                      <p className="text-xs text-emerald-400 font-medium">
+                        ✓ Lệnh nạp token đã hoàn tất thành công. Vui lòng mở tài khoản Muse AI của bạn để kiểm tra số dư token!
+                      </p>
+                    ) : item.buffFulfillment?.status === 'failed' ? (
+                      <p className="text-xs text-rose-400">
+                        {item.buffFulfillment.errorMessage || 'Lệnh nạp đang được hỗ trợ viên kiểm tra lại.'}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        ⚡ Hệ thống đang tự động nạp token vào tài khoản Muse AI của bạn theo mã mời đã cung cấp. Vui lòng giữ nguyên trang hoặc kiểm tra lại sau ít phút.
+                      </p>
+                    )}
+                  </div>
+                ) : serialList.length > 0 ? (
                   <div className="space-y-2">
                     <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">
                       Thông tin tài khoản bàn giao ({serialList.length} mục)

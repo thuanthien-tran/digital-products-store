@@ -31,6 +31,9 @@ model Product {
   description         String
   images              String         @default("[]") // JSON array of image URLs
   deliveryType        String         @default("serials") // "serials" | "service" | "fatcat"
+  fulfillmentType     String         @default("serials") // "serials" | "service" | "buff"
+  quantityMode        String         @default("flexible") // "flexible" | "fixed_package"
+  requiresInviteCode  Boolean        @default(false)
   serviceInstructions String?
   warrantyTerms       String?
   usageInstructions   String?
@@ -65,6 +68,8 @@ model Variant {
   minQuantity         Int                 @default(1)
   maxQuantity         Int?
   sortOrder           Int                 @default(0)
+  tokenAmountB        Int?                // Amount of tokens in billions (e.g., 1, 5, 10, 20, 30) for buff services
+  isActive            Boolean             @default(true)      // Active/visible status for variant selection
   provider            String?             // "fatcat" | null for internal
   providerProductId   Int?                // FatCat product ID (e.g. 48, 30, 58)
   providerPrice       Int?                // Wholesale price from FatCat in VND
@@ -104,6 +109,7 @@ model Order {
   accessToken     String?           // Secret viewer token (anti-scraping)
   resellerId      String?           // Tenant identity for reseller isolation
   note            String?
+  inviteCode      String?           // Normalized Invite Code for buff services
   couponId        String?
   couponCode      String?
   couponSnapshot  String?           // JSON snapshot of applied coupon & breakdown
@@ -135,6 +141,9 @@ model OrderItem {
   connectionId   String?  // Historical connection reference at order time
   connectionName String?  // Historical name at order time
   providerCost   Int?     // Wholesale cost recorded at purchase time
+  tokenAmountB   Int?     // Snapshot of token capacity in billions (B) at order time
+  inviteCode     String?  // Snapshot of Invite Code for this line item
+  buffFulfillment BuffFulfillment?
   serials        Serial[]
   createdAt      DateTime @default(now())
 }
@@ -382,4 +391,26 @@ model CouponAuditLog {
   createdAt DateTime @default(now())
 
   @@index([couponId, createdAt])
+}
+
+model BuffFulfillment {
+  id                String     @id @default(cuid())
+  orderItemId       String     @unique
+  orderItem         OrderItem  @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  orderId           String
+  inviteCode        String
+  tokenAmountB      Int        // Requested B token amount sent to provider (e.g. 1, 5, 10, 20, 30)
+  completedB        Int?       // Completed B token amount reported by provider
+  status            String     @default("pending") // "pending" | "submitting" | "processing" | "succeeded" | "failed" | "needs_review"
+  usedMethod        String?    // "credit" | "wallet"
+  providerOrderCode String?    // Provider returned order code
+  partnerRef        String?    // Stable idempotency partner reference
+  lastCheckedAt     DateTime?
+  errorMessage      String?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  @@index([status])
+  @@index([orderId])
+  @@index([providerOrderCode])
 }

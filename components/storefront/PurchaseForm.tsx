@@ -29,6 +29,8 @@ export interface PurchaseVariant {
   availableStock: number
   minQuantity?: number
   maxQuantity?: number | null
+  tokenAmountB?: number | null
+  isActive?: boolean
 }
 
 export interface PurchaseFormProps {
@@ -36,6 +38,9 @@ export interface PurchaseFormProps {
     id: string
     name: string
     deliveryType: string
+    fulfillmentType?: string
+    quantityMode?: string
+    requiresInviteCode?: boolean
     noticeNotes?: string | null
     warrantyTerms?: string | null
   }
@@ -166,12 +171,19 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
   const effectiveStock = selectedVariant ? getEffectiveStock(selectedVariant) : 0
   const isOutOfStock = !selectedVariant || effectiveStock <= 0
 
-  // Quantity limits
-  const maxAllowedQuantity = Math.min(
-    selectedVariant?.maxQuantity || 50,
-    effectiveStock || 1
-  )
+  const isBuffProduct =
+    product.fulfillmentType === "buff" ||
+    product.deliveryType === "buff" ||
+    Boolean(selectedVariant?.tokenAmountB) ||
+    /buff/i.test(`${product.name} ${selectedVariant?.name || ""}`)
+  const isFixedPackage = product.quantityMode === "fixed_package" || isBuffProduct
+
+  // Quantity limits: Buff and fixed package are strictly locked to 1
+  const maxAllowedQuantity = isFixedPackage
+    ? 1
+    : Math.min(selectedVariant?.maxQuantity || 50, effectiveStock || 1)
   const allowMultiQuantity = Boolean(
+    !isFixedPackage &&
     selectedVariant &&
     (selectedVariant.maxQuantity === undefined || selectedVariant.maxQuantity === null || selectedVariant.maxQuantity > 1) &&
     effectiveStock > 1
@@ -362,11 +374,11 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
       return
     }
 
-    if (isBuffProduct) {
+    if (isBuffProduct || product.requiresInviteCode) {
       const cleanCode = inviteCode.trim().toUpperCase()
-      if (!cleanCode || cleanCode.length !== 6) {
-        setInviteCodeError("Mã mời phải đúng chính xác 6 ký tự chữ hoặc số.")
-        setSubmitError("Vui lòng nhập chính xác mã mời 6 ký tự để hệ thống nạp token tự động.")
+      if (!cleanCode || cleanCode.length < 4 || cleanCode.length > 20) {
+        setInviteCodeError("Mã mời phải từ 4 đến 20 ký tự chữ hoặc số.")
+        setSubmitError("Vui lòng nhập chính xác mã mời nhận token Muse AI để tiếp tục.")
         return
       }
     }
@@ -430,7 +442,6 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
   }
 
   // Detect critical condition notes
-  const isBuffProduct = /buff/i.test(`${product.name} ${selectedVariant?.name || ""}`)
   const isKBH = /kbh|không bảo hành/i.test(`${selectedVariant?.name || ""} ${product.name}`)
   const isVPN = /vpn|ấn độ|india/i.test(`${selectedVariant?.name || ""} ${product.noticeNotes || ""}`)
 
@@ -471,10 +482,10 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
               id={`${formId}-variant-label`}
               className="text-xs font-bold text-foreground uppercase tracking-wider block"
             >
-              1. Chọn gói / thời hạn
+              {isBuffProduct ? "1. Chọn gói dung lượng Token Muse AI *" : "1. Chọn gói / thời hạn *"}
             </label>
             <span className="text-[11px] text-muted-foreground font-medium">
-              {variants.length} lựa chọn
+              {variants.length} gói
             </span>
           </div>
 
@@ -543,6 +554,12 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
                           {v.name}
                         </span>
 
+                        {v.tokenAmountB && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-caramel/20 text-caramel border border-caramel/40">
+                            ⚡ Nạp {v.tokenAmountB}B Token (~{v.tokenAmountB} tỷ Tokens)
+                          </span>
+                        )}
+
                         {conditionBadge && (
                           <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-300 border border-amber-500/30">
                             {conditionBadge}
@@ -558,7 +575,9 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
                           </span>
                         )}
                         <span className="text-[11px]">
-                          {product.deliveryType === "contact"
+                          {isBuffProduct
+                            ? "Sẵn sàng nạp tự động 24/7"
+                            : product.deliveryType === "contact"
                             ? "Sẵn sàng cấp qua Zalo"
                             : outOfStock
                             ? "Hết hàng"
@@ -640,26 +659,31 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
         </div>
 
         {/* Trường nhập Mã Mời (Invite Code) dành riêng cho các gói Buff Token */}
-        {isBuffProduct && (
-          <div>
-            <label htmlFor="customer-invite-code" className="block text-xs font-semibold text-foreground mb-1.5">
-              Mã mời Muse AI của bạn (Invite Code) <span className="text-red-400">*</span>
-            </label>
+        {(isBuffProduct || product.requiresInviteCode) && (
+          <div className="space-y-1.5 p-3.5 rounded-xl border border-caramel/30 bg-caramel/5">
+            <div className="flex items-center justify-between">
+              <label htmlFor="customer-invite-code" className="text-xs font-bold text-caramel uppercase tracking-wider block">
+                Mã mời Muse AI của bạn (Invite Code) *
+              </label>
+              <span className="text-[11px] text-muted-foreground font-mono">
+                {inviteCode.length}/20
+              </span>
+            </div>
             <input
               id="customer-invite-code"
               type="text"
-              maxLength={6}
-              placeholder="VD: 0FBALX (Đúng 6 ký tự)"
+              maxLength={20}
+              placeholder="VD: 0FBALX (Mã mời từ Muse AI)"
               value={inviteCode}
               onChange={(e) => {
                 const val = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "")
                 setInviteCode(val)
-                if (inviteCodeError && val.length === 6) setInviteCodeError(null)
+                if (inviteCodeError && val.length >= 4) setInviteCodeError(null)
               }}
               className={`w-full h-11 px-3.5 rounded-xl border bg-secondary/40 text-foreground font-mono text-sm tracking-widest uppercase placeholder:text-muted-foreground/50 transition-all focus:outline-none ${
                 inviteCodeError
                   ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20"
-                  : "border-border hover:border-border/90 focus:border-caramel focus:ring-2 focus:ring-caramel/20"
+                  : "border-caramel/50 hover:border-caramel focus:border-caramel focus:ring-2 focus:ring-caramel/20"
               }`}
             />
             {inviteCodeError ? (
@@ -669,7 +693,7 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
               </p>
             ) : (
               <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                Nhập mã mời tài khoản của bạn để hệ thống tự động kích hoạt nạp token thẳng vào tài khoản ngay sau khi thanh toán.
+                Nhập mã mời nhận token trong tài khoản Muse AI của bạn để hệ thống nạp tự động ngay sau khi thanh toán.
               </p>
             )}
           </div>

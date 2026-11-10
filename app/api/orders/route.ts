@@ -6,6 +6,7 @@ import { verifyAdminRequest } from "@/lib/auth"
 import { verifyVariantLiveStock } from "@/lib/provider-stock-verifier"
 import { normalizeCouponCode, reserveCouponForOrder, OrderItemEvalInput } from "@/lib/coupon-service"
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit"
+import { normalizeInviteCode, isValidInviteCode, calculateExpectedBuffCost } from "@/lib/buff-pricing"
 
 interface OrderItemInput {
   productId: string
@@ -101,6 +102,36 @@ export async function POST(req: Request) {
         _count: { select: { serials: { where: { status: "available" } } } },
       },
     })
+
+    // Buff Token Muse AI & Fixed Package validation
+    const hasBuff = variants.some((v) => v.product.fulfillmentType === "buff" || v.tokenAmountB != null)
+    let validatedInviteCode: string | null = null
+
+    if (hasBuff) {
+      if (items.length > 1) {
+        return NextResponse.json(
+          { error: "Dịch vụ Buff Token Muse AI phải được đặt đơn riêng biệt, không thể mua chung với sản phẩm khác." },
+          { status: 400 }
+        )
+      }
+      const singleItem = items[0]
+      if (singleItem.quantity !== 1) {
+        return NextResponse.json(
+          { error: "Dịch vụ Buff Token Muse AI bán theo các gói dung lượng cố định. Số lượng bắt buộc là 1 gói / lần nạp." },
+          { status: 400 }
+        )
+      }
+      const rawCode = body.inviteCode || body.note
+      validatedInviteCode = normalizeInviteCode(rawCode)
+      if (!validatedInviteCode || !isValidInviteCode(validatedInviteCode)) {
+        return NextResponse.json(
+          { error: "Vui lòng nhập chính xác Mã Mời (Invite Code) hợp lệ (từ 4 đến 20 ký tự chữ và số, ví dụ: 0FBALX)." },
+          { status: 400 }
+        )
+      }
+    } else if (body.inviteCode) {
+      validatedInviteCode = normalizeInviteCode(body.inviteCode)
+    }
 
     // Consolidate quantities if the same variantId is submitted multiple times
     const variantQtyMap = new Map<string, number>()
@@ -223,7 +254,7 @@ export async function POST(req: Request) {
             { status: 400 }
           )
         }
-      } else if (variant.product.deliveryType === "serials" && variant._count.serials < totalQty) {
+      } else if (variant.product.deliveryType === "serials" && variant.product.fulfillmentType !== "buff" && variant._count.serials < totalQty) {
         return NextResponse.json(
           {
             error: `Sản phẩm "${variant.product.name} - ${variant.name}" chỉ còn ${variant._count.serials} trong kho (bạn đang yêu cầu tổng cộng ${totalQty})`,
@@ -245,6 +276,8 @@ export async function POST(req: Request) {
       connectionId: string | null
       connectionName: string | null
       providerCost: number | null
+      tokenAmountB: number | null
+      inviteCode: string | null
       discountCents?: number
     }
     const itemsToCreate: ItemToCreate[] = []
@@ -262,6 +295,10 @@ export async function POST(req: Request) {
       const itemTotal = variant.priceCents * item.quantity
       totalCents += itemTotal
 
+      const isBuffVariant = variant.product.fulfillmentType === "buff" || variant.tokenAmountB != null
+      const tokenAmountB = variant.tokenAmountB || (isBuffVariant ? 1 : null)
+      const wholesaleCost = variant.providerPrice || (tokenAmountB ? calculateExpectedBuffCost(tokenAmountB) : null)
+
       itemsToCreate.push({
         productId: variant.productId,
         variantId: variant.id,
@@ -271,7 +308,9 @@ export async function POST(req: Request) {
         variantName: variant.name,
         connectionId: variant.connectionId || null,
         connectionName: variant.connection?.name || null,
-        providerCost: variant.providerPrice || null,
+        providerCost: wholesaleCost,
+        tokenAmountB,
+        inviteCode: isBuffVariant ? validatedInviteCode : null,
       })
     }
 
@@ -286,8 +325,8 @@ export async function POST(req: Request) {
     const accessToken = generateAccessToken()
     const orderNote = body.note
       ? String(body.note).trim()
-      : body.inviteCode
-      ? `Mã mời: ${String(body.inviteCode).trim()}`
+      : validatedInviteCode
+      ? `Mã mời: ${validatedInviteCode}`
       : null
 
     const rawCouponCode = body.couponCode && typeof body.couponCode === "string" ? normalizeCouponCode(body.couponCode) : null
@@ -348,6 +387,7 @@ export async function POST(req: Request) {
             status: "pending",
             accessToken,
             note: orderNote,
+            inviteCode: validatedInviteCode,
             couponId,
             couponCode: couponCodeApplied,
             couponSnapshot,
@@ -371,6 +411,7 @@ export async function POST(req: Request) {
             status: "pending",
             accessToken,
             note: orderNote,
+            inviteCode: validatedInviteCode,
             idempotencyKey,
             items: {
               create: itemsToCreate.map((it) => ({

@@ -9,6 +9,7 @@ import { OrderStatus } from "@/components/storefront/OrderStatus"
 import { generateVietQRUrl } from "@/lib/vietqr"
 import { verifyAdminToken } from "@/lib/auth"
 import { cancelIfExpired } from "@/lib/order-expiry"
+import { syncBuffFulfillmentsForOrder } from "@/lib/fulfillment"
 
 export const dynamic = "force-dynamic"
 export const revalidate = 0
@@ -28,6 +29,7 @@ async function getOrder(id: string) {
           include: {
             product: { select: { name: true, serviceInstructions: true, deliveryType: true } },
             variant: { select: { name: true } },
+            buffFulfillment: true,
             serials: { select: { content: true } },
           },
         },
@@ -104,15 +106,31 @@ export default async function OrderPage({ params, searchParams }: Props) {
     description: order.code,
   })
 
+  // Proactively check buff status if paid
+  if (order.status === "paid") {
+    await syncBuffFulfillmentsForOrder(order.id)
+  }
+
   // INVARIANT: Never expose serial credentials in HTML/RSC payload to unauthenticated callers
   const items = order.items.map((item) => {
     const isPaidOrder = order.status === "paid"
     const serialList = isPaidOrder && canViewCredentials ? item.serials.map((s) => s.content) : []
+    const buff = item.buffFulfillment
     return {
       productName: item.product.name,
       variantName: item.variant.name,
       priceCents: item.priceCents,
       quantity: item.quantity,
+      tokenAmountB: item.tokenAmountB,
+      inviteCode: canViewCredentials ? item.inviteCode : (item.inviteCode ? `${item.inviteCode.slice(0, 2)}***` : null),
+      buffFulfillment: buff ? {
+        status: buff.status,
+        tokenAmountB: buff.tokenAmountB,
+        completedB: buff.completedB,
+        providerOrderCode: buff.providerOrderCode,
+        inviteCode: canViewCredentials ? buff.inviteCode : `${buff.inviteCode.slice(0, 2)}***`,
+        errorMessage: buff.errorMessage,
+      } : null,
       serials: serialList,
       serial: serialList.length > 0 ? serialList.join("\n") : null,
       serviceInstructions: item.product.serviceInstructions,

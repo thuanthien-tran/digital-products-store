@@ -18,6 +18,7 @@ import {
   Star
 } from "lucide-react"
 import { ProductCard } from "@/components/storefront/ProductCard"
+import { MUSE_BUFF_STANDARD_PACKAGES, calculateExpectedBuffCost } from "@/lib/buff-pricing"
 
 interface RawVariant {
   id: string
@@ -27,6 +28,9 @@ interface RawVariant {
   provider: string | null
   providerPrice: number | null
   providerStock: number | null
+  tokenAmountB?: number | null
+  isActive?: boolean
+  sortOrder?: number
   _count?: { serials?: number }
   connectionId?: string | null
   connection?: { name: string } | null
@@ -48,6 +52,9 @@ interface RawProduct {
   serviceInstructions?: string | null
   noticeNotes?: string | null
   deliveryType: string
+  fulfillmentType?: string
+  quantityMode?: string
+  requiresInviteCode?: boolean
   visibility: string
   editorialStatus?: "draft" | "published" | "hidden"
   hasPendingChanges?: boolean
@@ -75,6 +82,18 @@ interface GroupOption {
   name: string
 }
 
+export interface FormVariantItem {
+  id?: string
+  name: string
+  tokenAmountB?: number | null
+  providerPrice?: number | null
+  priceCents: number
+  compareAtPriceCents?: number | null
+  isActive: boolean
+  sortOrder: number
+  _delete?: boolean
+}
+
 interface ProductItem {
   id: string
   name: string
@@ -89,6 +108,9 @@ interface ProductItem {
   usageInstructions?: string | null
   noticeNotes?: string | null
   deliveryType: string
+  fulfillmentType?: string
+  quantityMode?: string
+  requiresInviteCode?: boolean
   visibility: string
   editorialStatus: "draft" | "published" | "hidden"
   hasPendingChanges: boolean
@@ -114,6 +136,9 @@ interface ProductItem {
     provider: string | null
     providerPrice: number | null
     providerStock: number | null
+    tokenAmountB?: number | null
+    isActive?: boolean
+    sortOrder?: number
     stock: number
     connectionId?: string | null
     connectionName?: string | null
@@ -167,9 +192,13 @@ export function ProductManagerClient({ groups }: Props) {
     warranty: "",
     notes: "",
     deliveryType: "serials",
+    fulfillmentType: "serials",
+    quantityMode: "flexible",
+    requiresInviteCode: false,
     statusOverride: "auto",
     isFeatured: false,
     sortOrder: 1,
+    variants: [] as FormVariantItem[],
   })
   const [saving, setSaving] = useState(false)
   const [confirmBelowCost, setConfirmBelowCost] = useState(false)
@@ -303,6 +332,9 @@ export function ProductManagerClient({ groups }: Props) {
               usageInstructions: p.usageInstructions || p.serviceInstructions || "",
               noticeNotes: p.noticeNotes || "",
               deliveryType: p.deliveryType,
+              fulfillmentType: p.fulfillmentType || "serials",
+              quantityMode: p.quantityMode || "flexible",
+              requiresInviteCode: Boolean(p.requiresInviteCode),
               visibility: p.visibility,
               editorialStatus: p.editorialStatus || (p.visibility === "public" ? "published" : "draft"),
               hasPendingChanges: Boolean(p.hasPendingChanges),
@@ -338,6 +370,9 @@ export function ProductManagerClient({ groups }: Props) {
                 provider: v.provider,
                 providerPrice: v.providerPrice,
                 providerStock: v.providerStock,
+                tokenAmountB: v.tokenAmountB ?? null,
+                isActive: v.isActive !== false,
+                sortOrder: v.sortOrder ?? 0,
                 stock: (v.providerStock ?? 0) + (v._count?.serials ?? 0),
                 connectionId: v.connectionId,
                 connectionName: v.connection?.name || null,
@@ -515,6 +550,17 @@ export function ProductManagerClient({ groups }: Props) {
       initialHighlights = bulletLines.slice(0, 3).join("\n")
     }
 
+    const initialVariants: FormVariantItem[] = (prod.variants || []).map((v, i) => ({
+      id: v.id,
+      name: v.name,
+      tokenAmountB: v.tokenAmountB ?? null,
+      providerPrice: v.providerPrice ?? 0,
+      priceCents: v.priceCents,
+      compareAtPriceCents: v.compareAtPriceCents ?? 0,
+      isActive: v.isActive !== false,
+      sortOrder: v.sortOrder ?? i + 1,
+    }))
+
     setEditForm({
       name: initialName,
       groupId: initialGroup,
@@ -528,9 +574,13 @@ export function ProductManagerClient({ groups }: Props) {
       warranty: initialWarranty,
       notes: initialNotes,
       deliveryType: prod.deliveryType || "serials",
+      fulfillmentType: prod.fulfillmentType || (prod.name.includes("Buff") || prod.name.includes("Muse") ? "buff" : "serials"),
+      quantityMode: prod.quantityMode || (prod.name.includes("Buff") ? "fixed_package" : "flexible"),
+      requiresInviteCode: prod.requiresInviteCode !== undefined ? prod.requiresInviteCode : (prod.name.includes("Buff") || prod.name.includes("Muse")),
       statusOverride: prod.statusOverride || "auto",
       isFeatured: Boolean(prod.isFeatured),
       sortOrder: prod.sortOrder || 1,
+      variants: initialVariants,
     })
     setConfirmBelowCost(false)
   }
@@ -579,6 +629,9 @@ export function ProductManagerClient({ groups }: Props) {
           name: editForm.name,
           groupId: editForm.groupId,
           deliveryType: editForm.deliveryType,
+          fulfillmentType: editForm.fulfillmentType,
+          quantityMode: editForm.quantityMode,
+          requiresInviteCode: editForm.requiresInviteCode,
           statusOverride: editForm.statusOverride,
           sortOrder: Number(editForm.sortOrder) || 1,
           description: fullDesc,
@@ -591,7 +644,19 @@ export function ProductManagerClient({ groups }: Props) {
           action: actionType,
           confirmBelowCost,
           isCustomized: true,
-          variants: mainVariant
+          variants: editForm.variants && editForm.variants.length > 0
+            ? editForm.variants.map((v) => ({
+                id: v.id,
+                name: v.name.trim(),
+                tokenAmountB: v.tokenAmountB ? Number(v.tokenAmountB) : null,
+                providerPrice: v.providerPrice !== undefined ? (v.providerPrice ? Number(v.providerPrice) : null) : null,
+                priceCents: Math.max(0, Math.floor(Number(v.priceCents) || 0)),
+                compareAtPriceCents: v.compareAtPriceCents ? Math.max(0, Math.floor(Number(v.compareAtPriceCents))) : null,
+                isActive: v.isActive !== false,
+                sortOrder: Number(v.sortOrder) || 0,
+                _delete: v._delete,
+              }))
+            : mainVariant
             ? [
                 {
                   id: mainVariant.id,
@@ -1247,7 +1312,21 @@ export function ProductManagerClient({ groups }: Props) {
 
                       {/* Provider Wholesale Price (Giá đại lý) */}
                       <td className="py-3 px-4 tabular-nums whitespace-nowrap">
-                        {mainVariant?.providerPrice ? (
+                        {p.variants.length > 1 ? (
+                          <div>
+                            {(() => {
+                              const activeVariants = p.variants.filter((v) => v.isActive !== false)
+                              const costs = activeVariants.map((v) => v.providerPrice || 0).filter((c) => c > 0)
+                              return costs.length > 0 ? (
+                                <span className="font-semibold text-muted-foreground block text-xs">
+                                  Từ {formatMoney(Math.min(...costs))}
+                                </span>
+                              ) : (
+                                <span className="text-muted-foreground/50 text-xs">—</span>
+                              )
+                            })()}
+                          </div>
+                        ) : mainVariant?.providerPrice ? (
                           <div>
                             <span className="font-semibold text-muted-foreground block text-xs">
                               {formatMoney(mainVariant.providerPrice)}
@@ -1265,14 +1344,36 @@ export function ProductManagerClient({ groups }: Props) {
 
                       {/* Price */}
                       <td className="py-3 px-4 tabular-nums whitespace-nowrap">
-                        <span className="font-bold text-foreground block">
-                          {formatMoney(mainVariant?.priceCents || 0)}
-                        </span>
-                        {mainVariant?.compareAtPriceCents ? (
-                          <span className="text-[10px] text-muted-foreground line-through block font-normal">
-                            {formatMoney(mainVariant.compareAtPriceCents)}
-                          </span>
-                        ) : null}
+                        {p.variants.length > 1 ? (
+                          <div>
+                            {(() => {
+                              const activeVariants = p.variants.filter((v) => v.isActive !== false)
+                              const prices = (activeVariants.length > 0 ? activeVariants : p.variants).map((v) => v.priceCents)
+                              const minP = Math.min(...prices)
+                              return (
+                                <>
+                                  <span className="font-bold text-foreground block">
+                                    Từ {formatMoney(minP)}
+                                  </span>
+                                  <span className="text-[10px] text-primary font-semibold block">
+                                    {p.variants.length} gói lựa chọn
+                                  </span>
+                                </>
+                              )
+                            })()}
+                          </div>
+                        ) : (
+                          <div>
+                            <span className="font-bold text-foreground block">
+                              {formatMoney(mainVariant?.priceCents || 0)}
+                            </span>
+                            {mainVariant?.compareAtPriceCents ? (
+                              <span className="text-[10px] text-muted-foreground line-through block font-normal">
+                                {formatMoney(mainVariant.compareAtPriceCents)}
+                              </span>
+                            ) : null}
+                          </div>
+                        )}
                       </td>
 
                       {/* Stock */}
@@ -1527,9 +1628,9 @@ export function ProductManagerClient({ groups }: Props) {
                     </p>
                   </div>
 
-                  {/* 2. Product Name, Category, Delivery Type & Sort Order */}
+                  {/* 2. Product Name, Category, Delivery & Fulfillment */}
                   <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-                    <div className="sm:col-span-4">
+                    <div className="sm:col-span-5">
                       <label className="block text-muted-foreground font-medium mb-1">
                         Tên sản phẩm trên website *
                       </label>
@@ -1554,7 +1655,7 @@ export function ProductManagerClient({ groups }: Props) {
                       )}
                     </div>
 
-                    <div className="sm:col-span-3">
+                    <div className="sm:col-span-4">
                       <label className="block text-muted-foreground font-medium mb-1">
                         Danh mục nhóm sản phẩm *
                       </label>
@@ -1571,23 +1672,45 @@ export function ProductManagerClient({ groups }: Props) {
                       </select>
                     </div>
 
-                    <div className="sm:col-span-2">
-                      <label className="block text-muted-foreground font-medium mb-1" title="Hình thức phân phối sản phẩm">
-                        Hình thức bán *
+                    <div className="sm:col-span-3">
+                      <label className="block text-muted-foreground font-medium mb-1" title="Kênh xử lý đơn hàng">
+                        Kênh xử lý đơn *
                       </label>
                       <select
-                        value={editForm.deliveryType}
-                        onChange={(e) => setEditForm({ ...editForm, deliveryType: e.target.value })}
-                        className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground text-xs focus:outline-none focus:ring-1 focus:ring-primary font-medium"
+                        value={editForm.fulfillmentType}
+                        onChange={(e) => {
+                          const fType = e.target.value
+                          setEditForm({
+                            ...editForm,
+                            fulfillmentType: fType,
+                            deliveryType: fType === "buff" ? "service" : editForm.deliveryType,
+                            quantityMode: fType === "buff" ? "fixed_package" : editForm.quantityMode,
+                            requiresInviteCode: fType === "buff" ? true : editForm.requiresInviteCode,
+                          })
+                        }}
+                        className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground text-xs focus:outline-none focus:ring-1 focus:ring-primary font-semibold"
                       >
-                        <option value="serials">Kho mã / Key (Tự động)</option>
-                        <option value="fatcat">Đại lý FatCat (API)</option>
-                        <option value="service">Nâng cấp thủ công</option>
-                        <option value="contact">Liên hệ Zalo đặt mua</option>
+                        <option value="serials">Kho mã Key (Tự động)</option>
+                        <option value="buff">🚀 Buff Token Muse AI (API ShopTool)</option>
+                        <option value="service">Dịch vụ thủ công</option>
                       </select>
                     </div>
 
-                    <div className="sm:col-span-2">
+                    <div className="sm:col-span-4">
+                      <label className="block text-muted-foreground font-medium mb-1">
+                        Quy cách số lượng
+                      </label>
+                      <select
+                        value={editForm.quantityMode}
+                        onChange={(e) => setEditForm({ ...editForm, quantityMode: e.target.value })}
+                        className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground text-xs focus:outline-none focus:ring-1 focus:ring-primary font-medium"
+                      >
+                        <option value="flexible">Tùy chọn số lượng (1, 2, 3...)</option>
+                        <option value="fixed_package">Gói cố định (Khóa số lượng = 1 gói)</option>
+                      </select>
+                    </div>
+
+                    <div className="sm:col-span-4">
                       <label className="block text-muted-foreground font-medium mb-1" title="Trạng thái hàng hiển thị cho khách">
                         Trạng thái kho *
                       </label>
@@ -1602,7 +1725,7 @@ export function ProductManagerClient({ groups }: Props) {
                       </select>
                     </div>
 
-                    <div className="sm:col-span-1">
+                    <div className="sm:col-span-2">
                       <label className="block text-muted-foreground font-medium mb-1" title="Số thứ tự ưu tiên hiển thị (1, 2, 3...)">
                         STT
                       </label>
@@ -1615,122 +1738,283 @@ export function ProductManagerClient({ groups }: Props) {
                         title="Số thứ tự hiển thị trên website (1 là đầu tiên, 2, 3...)"
                       />
                     </div>
+
+                    <div className="sm:col-span-2 flex items-center pt-5">
+                      <label className="flex items-center gap-1.5 cursor-pointer text-xs font-medium text-foreground select-none">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(editForm.requiresInviteCode)}
+                          onChange={(e) => setEditForm({ ...editForm, requiresInviteCode: e.target.checked })}
+                          className="size-4 rounded border-border bg-card text-caramel accent-caramel"
+                        />
+                        <span>Cần Invite Code</span>
+                      </label>
+                    </div>
                   </div>
 
-                  {/* 3. Structured Pricing & Discount Indicator */}
+                  {/* 3. Multi-Variant / Tier Management */}
                   <div className="p-3.5 rounded-xl border border-border bg-secondary/20 space-y-3">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-primary block">
-                      Cấu trúc Giá bán &amp; Mức giảm giá
-                    </label>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-border/40">
                       <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <label className="text-muted-foreground font-medium">
-                            Giá bên đại lý (VNĐ)
-                          </label>
-                          {editingProduct.variants[0]?.provider ? (
-                            <span className="text-[10px] text-primary/80 uppercase font-semibold">
-                              {editingProduct.variants[0].provider}
-                            </span>
-                          ) : (
-                            <span className="text-[10px] text-muted-foreground">
-                              (Tự nhập)
-                            </span>
-                          )}
-                        </div>
-                        {editingProduct.variants[0]?.provider ? (
-                          <input
-                            type="text"
-                            readOnly
-                            value={editForm.providerPrice ? `${editForm.providerPrice.toLocaleString("vi-VN")} ₫` : "0 ₫"}
-                            className="w-full p-2.5 rounded-lg border border-border bg-secondary/40 text-muted-foreground text-xs font-mono font-medium focus:outline-none cursor-not-allowed select-none"
-                            title="Giá sỉ từ nhà cung cấp / đại lý (Đồng bộ qua API, không thể sửa tay)"
-                          />
-                        ) : (
-                          <input
-                            type="number"
-                            min={0}
-                            step="any"
-                            value={editForm.providerPrice || 0}
-                            onChange={(e) => setEditForm({ ...editForm, providerPrice: Number(e.target.value) || 0 })}
-                            className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground text-xs font-mono font-bold focus:outline-none focus:ring-1 focus:ring-primary"
-                            placeholder="Nhập giá vốn đại lý..."
-                            title="Giá vốn / giá bên đại lý để tự tính lợi nhuận"
-                          />
+                        <label className="text-[11px] font-bold uppercase tracking-wider text-primary block">
+                          Quản lý các biến thể &amp; Gói sản phẩm ({editForm.variants.filter((v) => !v._delete).length})
+                        </label>
+                        <p className="text-[10.5px] text-muted-foreground mt-0.5">
+                          {editForm.fulfillmentType === "buff"
+                            ? "Cấu hình các gói nạp Token Muse AI (1B, 5B, 10B, 20B, 30B). Mỗi gói có giá bán và dung lượng B thực nạp riêng."
+                            : "Thêm nhiều gói thời hạn hoặc biến thể để khách hàng chọn lựa tại trang thanh toán."}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {editForm.fulfillmentType === "buff" && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const buffVariants: FormVariantItem[] = MUSE_BUFF_STANDARD_PACKAGES.map((pkg, i) => ({
+                                name: pkg.name,
+                                tokenAmountB: pkg.tokenAmountB,
+                                providerPrice: pkg.expectedCost,
+                                priceCents: pkg.defaultPrice,
+                                compareAtPriceCents: pkg.defaultComparePrice || null,
+                                isActive: true,
+                                sortOrder: i + 1,
+                              }))
+                              setEditForm({
+                                ...editForm,
+                                variants: buffVariants,
+                                fulfillmentType: "buff",
+                                quantityMode: "fixed_package",
+                                requiresInviteCode: true,
+                                priceCents: buffVariants[0].priceCents,
+                                compareAtPriceCents: buffVariants[0].compareAtPriceCents || 0,
+                                providerPrice: buffVariants[0].providerPrice || 0,
+                              })
+                            }}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-caramel/50 bg-caramel/10 text-caramel text-[11px] font-bold hover:bg-caramel/20 transition-all cursor-pointer"
+                          >
+                            ⚡ Tạo 5 gói chuẩn Muse AI (1B - 30B)
+                          </button>
                         )}
-                      </div>
 
-                      <div>
-                        <label className="block text-muted-foreground font-medium mb-1">
-                          Giá bán niêm yết (VNĐ) *
-                        </label>
-                        <input
-                          type="number"
-                          required
-                          value={editForm.priceCents}
-                          onChange={(e) => setEditForm({ ...editForm, priceCents: Number(e.target.value) })}
-                          className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground text-xs font-mono font-bold focus:outline-none focus:ring-1 focus:ring-primary"
-                          step="any"
-                          min={0}
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-muted-foreground font-medium mb-1">
-                          Giá ban đầu
-                        </label>
-                        <input
-                          type="number"
-                          value={editForm.compareAtPriceCents || ""}
-                          onChange={(e) => setEditForm({ ...editForm, compareAtPriceCents: Number(e.target.value) })}
-                          className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground text-xs font-mono focus:outline-none focus:ring-1 focus:ring-primary"
-                          step="any"
-                          min={0}
-                          placeholder="Bỏ trống nếu không giảm giá"
-                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const isBuff = editForm.fulfillmentType === "buff"
+                            const nextOrder = editForm.variants.filter((v) => !v._delete).length + 1
+                            const defaultB = isBuff ? 10 : null
+                            const expectedCost = defaultB ? calculateExpectedBuffCost(defaultB) : 0
+                            const newV: FormVariantItem = {
+                              name: isBuff ? `Nạp ${defaultB}B Token Muse AI` : `Biến thể ${nextOrder}`,
+                              tokenAmountB: defaultB,
+                              providerPrice: expectedCost,
+                              priceCents: 50000,
+                              compareAtPriceCents: 70000,
+                              isActive: true,
+                              sortOrder: nextOrder,
+                            }
+                            setEditForm({
+                              ...editForm,
+                              variants: [...editForm.variants, newV],
+                            })
+                          }}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border bg-secondary hover:bg-secondary/80 text-foreground text-[11px] font-semibold transition-all cursor-pointer"
+                        >
+                          + Thêm gói / biến thể
+                        </button>
                       </div>
                     </div>
 
-                    {/* Calculated Indicators */}
-                    <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px]">
-                      {currentDiscountPercent >= 1 ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-500/15 text-rose-300 font-bold border border-rose-500/30">
-                          Mức giảm: -{currentDiscountPercent}%
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground text-[10.5px]">
-                          (Nhập giá ban đầu cao hơn giá bán để hiển thị nhãn giảm giá)
-                        </span>
-                      )}
+                    {/* Variant Cards List */}
+                    <div className="space-y-2.5 pt-1">
+                      {editForm.variants
+                        .filter((v) => !v._delete)
+                        .map((v, vIdx) => {
+                          const diff = (v.compareAtPriceCents || 0) > v.priceCents ? (v.compareAtPriceCents || 0) - v.priceCents : 0
+                          const pct = (v.compareAtPriceCents || 0) > v.priceCents ? Math.floor((diff / (v.compareAtPriceCents || 1)) * 100) : 0
+                          const profit = v.priceCents - (v.providerPrice || 0)
+                          const isBelow = (v.providerPrice || 0) > 0 && v.priceCents < (v.providerPrice || 0)
 
-                      {currentDiff > 0 && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-300 font-semibold border border-emerald-500/30">
-                          Khách tiết kiệm: {formatMoney(currentDiff)}
-                        </span>
-                      )}
-
-                      {editForm.providerPrice > 0 ? (
-                        <span className="text-muted-foreground ml-auto flex items-center gap-1.5 flex-wrap">
-                          <span>Giá sỉ: <strong className="text-foreground">{formatMoney(editForm.providerPrice)}</strong></span>
-                          <span>·</span>
-                          <span>
-                            Lãi:{" "}
-                            <strong
-                              className={
-                                editForm.priceCents >= editForm.providerPrice
-                                  ? "text-emerald-400 font-bold"
-                                  : "text-rose-400 font-bold"
-                              }
+                          return (
+                            <div
+                              key={v.id || `v-item-${vIdx}`}
+                              className={`p-3 rounded-xl border text-xs transition-all space-y-2.5 ${
+                                !v.isActive
+                                  ? "bg-secondary/20 border-border/40 opacity-70"
+                                  : isBelow
+                                  ? "bg-rose-500/5 border-rose-500/30"
+                                  : "bg-secondary/40 border-border hover:border-border/80"
+                              }`}
                             >
-                              {formatMoney(editForm.priceCents - editForm.providerPrice)}
-                              <span className="text-[10px] ml-1 font-normal opacity-85">
-                                ({Math.round(((editForm.priceCents - editForm.providerPrice) / editForm.providerPrice) * 100)}%)
-                              </span>
-                            </strong>
-                          </span>
-                        </span>
-                      ) : null}
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                <div className="flex items-center gap-2 flex-1 min-w-0">
+                                  <span className="size-5 rounded-full bg-secondary border border-border flex items-center justify-center font-mono text-[10px] text-muted-foreground shrink-0">
+                                    {vIdx + 1}
+                                  </span>
+                                  <input
+                                    type="text"
+                                    required
+                                    value={v.name}
+                                    placeholder="Tên gói (VD: Nạp 10B Token Muse AI)"
+                                    onChange={(e) => {
+                                      const updated = [...editForm.variants]
+                                      updated[vIdx] = { ...v, name: e.target.value }
+                                      setEditForm({ ...editForm, variants: updated })
+                                    }}
+                                    className="w-full sm:max-w-xs p-1.5 rounded-lg border border-border bg-background text-foreground text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-primary"
+                                  />
+                                  {editForm.fulfillmentType === "buff" && (
+                                    <div className="flex items-center gap-1 shrink-0">
+                                      <span className="text-[11px] text-muted-foreground font-medium">Lượng nạp:</span>
+                                      <input
+                                        type="number"
+                                        min={1}
+                                        max={100}
+                                        value={v.tokenAmountB || ""}
+                                        placeholder="10"
+                                        onChange={(e) => {
+                                          const bVal = parseInt(e.target.value) || 0
+                                          const updated = [...editForm.variants]
+                                          const autoCost = calculateExpectedBuffCost(bVal)
+                                          updated[vIdx] = {
+                                            ...v,
+                                            tokenAmountB: bVal,
+                                            providerPrice: autoCost,
+                                          }
+                                          setEditForm({ ...editForm, variants: updated })
+                                        }}
+                                        className="w-16 p-1.5 rounded-lg border border-border bg-background text-foreground text-xs font-mono font-bold text-center focus:outline-none focus:ring-1 focus:ring-primary"
+                                        title="Dung lượng nạp thực tế gửi sang đại lý ShopTool (1B = 1 tỷ Token)"
+                                      />
+                                      <span className="text-[11px] font-bold text-caramel">B Token</span>
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                                  <label className="flex items-center gap-1.5 cursor-pointer text-[11px] text-muted-foreground hover:text-foreground select-none">
+                                    <input
+                                      type="checkbox"
+                                      checked={v.isActive}
+                                      onChange={(e) => {
+                                        const updated = [...editForm.variants]
+                                        updated[vIdx] = { ...v, isActive: e.target.checked }
+                                        setEditForm({ ...editForm, variants: updated })
+                                      }}
+                                      className="size-3.5 rounded border-border bg-card text-emerald-500 accent-emerald-500"
+                                    />
+                                    <span>{v.isActive ? "Đang bán" : "Tạm ẩn"}</span>
+                                  </label>
+
+                                  {editForm.variants.filter((item) => !item._delete).length > 1 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const updated = [...editForm.variants]
+                                        if (v.id) {
+                                          updated[vIdx] = { ...v, _delete: true }
+                                        } else {
+                                          updated.splice(vIdx, 1)
+                                        }
+                                        setEditForm({ ...editForm, variants: updated })
+                                      }}
+                                      className="p-1 rounded text-muted-foreground hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                                      title="Xóa biến thể này"
+                                    >
+                                      <Trash2 className="size-3.5" />
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Price inputs for this variant */}
+                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+                                <div>
+                                  <label className="block text-[10.5px] text-muted-foreground font-medium mb-0.5">
+                                    Giá vốn đại lý (VNĐ)
+                                  </label>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    value={v.providerPrice ?? 0}
+                                    onChange={(e) => {
+                                      const updated = [...editForm.variants]
+                                      updated[vIdx] = { ...v, providerPrice: Number(e.target.value) || 0 }
+                                      setEditForm({ ...editForm, variants: updated })
+                                    }}
+                                    className="w-full p-2 rounded-lg border border-border bg-background text-foreground text-xs font-mono font-medium focus:outline-none focus:ring-1 focus:ring-primary"
+                                    placeholder="Giá vốn..."
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="block text-[10.5px] text-muted-foreground font-medium mb-0.5">
+                                    Giá bán niêm yết (VNĐ) *
+                                  </label>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    required
+                                    value={v.priceCents}
+                                    onChange={(e) => {
+                                      const newPrice = Number(e.target.value) || 0
+                                      const updated = [...editForm.variants]
+                                      updated[vIdx] = { ...v, priceCents: newPrice }
+                                      const topPrice = vIdx === 0 ? newPrice : editForm.priceCents
+                                      setEditForm({ ...editForm, variants: updated, priceCents: topPrice })
+                                    }}
+                                    className="w-full p-2 rounded-lg border border-border bg-background text-foreground text-xs font-mono font-bold focus:outline-none focus:ring-1 focus:ring-primary"
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="block text-[10.5px] text-muted-foreground font-medium mb-0.5">
+                                    Giá ban đầu (gạch)
+                                  </label>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    value={v.compareAtPriceCents ?? ""}
+                                    placeholder="Không giảm giá"
+                                    onChange={(e) => {
+                                      const newCompare = Number(e.target.value) || null
+                                      const updated = [...editForm.variants]
+                                      updated[vIdx] = { ...v, compareAtPriceCents: newCompare }
+                                      const topCompare = vIdx === 0 ? (newCompare || 0) : editForm.compareAtPriceCents
+                                      setEditForm({ ...editForm, variants: updated, compareAtPriceCents: topCompare })
+                                    }}
+                                    className="w-full p-2 rounded-lg border border-border bg-background text-foreground text-xs font-mono focus:outline-none focus:ring-1 focus:ring-primary"
+                                  />
+                                </div>
+                              </div>
+
+                              {/* Profit & Status footer for this variant */}
+                              <div className="flex items-center justify-between text-[10.5px] pt-0.5 text-muted-foreground flex-wrap gap-2">
+                                <div className="flex items-center gap-2">
+                                  {pct >= 1 && (
+                                    <span className="text-rose-400 font-bold bg-rose-500/10 px-1.5 py-0.2 rounded border border-rose-500/20">
+                                      -{pct}%
+                                    </span>
+                                  )}
+                                  {diff > 0 && (
+                                    <span>Tiết kiệm: <strong className="text-emerald-400">{formatMoney(diff)}</strong></span>
+                                  )}
+                                </div>
+
+                                <div>
+                                  {(v.providerPrice || 0) > 0 && (
+                                    <span>
+                                      Lợi nhuận:{" "}
+                                      <strong className={profit >= 0 ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
+                                        {formatMoney(profit)}
+                                      </strong>
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        })}
                     </div>
                   </div>
 

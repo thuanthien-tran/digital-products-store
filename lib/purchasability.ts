@@ -67,6 +67,7 @@ export function evaluateVariantPurchasability(params: {
     connectionId?: string | null
     connection?: { isEnabled: boolean } | null
     sourceProduct?: { sourceStatus: string; sourceStock: number } | null
+    isActive?: boolean
   }
   localSerialCount: number
 }): VariantPurchasability {
@@ -75,6 +76,25 @@ export function evaluateVariantPurchasability(params: {
   const minQuantity = Math.max(1, variant.minQuantity ?? 1)
   const maxQuantity = variant.maxQuantity ?? null
   const localStock = Math.max(0, localSerialCount)
+
+  if (variant.isActive === false) {
+    return {
+      variantId: variant.id,
+      productId: product.id,
+      productName: product.name,
+      variantName: variant.name,
+      isPurchasable: false,
+      reason: "admin_suspended",
+      displayStatus: "suspended",
+      userMessage: "Gói này hiện đang tạm ẩn",
+      availableStock: 0,
+      localStock: 0,
+      providerStock: 0,
+      minQuantity,
+      maxQuantity,
+      unitPriceCents: variant.priceCents,
+    }
+  }
 
   // 1. Check Admin Product-Level Controls
   if (product.visibility !== "public") {

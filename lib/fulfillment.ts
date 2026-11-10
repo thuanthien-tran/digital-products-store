@@ -54,9 +54,10 @@ export async function fulfillOrder(
     include: {
       items: {
         include: {
-          product: { select: { deliveryType: true } },
+          product: { select: { deliveryType: true, fulfillmentType: true } },
           variant: {
             select: {
+              tokenAmountB: true,
               provider: true,
               providerProductId: true,
               providerStock: true,
@@ -66,6 +67,7 @@ export async function fulfillOrder(
               connection: { select: { id: true, provider: true, baseUrl: true, apiKeyEncrypted: true, isEnabled: true } },
             },
           },
+          buffFulfillment: true,
           serials: true,
         },
       },
@@ -104,10 +106,143 @@ export async function fulfillOrder(
       item.variant?.connection?.provider === 'shoptoolgiare' ||
       item.variant?.sourceProduct?.provider === 'shoptool' ||
       item.variant?.sourceProduct?.provider === 'shoptoolgiare'
+    const isBuff = Boolean(
+      item.tokenAmountB != null ||
+      item.variant?.tokenAmountB != null ||
+      item.product.fulfillmentType === 'buff' ||
+      item.variant?.sourceProduct?.externalId === 'buff_muse'
+    )
+
+    totalNeeded += item.quantity
+
+    if (isBuff) {
+      // -------------------------------------------------------------
+      // BUFF TOKEN MUSE AI FULFILLMENT (Idempotent & Exact Token B)
+      // -------------------------------------------------------------
+      if (item.buffFulfillment && ['processing', 'succeeded', 'submitting'].includes(item.buffFulfillment.status)) {
+        // Already claimed / submitted to ShopTool - Prevent duplicate API call
+        totalDelivered += item.quantity
+        continue
+      }
+
+      const tokenAmountB = item.tokenAmountB || item.variant?.tokenAmountB || 1
+      let inviteCode = (item.inviteCode || order.inviteCode || '').trim().toUpperCase()
+      if (!inviteCode) {
+        const m = (order.note || '').match(/\b([A-Z0-9]{4,20})\b/i)
+        if (m) inviteCode = m[1].toUpperCase()
+      }
+
+      if (!inviteCode) {
+        await db.order.update({
+          where: { id: orderId },
+          data: {
+            note: `[Chờ khách cung cấp mã mời]: Đơn hàng Buff Token Muse AI cần Mã mời (Invite Code). Vui lòng cập nhật mã mời để hệ thống tự động buff token.`,
+          },
+        })
+        continue
+      }
+
+      try {
+        const { buyShopToolBuff, getShopToolActiveConnection } = await import('./shoptool')
+        const { decryptSecret } = await import('./crypto')
+
+        let shopToolConfig = null
+        if (item.variant?.connection?.isEnabled && item.variant.connection.apiKeyEncrypted) {
+          try {
+            shopToolConfig = {
+              baseUrl: item.variant.connection.baseUrl.trim().replace(/\/+$/, ''),
+              apiKey: decryptSecret(item.variant.connection.apiKeyEncrypted),
+            }
+          } catch {}
+        }
+
+        if (!shopToolConfig) {
+          const activeConn = await getShopToolActiveConnection()
+          shopToolConfig = activeConn.config
+        }
+
+        if (!shopToolConfig) {
+          await db.order.update({
+            where: { id: orderId },
+            data: {
+              note: '[Kênh giao hàng ShopTool chưa kết nối]: Chưa tìm thấy cấu hình đại lý ShopTool Giá Rẻ hợp lệ.',
+            },
+          })
+          continue
+        }
+
+        // Claim work atomically with status: submitting
+        const partnerRef = `${order.code}-${item.id}`
+        let buffRec = item.buffFulfillment
+        if (!buffRec) {
+          buffRec = await db.buffFulfillment.create({
+            data: {
+              orderItemId: item.id,
+              orderId: order.id,
+              inviteCode,
+              tokenAmountB,
+              status: 'submitting',
+              partnerRef,
+            },
+          })
+        } else {
+          await db.buffFulfillment.update({
+            where: { id: buffRec.id },
+            data: { status: 'submitting', errorMessage: null },
+          })
+        }
+
+        // Call provider API with exact capacity in Billions (B)
+        const buffRes = await buyShopToolBuff(shopToolConfig, {
+          invite_code: inviteCode,
+          quantity: tokenAmountB, // Send exact token amount B (e.g. 10 for 10B)
+          mode: 'auto',
+        })
+
+        if (buffRes.success) {
+          await db.buffFulfillment.update({
+            where: { id: buffRec.id },
+            data: {
+              status: 'processing',
+              providerOrderCode: buffRes.order_code,
+              usedMethod: buffRes.used_method,
+              lastCheckedAt: new Date(),
+            },
+          })
+          totalDelivered += item.quantity
+          await db.order.update({
+            where: { id: orderId },
+            data: {
+              note: `[Đã gửi lệnh Buff sang ShopTool thành công]: Mã đơn: ${buffRes.order_code}, Gói: ${tokenAmountB}B Token, Mã mời: ${inviteCode} (${buffRes.used_method === 'credit' ? 'Credit 0đ' : 'Ví VND'}). Tiến trình đang chạy tự động.`,
+            },
+          })
+        } else {
+          const isInsuff = buffRes.isInsufficientBalance || buffRes.isInsufficientCredits
+          await db.buffFulfillment.update({
+            where: { id: buffRec.id },
+            data: {
+              status: 'failed',
+              errorMessage: buffRes.error || 'Lỗi gửi lệnh buff sang đại lý',
+              lastCheckedAt: new Date(),
+            },
+          })
+          await db.order.update({
+            where: { id: orderId },
+            data: {
+              note: `[NGOẠI LỆ NGUỒN HÀNG SHOPTOOL]: ${isInsuff ? 'Ví hoặc Credit của bạn không đủ để buff' : buffRes.error || 'Lỗi gửi lệnh'}. Vui lòng nạp tiền vào ShopTool và bấm Giao lại đơn hàng.`,
+            },
+          })
+        }
+      } catch (buffErr) {
+        const msg = buffErr instanceof Error ? buffErr.message : 'Buff API Exception'
+        console.error(`[Fulfillment Buff Exception]`, msg)
+      }
+      continue
+    }
+
     const isSerialDelivery = item.product.deliveryType === 'serials' || isFatcat || isDino || isShopTool
     const alreadyDelivered = item.serials.length
     const needed = isSerialDelivery ? Math.max(0, item.quantity - alreadyDelivered) : 0
-    totalNeeded += item.quantity
 
     if (needed > 0) {
       // 1. Try local serial inventory first
@@ -360,104 +495,40 @@ export async function fulfillOrder(
             continue
           }
 
-          const isBuffService = shopToolCode.startsWith('buff_') || shopToolCode === 'buff_muse'
+          // Ready-made account buy
+          const buyRes = await buyShopToolAccount(shopToolConfig, {
+            product_code: shopToolCode,
+            quantity: remainingNeeded,
+          })
 
-          if (isBuffService) {
-            // Check invite code from order note or customer note
-            const rawNote = (order.note || '').trim()
-            const match = rawNote.match(/\b([A-Z0-9]{6})\b/i)
-            const inviteCode = match ? match[1].toUpperCase() : rawNote.replace(/[^A-Za-z0-9]/g, '').slice(0, 6).toUpperCase()
-
-            if (inviteCode && inviteCode.length === 6) {
-              const buffRes = await buyShopToolBuff(shopToolConfig, {
-                invite_code: inviteCode,
-                quantity: remainingNeeded,
-                mode: 'auto',
-              })
-
-              if (buffRes.success) {
-                const deliveryNote = `[ShopTool #${buffRes.order_code}]: Đã kích hoạt lệnh Buff ${remainingNeeded}B Token thành công vào mã mời [${inviteCode}] qua (${buffRes.used_method === 'credit' ? 'Credit 0đ' : 'Ví VND'}). Hệ thống đang chạy tự động!`
-                await db.serial.create({
-                  data: {
-                    variantId: item.variantId,
-                    orderItemId: item.id,
-                    content: deliveryNote,
-                    status: 'sold',
-                  },
-                })
-                totalDelivered += alreadyDelivered + localDelivered + remainingNeeded
-                await db.order.update({
-                  where: { id: orderId },
-                  data: {
-                    note: `[Đã gửi lệnh Buff sang ShopTool thành công]: Mã đơn: ${buffRes.order_code}, Mã mời: ${inviteCode}`,
-                  },
-                })
-              } else {
-                const noteMsg = buffRes.isInsufficientBalance || buffRes.isInsufficientCredits
-                  ? `[NGOẠI LỆ NGUỒN HÀNG SHOPTOOL]: Ví hoặc Credit của bạn không đủ để buff (${buffRes.error}). Vui lòng nạp tiền vào ShopTool và bấm Giao Lại đơn hàng.`
-                  : `[NGOẠI LỆ NGUỒN HÀNG SHOPTOOL]: Đại lý báo lỗi "${buffRes.error}". Chờ đối soát thủ công.`
-
-                await db.order.update({
-                  where: { id: orderId },
-                  data: { note: noteMsg },
-                })
-                totalDelivered += alreadyDelivered + localDelivered
-              }
-            } else {
-              // Missing or invalid invite code
-              const deliveryNote = `[Chờ khách cung cấp mã mời]: Đơn hàng Buff Token cần Mã mời (Invite code 6 ký tự). Vui lòng nhắn tin mã mời qua CSKH hoặc cập nhật ghi chú đơn hàng để hệ thống tự động kích hoạt.`
+          if (buyRes.success && buyRes.credentials && buyRes.credentials.length > 0) {
+            for (const cred of buyRes.credentials) {
               await db.serial.create({
                 data: {
                   variantId: item.variantId,
                   orderItemId: item.id,
-                  content: deliveryNote,
+                  content: cred,
                   status: 'sold',
                 },
               })
-              totalDelivered += alreadyDelivered + localDelivered + remainingNeeded
-              await db.order.update({
-                where: { id: orderId },
-                data: {
-                  note: `[Cần Mã Mời (Invite Code)]: Khách chưa cung cấp mã mời 6 ký tự để buff tự động.`,
-                },
-              })
             }
-          } else {
-            // Ready-made account buy
-            const buyRes = await buyShopToolAccount(shopToolConfig, {
-              product_code: shopToolCode,
-              quantity: remainingNeeded,
+            totalDelivered += alreadyDelivered + localDelivered + buyRes.credentials.length
+            await db.order.update({
+              where: { id: orderId },
+              data: {
+                note: `[Đã mua tài khoản từ ShopTool thành công]: Mã đơn: ${buyRes.order_code}`,
+              },
             })
+          } else {
+            const noteMsg = buyRes.isInsufficientBalance
+              ? `[NGOẠI LỆ NGUỒN HÀNG SHOPTOOL]: Số dư ví ShopTool không đủ để mua tài khoản (${buyRes.error}). Vui lòng nạp tiền vào ShopTool và bấm Giao Lại đơn hàng.`
+              : `[NGOẠI LỆ NGUỒN HÀNG SHOPTOOL]: Đại lý báo lỗi "${buyRes.error || 'Mua thất bại'}".`
 
-            if (buyRes.success && buyRes.credentials && buyRes.credentials.length > 0) {
-              for (const cred of buyRes.credentials) {
-                await db.serial.create({
-                  data: {
-                    variantId: item.variantId,
-                    orderItemId: item.id,
-                    content: cred,
-                    status: 'sold',
-                  },
-                })
-              }
-              totalDelivered += alreadyDelivered + localDelivered + buyRes.credentials.length
-              await db.order.update({
-                where: { id: orderId },
-                data: {
-                  note: `[Đã mua tài khoản từ ShopTool thành công]: Mã đơn: ${buyRes.order_code}`,
-                },
-              })
-            } else {
-              const noteMsg = buyRes.isInsufficientBalance
-                ? `[NGOẠI LỆ NGUỒN HÀNG SHOPTOOL]: Số dư ví ShopTool không đủ để mua tài khoản (${buyRes.error}). Vui lòng nạp tiền vào ShopTool và bấm Giao Lại đơn hàng.`
-                : `[NGOẠI LỆ NGUỒN HÀNG SHOPTOOL]: Đại lý báo lỗi "${buyRes.error || 'Mua thất bại'}".`
-
-              await db.order.update({
-                where: { id: orderId },
-                data: { note: noteMsg },
-              })
-              totalDelivered += alreadyDelivered + localDelivered
-            }
+            await db.order.update({
+              where: { id: orderId },
+              data: { note: noteMsg },
+            })
+            totalDelivered += alreadyDelivered + localDelivered
           }
         } catch (shopToolErr) {
           const msg = shopToolErr instanceof Error ? shopToolErr.message : 'ShopTool API Exception'
@@ -547,5 +618,64 @@ export async function releaseOrderSerials(
       },
     })
     return { releasedCount: serials.length, revokedCount: 0 }
+  }
+}
+
+/**
+ * Tra cứu và đồng bộ tiến độ nạp Token Muse AI từ đại lý ShopTool Giá Rẻ
+ */
+export async function syncBuffFulfillmentsForOrder(orderId: string): Promise<void> {
+  try {
+    const buffItems = await prisma.buffFulfillment.findMany({
+      where: { orderId, status: { in: ['submitting', 'processing'] } },
+    })
+    if (buffItems.length === 0) return
+
+    const { getShopToolActiveConnection, getShopToolBuffStatus } = await import('./shoptool')
+    const { config } = await getShopToolActiveConnection()
+    if (!config) return
+
+    for (const item of buffItems) {
+      if (!item.providerOrderCode) continue
+      try {
+        const res = await getShopToolBuffStatus(config, item.providerOrderCode)
+        if (res.success && res.data) {
+          const st = String(res.data.status || res.data.order?.status || '').toLowerCase()
+          const completedAmount = Number(res.data.completed_quantity ?? res.data.completed ?? item.tokenAmountB)
+
+          if (st === 'completed' || st === 'success' || st === 'done') {
+            await prisma.buffFulfillment.update({
+              where: { id: item.id },
+              data: {
+                status: 'succeeded',
+                completedB: completedAmount || item.tokenAmountB,
+                lastCheckedAt: new Date(),
+              },
+            })
+          } else if (st === 'failed' || st === 'cancelled' || st === 'canceled') {
+            await prisma.buffFulfillment.update({
+              where: { id: item.id },
+              data: {
+                status: 'failed',
+                errorMessage: res.data.error || res.data.message || 'Đại lý báo thất bại',
+                lastCheckedAt: new Date(),
+              },
+            })
+          } else {
+            await prisma.buffFulfillment.update({
+              where: { id: item.id },
+              data: {
+                completedB: completedAmount || item.completedB,
+                lastCheckedAt: new Date(),
+              },
+            })
+          }
+        }
+      } catch (err) {
+        console.error('[syncBuffFulfillmentsForOrder Exception]', err)
+      }
+    }
+  } catch (err) {
+    console.error('[syncBuffFulfillmentsForOrder Outer Exception]', err)
   }
 }

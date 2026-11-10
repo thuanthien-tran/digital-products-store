@@ -24,13 +24,41 @@ export async function ensureDatabaseSchema(): Promise<void> {
           `PRAGMA table_info("Product");`
         )
         if (Array.isArray(tableInfo) && tableInfo.length > 0) {
-          const hasIsFeatured = tableInfo.some((col) => col.name === 'isFeatured')
-          if (!hasIsFeatured) {
+          const cols = new Set(tableInfo.map((col) => col.name))
+          if (!cols.has('isFeatured')) {
             console.log('[AutoMigration] Adding missing isFeatured column to Product table...')
             await prisma.$executeRawUnsafe(
               `ALTER TABLE "Product" ADD COLUMN "isFeatured" BOOLEAN NOT NULL DEFAULT 0;`
             )
-            console.log('[AutoMigration] Successfully added isFeatured column to Product table')
+          }
+          if (!cols.has('fulfillmentType')) {
+            await prisma.$executeRawUnsafe(
+              `ALTER TABLE "Product" ADD COLUMN "fulfillmentType" TEXT NOT NULL DEFAULT 'serials';`
+            )
+          }
+          if (!cols.has('quantityMode')) {
+            await prisma.$executeRawUnsafe(
+              `ALTER TABLE "Product" ADD COLUMN "quantityMode" TEXT NOT NULL DEFAULT 'flexible';`
+            )
+          }
+          if (!cols.has('requiresInviteCode')) {
+            await prisma.$executeRawUnsafe(
+              `ALTER TABLE "Product" ADD COLUMN "requiresInviteCode" BOOLEAN NOT NULL DEFAULT 0;`
+            )
+          }
+        }
+
+        // Check Variant table columns
+        const variantTableInfo = await prisma.$queryRawUnsafe<Array<{ name: string }>>(
+          `PRAGMA table_info("Variant");`
+        )
+        if (Array.isArray(variantTableInfo) && variantTableInfo.length > 0) {
+          const cols = new Set(variantTableInfo.map((c) => c.name))
+          if (!cols.has('tokenAmountB')) {
+            await prisma.$executeRawUnsafe(`ALTER TABLE "Variant" ADD COLUMN "tokenAmountB" INTEGER;`)
+          }
+          if (!cols.has('isActive')) {
+            await prisma.$executeRawUnsafe(`ALTER TABLE "Variant" ADD COLUMN "isActive" BOOLEAN NOT NULL DEFAULT 1;`)
           }
         }
 
@@ -83,6 +111,9 @@ export async function ensureDatabaseSchema(): Promise<void> {
           if (!cols.has('idempotencyKey')) {
             await prisma.$executeRawUnsafe(`ALTER TABLE "Order" ADD COLUMN "idempotencyKey" TEXT;`)
           }
+          if (!cols.has('inviteCode')) {
+            await prisma.$executeRawUnsafe(`ALTER TABLE "Order" ADD COLUMN "inviteCode" TEXT;`)
+          }
         }
 
         // Check OrderItem table columns
@@ -94,7 +125,37 @@ export async function ensureDatabaseSchema(): Promise<void> {
           if (!cols.has('discountCents')) {
             await prisma.$executeRawUnsafe(`ALTER TABLE "OrderItem" ADD COLUMN "discountCents" INTEGER NOT NULL DEFAULT 0;`)
           }
+          if (!cols.has('tokenAmountB')) {
+            await prisma.$executeRawUnsafe(`ALTER TABLE "OrderItem" ADD COLUMN "tokenAmountB" INTEGER;`)
+          }
+          if (!cols.has('inviteCode')) {
+            await prisma.$executeRawUnsafe(`ALTER TABLE "OrderItem" ADD COLUMN "inviteCode" TEXT;`)
+          }
         }
+
+        // Check BuffFulfillment table
+        await prisma.$executeRawUnsafe(`
+          CREATE TABLE IF NOT EXISTS "BuffFulfillment" (
+            "id" TEXT NOT NULL PRIMARY KEY,
+            "orderItemId" TEXT NOT NULL UNIQUE,
+            "orderId" TEXT NOT NULL,
+            "inviteCode" TEXT NOT NULL,
+            "tokenAmountB" INTEGER NOT NULL,
+            "completedB" INTEGER,
+            "status" TEXT NOT NULL DEFAULT 'pending',
+            "usedMethod" TEXT,
+            "providerOrderCode" TEXT,
+            "partnerRef" TEXT,
+            "lastCheckedAt" DATETIME,
+            "errorMessage" TEXT,
+            "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY ("orderItemId") REFERENCES "OrderItem" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+          );
+        `)
+        await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "BuffFulfillment_status_idx" ON "BuffFulfillment"("status");`)
+        await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "BuffFulfillment_orderId_idx" ON "BuffFulfillment"("orderId");`)
+        await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "BuffFulfillment_providerOrderCode_idx" ON "BuffFulfillment"("providerOrderCode");`)
         globalForPrisma.schemaEnsured = true
       } catch (err) {
         console.error('[AutoMigration] Failed to verify/migrate schema:', err)

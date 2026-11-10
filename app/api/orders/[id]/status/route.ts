@@ -15,6 +15,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
           include: {
             product: { select: { name: true, serviceInstructions: true } },
             variant: { select: { name: true } },
+            buffFulfillment: true,
             serials: { select: { content: true } },
           },
         },
@@ -55,6 +56,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
                 include: {
                   product: { select: { name: true, serviceInstructions: true } },
                   variant: { select: { name: true } },
+                  buffFulfillment: true,
                   serials: { select: { content: true } },
                 },
               },
@@ -81,11 +83,12 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     // Self-healing: if order is fully paid but fulfillment is pending or interrupted, auto-fulfill
     if (!isExpired && (currentStatus === "pending" || currentStatus === "processing") && totalPaid >= order.totalCents) {
       try {
-        const { fulfillOrder } = await import("@/lib/fulfillment")
+        const { fulfillOrder, syncBuffFulfillmentsForOrder } = await import("@/lib/fulfillment")
         const fRes = await fulfillOrder(order.id)
+        await syncBuffFulfillmentsForOrder(order.id)
         if (fRes.status) {
           currentStatus = fRes.status
-          // Re-fetch fresh serials
+          // Re-fetch fresh serials & buff fulfillment
           const refreshed = await prisma.order.findUnique({
             where: { id: order.id },
             include: {
@@ -93,6 +96,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
                 include: {
                   product: { select: { name: true, serviceInstructions: true } },
                   variant: { select: { name: true } },
+                  buffFulfillment: true,
                   serials: { select: { content: true } },
                 },
               },
@@ -105,6 +109,11 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       } catch (fErr) {
         console.error("[Auto-Fulfillment on Status Poll Error]:", fErr)
       }
+    } else if (currentStatus === "paid") {
+      try {
+        const { syncBuffFulfillmentsForOrder } = await import("@/lib/fulfillment")
+        await syncBuffFulfillmentsForOrder(order.id)
+      } catch {}
     }
 
     const expiresAt = new Date(new Date(order.createdAt).getTime() + ORDER_EXPIRY_MS).toISOString()
@@ -123,11 +132,22 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         const serialContents = item.serials.map((s) => s.content)
         // INVARIANT: Reveal serials only if order is paid AND requester is verified owner or admin
         const isPaid = currentStatus === "paid"
+        const buff = (item as any).buffFulfillment
         return {
           productName: item.product.name,
           variantName: item.variant.name,
           priceCents: item.priceCents,
           quantity: item.quantity,
+          tokenAmountB: (item as any).tokenAmountB ?? null,
+          inviteCode: hasOrderAccess ? (item as any).inviteCode : ((item as any).inviteCode ? `${(item as any).inviteCode.slice(0, 2)}***` : null),
+          buffFulfillment: buff ? {
+            status: buff.status,
+            tokenAmountB: buff.tokenAmountB,
+            completedB: buff.completedB,
+            providerOrderCode: buff.providerOrderCode,
+            inviteCode: hasOrderAccess ? buff.inviteCode : `${buff.inviteCode.slice(0, 2)}***`,
+            errorMessage: buff.errorMessage,
+          } : null,
           serials: isPaid && hasOrderAccess ? serialContents : [],
           serial: isPaid && hasOrderAccess ? serialContents.join("\n") || null : null,
           serviceInstructions: item.product.serviceInstructions,
