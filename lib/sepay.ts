@@ -1,5 +1,6 @@
 import { prisma } from "./db"
 import { fulfillOrder } from "./fulfillment"
+import { redeemCouponReservation } from "./coupon-service"
 
 export interface SepayNormalizedTransaction {
   id: string
@@ -220,6 +221,10 @@ export async function reconcileOrderWithSepay(orderId: string): Promise<{
         where: { id: order.id },
         data: { status: fullyPaid ? "processing" : "partially_paid" },
       })
+
+      if (fullyPaid) {
+        await redeemCouponReservation(order.id, tx)
+      }
     })
   } else {
     newlyRecordedAmount = order.payments.reduce((sum, p) => sum + p.amount, 0)

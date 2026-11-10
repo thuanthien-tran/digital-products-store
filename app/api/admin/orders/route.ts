@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { verifyAdminRequest } from "@/lib/auth"
 import { validateStatusTransition, fulfillOrder, releaseOrderSerials } from "@/lib/fulfillment"
+import { redeemCouponReservation, releaseCouponReservation } from "@/lib/coupon-service"
 
 export async function PATCH(req: Request) {
   try {
@@ -152,6 +153,7 @@ export async function PATCH(req: Request) {
 
         if (totalPaid >= currentOrder.totalCents) {
           // Fully paid: mark processing so external provider fulfillment can run safely outside transaction
+          await redeemCouponReservation(currentOrder.id, tx)
           return tx.order.update({
             where: { id: orderId },
             data: { status: "processing" },
@@ -191,6 +193,7 @@ export async function PATCH(req: Request) {
 
         // Quarantine serials if order was paid, refunded, or processing (assigned/delivered)
         await releaseOrderSerials(currentOrder.id, false, tx)
+        await releaseCouponReservation(currentOrder.id, tx, "admin_cancelled")
 
         return tx.order.update({
           where: { id: orderId },
@@ -303,6 +306,10 @@ export async function GET(req: Request) {
         id: o.id,
         code: o.code,
         email: o.email,
+        subtotalCents: o.subtotalCents ?? o.totalCents,
+        discountCents: o.discountCents ?? 0,
+        couponCode: o.couponCode || null,
+        couponSnapshot: o.couponSnapshot || null,
         totalCents: o.totalCents,
         paidAmount,
         status: o.status,

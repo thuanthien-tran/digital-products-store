@@ -51,6 +51,8 @@ model Product {
   variants            Variant[]
   orderItems          OrderItem[]
   sourceProduct       SourceProduct?
+  couponProducts         CouponProduct[]
+  couponExcludedProducts CouponExcludedProduct[]
 }
 
 model Variant {
@@ -76,6 +78,8 @@ model Variant {
   updatedAt           DateTime            @updatedAt
   serials             Serial[]
   orderItems          OrderItem[]
+  couponVariants         CouponVariant[]
+  couponExcludedVariants CouponExcludedVariant[]
 }
 
 model Serial {
@@ -90,20 +94,29 @@ model Serial {
 }
 
 model Order {
-  id          String      @id @default(cuid())
-  code        String      @unique // Payment reference (e.g., AG1234)
-  email       String
-  totalCents  Int
-  status      String      @default("pending") // "pending" | "partially_paid" | "paid" | "processing" | "cancelled"
-  accessToken String?     // Secret viewer token (anti-scraping)
-  resellerId  String?     // Tenant identity for reseller isolation
-  note        String?
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  items       OrderItem[]
-  payments    Payment[]
+  id              String            @id @default(cuid())
+  code            String            @unique // Payment reference (e.g., AG1234)
+  email           String
+  subtotalCents   Int               @default(0) // Total price of items before coupon
+  discountCents   Int               @default(0) // Total discount amount applied
+  totalCents      Int               // Final payable amount (subtotal - discount)
+  status          String            @default("pending") // "pending" | "partially_paid" | "paid" | "processing" | "cancelled"
+  accessToken     String?           // Secret viewer token (anti-scraping)
+  resellerId      String?           // Tenant identity for reseller isolation
+  note            String?
+  couponId        String?
+  couponCode      String?
+  couponSnapshot  String?           // JSON snapshot of applied coupon & breakdown
+  idempotencyKey  String?           @unique // Idempotent checkout key
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  items           OrderItem[]
+  payments        Payment[]
+  coupon          Coupon?           @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  redemption      CouponRedemption?
 
   @@index([resellerId])
+  @@index([couponId])
 }
 
 model OrderItem {
@@ -116,6 +129,7 @@ model OrderItem {
   variant        Variant  @relation(fields: [variantId], references: [id])
   quantity       Int      @default(1)
   priceCents     Int
+  discountCents  Int      @default(0) // Allocated coupon discount for this line
   productName    String?
   variantName    String?
   connectionId   String?  // Historical connection reference at order time
@@ -267,4 +281,105 @@ model SiteSettings {
   version            Int      @default(1)
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
+}
+
+model Coupon {
+  id                String                  @id @default(cuid())
+  code              String                  @unique // Standardized uppercase (e.g., CAPY5K)
+  name              String                  // Internal campaign name / description
+  discountType      String                  // "fixed" | "percent"
+  discountValue     Int                     // Amount in VND or percent value (1-100)
+  maxDiscountAmount Int?                    // Max discount in VND for percent type (mandatory for percent)
+  minOrderAmount    Int?                    // Min eligible subtotal in VND
+  scope             String                  @default("all") // "all" | "products" | "variants"
+  startDate         DateTime?
+  endDate           DateTime?
+  usageLimit        Int?                    // Global usage quota across all users
+  perEmailLimit     Int?                    // Usage quota per normalized email
+  usedCount         Int                     @default(0) // Fast counter reconciled with CouponRedemption
+  status            String                  @default("active") // "draft" | "active" | "paused" | "archived"
+  version           Int                     @default(1) // Optimistic concurrency lock
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+  orders            Order[]
+  redemptions       CouponRedemption[]
+  auditLogs         CouponAuditLog[]
+  products          CouponProduct[]
+  variants          CouponVariant[]
+  excludedProducts  CouponExcludedProduct[]
+  excludedVariants  CouponExcludedVariant[]
+
+  @@index([status, startDate, endDate])
+}
+
+model CouponProduct {
+  id        String   @id @default(cuid())
+  couponId  String
+  coupon    Coupon   @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([couponId, productId])
+}
+
+model CouponVariant {
+  id        String   @id @default(cuid())
+  couponId  String
+  coupon    Coupon   @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  variantId String
+  variant   Variant  @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@unique([couponId, variantId])
+}
+
+model CouponExcludedProduct {
+  id        String   @id @default(cuid())
+  couponId  String
+  coupon    Coupon   @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([couponId, productId])
+}
+
+model CouponExcludedVariant {
+  id        String   @id @default(cuid())
+  couponId  String
+  coupon    Coupon   @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  variantId String
+  variant   Variant  @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@unique([couponId, variantId])
+}
+
+model CouponRedemption {
+  id             String    @id @default(cuid())
+  couponId       String
+  coupon         Coupon    @relation(fields: [couponId], references: [id], onDelete: Restrict)
+  orderId        String    @unique // Guaranteed strictly 1 redemption record per order
+  order          Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  email          String    // Normalized lowercase email
+  discountAmount Int       // Actual discount in VND
+  status         String    @default("reserved") // "reserved" | "redeemed" | "released"
+  reservedAt     DateTime  @default(now())
+  redeemedAt     DateTime?
+  releasedAt     DateTime?
+  releaseReason  String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([couponId, email])
+  @@index([couponId, status])
+}
+
+model CouponAuditLog {
+  id        String   @id @default(cuid())
+  couponId  String
+  coupon    Coupon   @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  actor     String   // Admin username or "system"
+  action    String   // "create" | "update" | "pause" | "activate" | "archive" | "adjust_quota" | "release_redemption"
+  diff      String?  // JSON string before / after
+  createdAt DateTime @default(now())
+
+  @@index([couponId, createdAt])
 }

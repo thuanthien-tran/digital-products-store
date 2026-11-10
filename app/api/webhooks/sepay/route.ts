@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache"
 import crypto from "crypto"
 import { prisma } from "@/lib/db"
 import { fulfillOrder } from "@/lib/fulfillment"
+import { redeemCouponReservation } from "@/lib/coupon-service"
 
 function timingSafeCompare(a: string, b: string): boolean {
   try {
@@ -232,6 +233,10 @@ export async function POST(req: Request) {
         where: { id: freshOrder.id },
         data: { status: newStatus },
       })
+
+      if (fullyPaid) {
+        await redeemCouponReservation(freshOrder.id, tx)
+      }
 
       return {
         orderId: freshOrder.id,

@@ -17,7 +17,8 @@ import {
   FileText, 
   Lock, 
   X, 
-  CheckCircle2 
+  CheckCircle2,
+  Ticket
 } from "lucide-react"
 
 export interface PaymentItem {
@@ -33,6 +34,10 @@ export interface OrderItem {
   id: string
   code: string
   email: string
+  subtotalCents?: number
+  discountCents?: number
+  couponCode?: string | null
+  couponSnapshot?: string | null
   totalCents: number
   paidAmount?: number
   status: string
@@ -387,7 +392,20 @@ export function OrderManagerClient({ orders }: { orders: OrderItem[] }) {
                 </div>
 
                 <div className="flex items-center gap-3">
-                  <span className="text-sm font-black text-primary">{formatPrice(order.totalCents)}</span>
+                  {order.couponCode && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-caramel/15 text-caramel border border-caramel/30 font-mono">
+                      <Ticket className="size-3" />
+                      {order.couponCode} (-{formatPrice(order.discountCents || 0)})
+                    </span>
+                  )}
+                  <div className="text-right">
+                    {order.discountCents && order.discountCents > 0 ? (
+                      <span className="text-[10px] text-muted-foreground line-through block tabular-nums">
+                        {formatPrice(order.subtotalCents || order.totalCents)}
+                      </span>
+                    ) : null}
+                    <span className="text-sm font-black text-primary tabular-nums">{formatPrice(order.totalCents)}</span>
+                  </div>
                   <a
                     href={`/order/${order.id}`}
                     target="_blank"

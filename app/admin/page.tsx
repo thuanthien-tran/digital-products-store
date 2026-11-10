@@ -14,7 +14,7 @@ export default async function AdminDashboardPage() {
       where: {
         status: { in: ["paid", "processing"] },
       },
-      select: { totalCents: true, status: true },
+      select: { totalCents: true, discountCents: true, status: true },
     }),
     prisma.serial.count(),
     prisma.serial.count({ where: { status: "available" } }),
@@ -42,13 +42,16 @@ export default async function AdminDashboardPage() {
   ])
 
   const totalRevenue = paidOrders.reduce((sum, order) => sum + order.totalCents, 0)
+  const totalDiscount = paidOrders.reduce((sum, order) => sum + (order.discountCents || 0), 0)
   const alertVariants = lowStockVariants.filter(v => v._count.serials < 3)
 
   const stats = [
     {
       title: "Tổng Doanh Thu",
       value: formatPrice(totalRevenue),
-      desc: `${paidOrders.length} đơn hoàn tất / đã thanh toán`,
+      desc: totalDiscount > 0
+        ? `${paidOrders.length} đơn hoàn tất (Ưu đãi: -${formatPrice(totalDiscount)})`
+        : `${paidOrders.length} đơn hoàn tất / đã thanh toán`,
       icon: DollarSign,
       color: "text-emerald-400",
       bg: "bg-emerald-500/10 border-emerald-500/20",

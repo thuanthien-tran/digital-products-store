@@ -13,6 +13,9 @@ interface OrderStatusProps {
   initialStatus: string
   createdAt?: string
   orderCode: string
+  subtotalCents?: number
+  discountCents?: number
+  couponCode?: string | null
   totalCents: number
   totalPaid?: number
   remainingCents?: number
@@ -37,6 +40,9 @@ export function OrderStatus({
   initialStatus,
   createdAt,
   orderCode,
+  subtotalCents,
+  discountCents = 0,
+  couponCode,
   totalCents,
   totalPaid: initialTotalPaid = 0,
   remainingCents: initialRemainingCents,
@@ -258,6 +264,24 @@ export function OrderStatus({
           })}
         </div>
 
+        {/* Chi tiết thanh toán & mã giảm giá */}
+        <div className="rounded-xl border border-border/70 bg-card p-4 space-y-2 text-xs">
+          <div className="flex items-center justify-between text-muted-foreground">
+            <span>Tạm tính:</span>
+            <span className="tabular-nums font-medium text-foreground">{formatPrice(subtotalCents || totalCents)}</span>
+          </div>
+          {discountCents > 0 && (
+            <div className="flex items-center justify-between text-emerald-400 font-medium">
+              <span>Mã giảm giá {couponCode ? `(${couponCode})` : ""}:</span>
+              <span className="tabular-nums">−{formatPrice(discountCents)}</span>
+            </div>
+          )}
+          <div className="pt-2 border-t border-border/50 flex items-center justify-between font-bold text-sm">
+            <span className="text-foreground">Tổng đã thanh toán:</span>
+            <span className="text-emerald-400 tabular-nums">{formatPrice(totalCents)}</span>
+          </div>
+        </div>
+
         <p className="text-center text-xs text-muted-foreground">
           Bạn có thể đánh dấu lưu lại đường dẫn này hoặc kiểm tra hộp thư email <span className="font-medium text-foreground">{email}</span> để xem lại thông tin đơn hàng bất kỳ lúc nào.
         </p>
@@ -464,6 +488,12 @@ export function OrderStatus({
                   { label: "Số tiền cần chuyển thêm", value: formatPrice(remainingCents), copyVal: remainingCents.toString(), key: "remainingAmount", isCode: true },
                 ]
               : [
+                  ...(discountCents > 0
+                    ? [
+                        { label: "Tạm tính", value: formatPrice(subtotalCents || totalCents), copyVal: (subtotalCents || totalCents).toString(), key: "subtotal" },
+                        { label: `Mã giảm giá ${couponCode ? `(${couponCode})` : ""}`, value: `-${formatPrice(discountCents)}`, copyVal: discountCents.toString(), key: "discount" },
+                      ]
+                    : []),
                   { label: "Số tiền chuyển", value: formatPrice(totalCents), copyVal: totalCents.toString(), key: "amount" },
                 ]),
             { label: "Nội dung chuyển khoản", value: orderCode, copyVal: orderCode, key: "code", isCode: true },

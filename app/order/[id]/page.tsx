@@ -128,6 +128,9 @@ export default async function OrderPage({ params, searchParams }: Props) {
           initialStatus={initialStatus}
           createdAt={order.createdAt.toISOString()}
           orderCode={order.code}
+          subtotalCents={order.subtotalCents ?? order.totalCents}
+          discountCents={order.discountCents ?? 0}
+          couponCode={order.couponCode || null}
           totalCents={order.totalCents}
           totalPaid={totalPaid}
           remainingCents={remainingCents}

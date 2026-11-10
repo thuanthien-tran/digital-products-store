@@ -56,6 +56,45 @@ export async function ensureDatabaseSchema(): Promise<void> {
             await prisma.$executeRawUnsafe(`ALTER TABLE "SiteSettings" ADD COLUMN "heroCtaText" TEXT DEFAULT 'Khám phá các gói';`)
           }
         }
+
+        // Check Order table columns & backfill
+        const orderTableInfo = await prisma.$queryRawUnsafe<Array<{ name: string }>>(
+          `PRAGMA table_info("Order");`
+        )
+        if (Array.isArray(orderTableInfo) && orderTableInfo.length > 0) {
+          const cols = new Set(orderTableInfo.map((c) => c.name))
+          if (!cols.has('subtotalCents')) {
+            await prisma.$executeRawUnsafe(`ALTER TABLE "Order" ADD COLUMN "subtotalCents" INTEGER NOT NULL DEFAULT 0;`)
+            // Backfill existing orders: subtotalCents = totalCents
+            await prisma.$executeRawUnsafe(`UPDATE "Order" SET "subtotalCents" = "totalCents" WHERE "subtotalCents" = 0;`)
+          }
+          if (!cols.has('discountCents')) {
+            await prisma.$executeRawUnsafe(`ALTER TABLE "Order" ADD COLUMN "discountCents" INTEGER NOT NULL DEFAULT 0;`)
+          }
+          if (!cols.has('couponId')) {
+            await prisma.$executeRawUnsafe(`ALTER TABLE "Order" ADD COLUMN "couponId" TEXT;`)
+          }
+          if (!cols.has('couponCode')) {
+            await prisma.$executeRawUnsafe(`ALTER TABLE "Order" ADD COLUMN "couponCode" TEXT;`)
+          }
+          if (!cols.has('couponSnapshot')) {
+            await prisma.$executeRawUnsafe(`ALTER TABLE "Order" ADD COLUMN "couponSnapshot" TEXT;`)
+          }
+          if (!cols.has('idempotencyKey')) {
+            await prisma.$executeRawUnsafe(`ALTER TABLE "Order" ADD COLUMN "idempotencyKey" TEXT;`)
+          }
+        }
+
+        // Check OrderItem table columns
+        const orderItemTableInfo = await prisma.$queryRawUnsafe<Array<{ name: string }>>(
+          `PRAGMA table_info("OrderItem");`
+        )
+        if (Array.isArray(orderItemTableInfo) && orderItemTableInfo.length > 0) {
+          const cols = new Set(orderItemTableInfo.map((c) => c.name))
+          if (!cols.has('discountCents')) {
+            await prisma.$executeRawUnsafe(`ALTER TABLE "OrderItem" ADD COLUMN "discountCents" INTEGER NOT NULL DEFAULT 0;`)
+          }
+        }
         globalForPrisma.schemaEnsured = true
       } catch (err) {
         console.error('[AutoMigration] Failed to verify/migrate schema:', err)

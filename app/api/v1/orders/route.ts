@@ -144,7 +144,14 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json()
-    const { email, variantId, quantity = 1 } = body
+    const { email, variantId, quantity = 1, couponCode } = body
+
+    if (couponCode !== undefined && couponCode !== null && String(couponCode).trim() !== "") {
+      return NextResponse.json(
+        { success: false, error: "API đối tác (v1) hiện chưa hỗ trợ áp dụng mã giảm giá (couponCode)" },
+        { status: 400 }
+      )
+    }
 
     if (!email || !variantId) {
       return NextResponse.json(

@@ -4,6 +4,8 @@ import { generateOrderCode } from "@/lib/utils"
 import { validateEmail, validateQuantity, generateAccessToken } from "@/lib/validations"
 import { verifyAdminRequest } from "@/lib/auth"
 import { verifyVariantLiveStock } from "@/lib/provider-stock-verifier"
+import { normalizeCouponCode, reserveCouponForOrder, OrderItemEvalInput } from "@/lib/coupon-service"
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit"
 
 interface OrderItemInput {
   productId: string
@@ -13,6 +15,15 @@ interface OrderItemInput {
 
 export async function POST(req: Request) {
   try {
+    const ip = getClientIp(req)
+    const rate = checkRateLimit(`order_create:${ip}`, 20, 60 * 1000)
+    if (!rate.allowed) {
+      return NextResponse.json(
+        { error: "Bạn đang tạo đơn quá nhanh. Vui lòng thử lại sau giây lát." },
+        { status: 429 }
+      )
+    }
+
     const body = await req.json()
     const { email, items, consentAccepted } = body
 
@@ -29,6 +40,36 @@ export async function POST(req: Request) {
         { error: emailValidation.error || "Địa chỉ email không hợp lệ" },
         { status: 400 }
       )
+    }
+
+    // Check Idempotency Key (Safe retry protection)
+    const idempotencyKey = body.idempotencyKey && typeof body.idempotencyKey === "string" ? body.idempotencyKey.trim() : null
+    if (idempotencyKey) {
+      const existingOrder = await prisma.order.findUnique({
+        where: { idempotencyKey },
+      })
+      if (existingOrder) {
+        if (existingOrder.email === emailValidation.normalized) {
+          const replayRes = NextResponse.json({
+            id: existingOrder.id,
+            code: existingOrder.code,
+            accessToken: existingOrder.accessToken,
+            idempotentReplay: true,
+          })
+          if (existingOrder.accessToken) {
+            replayRes.cookies.set(`order_access_${existingOrder.id}`, existingOrder.accessToken, {
+              httpOnly: true,
+              secure: process.env.NODE_ENV === "production",
+              sameSite: "lax",
+              path: "/",
+              maxAge: 30 * 24 * 60 * 60,
+            })
+          }
+          return replayRes
+        } else {
+          return NextResponse.json({ error: "Khóa giao dịch không hợp lệ cho tài khoản này" }, { status: 400 })
+        }
+      }
     }
 
     if (!Array.isArray(items) || items.length === 0) {
@@ -141,10 +182,8 @@ export async function POST(req: Request) {
           ) + variant._count.serials
 
           const isStoreActive =
-            cachedStock >= totalQty ||
-            variant.sourceProduct?.sourceStatus === "available" ||
-            variant.product.statusOverride === "in_stock" ||
-            variant.product.visibility === "public"
+            (cachedStock >= totalQty && variant.sourceProduct?.sourceStatus === "available") ||
+            variant.product.statusOverride === "in_stock"
 
           if (!isStoreActive) {
             if (verifyRes.isNetworkOrTimeout) {
@@ -196,7 +235,19 @@ export async function POST(req: Request) {
     }
 
     let totalCents = 0
-    const itemsToCreate = []
+    interface ItemToCreate {
+      productId: string
+      variantId: string
+      quantity: number
+      priceCents: number
+      productName: string
+      variantName: string
+      connectionId: string | null
+      connectionName: string | null
+      providerCost: number | null
+      discountCents?: number
+    }
+    const itemsToCreate: ItemToCreate[] = []
 
     for (const item of items as OrderItemInput[]) {
       const variant = variants.find((v) => v.id === item.variantId)!
@@ -239,24 +290,107 @@ export async function POST(req: Request) {
       ? `Mã mời: ${String(body.inviteCode).trim()}`
       : null
 
-    const order = await prisma.order.create({
-      data: {
-        code,
-        email: emailValidation.normalized!,
-        totalCents,
-        status: "pending",
-        accessToken,
-        note: orderNote,
-        items: {
-          create: itemsToCreate,
-        },
-      },
+    const rawCouponCode = body.couponCode && typeof body.couponCode === "string" ? normalizeCouponCode(body.couponCode) : null
+
+    const evalItems: OrderItemEvalInput[] = itemsToCreate.map((it) => ({
+      productId: it.productId,
+      variantId: it.variantId,
+      quantity: it.quantity,
+      priceCents: it.priceCents,
+      productName: it.productName || undefined,
+      variantName: it.variantName || undefined,
+    }))
+
+    // Use transaction to ensure order creation and coupon reservation are strictly atomic
+    const order = await prisma.$transaction(async (tx) => {
+      let subtotalCents = totalCents
+      let discountCents = 0
+      let finalPayableCents = totalCents
+      let couponId: string | null = null
+      let couponCodeApplied: string | null = null
+      let couponSnapshot: string | null = null
+      const itemAllocationsMap = new Map<string, number>()
+
+      if (rawCouponCode) {
+        // Pre-create a deterministic order ID for redemption foreign key
+        const tempOrderId = `ord_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+        const reservation = await reserveCouponForOrder(tx, {
+          code: rawCouponCode,
+          email: emailValidation.normalized!,
+          items: evalItems,
+          orderId: tempOrderId,
+        })
+
+        if (!reservation.success) {
+          throw new Error(reservation.evaluation.error || "Mã giảm giá không hợp lệ hoặc đã hết hạn.")
+        }
+
+        const ev = reservation.evaluation
+        subtotalCents = ev.subtotalCents
+        discountCents = ev.discountCents
+        finalPayableCents = ev.totalCents
+        couponId = ev.couponId || null
+        couponCodeApplied = ev.code
+        couponSnapshot = JSON.stringify(ev.couponSnapshot)
+
+        for (const alloc of ev.allocations) {
+          itemAllocationsMap.set(alloc.variantId, alloc.discountCents)
+        }
+
+        return await tx.order.create({
+          data: {
+            id: tempOrderId,
+            code,
+            email: emailValidation.normalized!,
+            subtotalCents,
+            discountCents,
+            totalCents: finalPayableCents,
+            status: "pending",
+            accessToken,
+            note: orderNote,
+            couponId,
+            couponCode: couponCodeApplied,
+            couponSnapshot,
+            idempotencyKey,
+            items: {
+              create: itemsToCreate.map((it) => ({
+                ...it,
+                discountCents: itemAllocationsMap.get(it.variantId) || 0,
+              })),
+            },
+          },
+        })
+      } else {
+        return await tx.order.create({
+          data: {
+            code,
+            email: emailValidation.normalized!,
+            subtotalCents: totalCents,
+            discountCents: 0,
+            totalCents: totalCents,
+            status: "pending",
+            accessToken,
+            note: orderNote,
+            idempotencyKey,
+            items: {
+              create: itemsToCreate.map((it) => ({
+                ...it,
+                discountCents: 0,
+              })),
+            },
+          },
+        })
+      }
     })
 
     const response = NextResponse.json({
       id: order.id,
       code: order.code,
       accessToken,
+      totalCents: order.totalCents,
+      discountCents: order.discountCents,
+      subtotalCents: order.subtotalCents,
+      couponCode: order.couponCode,
     })
 
     // Set secure HttpOnly cookie for order access
@@ -270,8 +404,9 @@ export async function POST(req: Request) {
 
     return response
   } catch (err) {
-    console.error("Create order error:", err)
-    return NextResponse.json({ error: "Lỗi hệ thống khi tạo đơn hàng" }, { status: 500 })
+    const msg = err instanceof Error ? err.message : "Lỗi hệ thống khi tạo đơn hàng"
+    console.error("Create order error:", msg)
+    return NextResponse.json({ error: msg }, { status: 400 })
   }
 }
 

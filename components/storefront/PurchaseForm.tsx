@@ -16,6 +16,9 @@ import {
   Zap,
   Clock,
   MessageCircle,
+  Tag,
+  CheckCircle2,
+  X,
 } from "lucide-react"
 
 export interface PurchaseVariant {
@@ -87,6 +90,29 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
   const [inviteCode, setInviteCode] = useState("")
   const [inviteCodeError, setInviteCodeError] = useState<string | null>(null)
 
+  // Coupon state
+  const [couponInput, setCouponInput] = useState("")
+  const [appliedCoupon, setAppliedCoupon] = useState<{
+    code: string
+    name: string
+    discountType: "fixed" | "percentage"
+    discountValue: number
+    maxDiscountCents: number | null
+    subtotalCents: number
+    discountCents: number
+    finalTotalCents: number
+    description: string
+  } | null>(null)
+  const [couponLoading, setCouponLoading] = useState(false)
+  const [couponError, setCouponError] = useState<string | null>(null)
+  const [couponSuccessMessage, setCouponSuccessMessage] = useState<string | null>(null)
+  const couponAbortControllerRef = useRef<AbortController | null>(null)
+  const idempotencyKeyRef = useRef<string>(
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `ord_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
+  )
+
   const isSubmittingRef = useRef(false)
   const radioRefs = useRef<Map<string, HTMLDivElement>>(new Map())
 
@@ -153,16 +179,102 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
 
   // Price calculations
   const unitPrice = selectedVariant?.priceCents || 0
-  const totalPrice = unitPrice * quantity
+  const subtotalPrice = unitPrice * quantity
+  const discountAmount = appliedCoupon ? appliedCoupon.discountCents : 0
+  const finalPrice = appliedCoupon ? appliedCoupon.finalTotalCents : subtotalPrice
 
   const rawCompare = selectedVariant?.compareAtPriceCents || null
   const hasValidCompare = Boolean(rawCompare && rawCompare > unitPrice)
   const compareTotalPrice = hasValidCompare && rawCompare ? rawCompare * quantity : null
-  const savingsAmount = compareTotalPrice ? compareTotalPrice - totalPrice : null
+  const savingsAmount = compareTotalPrice ? compareTotalPrice - subtotalPrice : null
   const discountPercent =
     hasValidCompare && rawCompare
       ? Math.floor(((rawCompare - unitPrice) / rawCompare) * 100)
       : null
+
+  const handleApplyCoupon = useCallback(async (codeToApply?: string) => {
+    const rawCode = (codeToApply !== undefined ? codeToApply : couponInput).trim().toUpperCase()
+    if (!rawCode) {
+      setCouponError("Vui lòng nhập mã giảm giá")
+      return
+    }
+
+    if (couponAbortControllerRef.current) {
+      couponAbortControllerRef.current.abort()
+    }
+    const controller = new AbortController()
+    couponAbortControllerRef.current = controller
+
+    setCouponLoading(true)
+    setCouponError(null)
+    setCouponSuccessMessage(null)
+
+    try {
+      const res = await fetch("/api/coupons/preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code: rawCode,
+          email: email.trim().toLowerCase() || undefined,
+          items: [
+            {
+              variantId: selectedVariantId,
+              quantity: Math.max(1, Math.min(quantity, maxAllowedQuantity)),
+            },
+          ],
+        }),
+        signal: controller.signal,
+      })
+
+      const data = await res.json().catch(() => ({}))
+      const couponObj = data.coupon || (data.code && data.valid ? {
+        id: data.couponId || "",
+        code: data.code,
+        name: data.name || data.code,
+        discountType: data.discountType === "percent" ? "percentage" : "fixed",
+        discountValue: data.discountValue || 0,
+        maxDiscountCents: data.maxDiscountCents ?? null,
+        subtotalCents: data.subtotalCents ?? subtotalPrice,
+        discountCents: data.discountCents ?? 0,
+        finalTotalCents: data.totalCents ?? data.finalTotalCents ?? (subtotalPrice - (data.discountCents ?? 0)),
+        description: data.name || data.code,
+      } : null)
+
+      if (!res.ok || !data.valid || !couponObj) {
+        setAppliedCoupon(null)
+        setCouponError(data.error || "Mã giảm giá không hợp lệ hoặc không đủ điều kiện áp dụng")
+      } else {
+        setAppliedCoupon(couponObj)
+        setCouponInput(couponObj.code)
+        setCouponError(null)
+        setCouponSuccessMessage(`Áp dụng thành công: ${couponObj.name} (-${formatPrice(couponObj.discountCents)})`)
+      }
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === "AbortError") return
+      console.error("[PurchaseForm] Lỗi kiểm tra coupon:", err)
+      setAppliedCoupon(null)
+      setCouponError(err instanceof Error && !err.message.includes("fetch") ? err.message : "Lỗi kết nối khi kiểm tra mã giảm giá")
+    } finally {
+      setCouponLoading(false)
+    }
+  }, [couponInput, email, selectedVariantId, quantity, maxAllowedQuantity])
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null)
+    setCouponInput("")
+    setCouponError(null)
+    setCouponSuccessMessage(null)
+  }
+
+  // Re-verify applied coupon if variant or quantity changes
+  useEffect(() => {
+    if (!appliedCoupon) return
+    const currentCode = appliedCoupon.code
+    const timer = setTimeout(() => {
+      handleApplyCoupon(currentCode)
+    }, 250)
+    return () => clearTimeout(timer)
+  }, [selectedVariantId, quantity, handleApplyCoupon])
 
   // Validate email
   const validateEmailValue = (val: string): string | null => {
@@ -274,6 +386,8 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
           consentTimestamp: new Date().toISOString(),
           note: isBuffProduct && inviteCode ? `Mã mời: ${inviteCode.trim().toUpperCase()}` : undefined,
           inviteCode: isBuffProduct && inviteCode ? inviteCode.trim().toUpperCase() : undefined,
+          couponCode: appliedCoupon ? appliedCoupon.code : undefined,
+          idempotencyKey: idempotencyKeyRef.current,
           items: [
             {
               productId: product.id,
@@ -628,37 +742,139 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
           </div>
         )}
 
+        {/* Coupon Code Input & Application */}
+        <div className="space-y-2 pt-1">
+          <label className="text-xs font-semibold text-foreground/90 flex items-center justify-between">
+            <span className="flex items-center gap-1.5">
+              <Tag className="size-3.5 text-caramel" />
+              Mã giảm giá (Coupon)
+            </span>
+            {appliedCoupon && (
+              <span className="text-[11px] text-emerald-400 font-medium">Đã áp dụng mã thành công</span>
+            )}
+          </label>
+
+          {appliedCoupon ? (
+            <div className="flex items-center justify-between p-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-xs">
+              <div className="flex items-center gap-2.5">
+                <CheckCircle2 className="size-4 text-emerald-400 shrink-0" />
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono font-bold text-emerald-300 tracking-wider">
+                      {appliedCoupon.code}
+                    </span>
+                    <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                      -{formatPrice(appliedCoupon.discountCents)}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    {appliedCoupon.name}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleRemoveCoupon}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-border/80 bg-secondary/60 hover:bg-secondary text-[11px] font-semibold text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                title="Bỏ mã giảm giá"
+              >
+                <X className="size-3" />
+                <span>Bỏ mã</span>
+              </button>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  value={couponInput}
+                  onChange={(e) => {
+                    setCouponInput(e.target.value.toUpperCase())
+                    if (couponError) setCouponError(null)
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault()
+                      handleApplyCoupon()
+                    }
+                  }}
+                  placeholder="Nhập mã ưu đãi..."
+                  className="w-full h-10 px-3.5 rounded-xl border border-border bg-secondary/40 font-mono text-xs uppercase placeholder:normal-case placeholder:font-sans placeholder:text-muted-foreground focus:border-caramel focus:ring-1 focus:ring-caramel outline-none transition-all"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => handleApplyCoupon()}
+                disabled={couponLoading || !couponInput.trim()}
+                className="px-4 h-10 rounded-xl bg-secondary hover:bg-secondary/80 border border-border text-foreground font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer shrink-0"
+              >
+                {couponLoading ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <span>Áp dụng</span>
+                )}
+              </button>
+            </div>
+          )}
+
+          {couponError && (
+            <p className="text-[11px] text-rose-400 font-medium flex items-center gap-1 animate-in fade-in duration-150">
+              <AlertCircle className="size-3 shrink-0" />
+              <span>{couponError}</span>
+            </p>
+          )}
+
+          {couponSuccessMessage && !couponError && (
+            <p className="text-[11px] text-emerald-400 font-medium flex items-center gap-1 animate-in fade-in duration-150">
+              <CheckCircle2 className="size-3 shrink-0" />
+              <span>{couponSuccessMessage}</span>
+            </p>
+          )}
+        </div>
+
         {/* E. Tóm tắt thanh toán */}
         <div className="p-4 rounded-xl border border-border/80 bg-secondary/30 space-y-2 text-xs text-muted-foreground">
-          {hasValidCompare && compareTotalPrice && savingsAmount && savingsAmount > 0 && (
-            <>
-              <div className="flex items-center justify-between">
-                <span>Giá ban đầu:</span>
-                <span className="text-foreground/80 tabular-nums font-medium">
-                  {formatPrice(compareTotalPrice)}
-                </span>
-              </div>
+          {/* Tạm tính */}
+          <div className="flex items-center justify-between">
+            <span>Tạm tính:</span>
+            <span className="text-foreground/90 tabular-nums font-medium">
+              {formatPrice(subtotalPrice)}
+            </span>
+          </div>
 
-              <div className="flex items-center justify-between text-emerald-400 font-semibold">
-                <span className="flex items-center gap-1.5">
-                  <span>Chiết khấu:</span>
-                  {discountPercent && (
-                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                      −{discountPercent}%
-                    </span>
-                  )}
-                </span>
-                <span className="tabular-nums">
-                  −{formatPrice(savingsAmount)}
-                </span>
-              </div>
-            </>
+          {/* Chiết khấu niêm yết nếu có compareAtPrice */}
+          {hasValidCompare && compareTotalPrice && savingsAmount && savingsAmount > 0 && (
+            <div className="flex items-center justify-between text-muted-foreground/80">
+              <span className="flex items-center gap-1.5">
+                <span>Tiết kiệm giá gốc:</span>
+                {discountPercent && (
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-secondary text-muted-foreground border border-border">
+                    −{discountPercent}%
+                  </span>
+                )}
+              </span>
+              <span className="tabular-nums">
+                −{formatPrice(savingsAmount)}
+              </span>
+            </div>
+          )}
+
+          {/* Mã giảm giá Coupon */}
+          {appliedCoupon && discountAmount > 0 && (
+            <div className="flex items-center justify-between text-emerald-400 font-semibold">
+              <span className="flex items-center gap-1.5">
+                <span>Mã giảm giá ({appliedCoupon.code}):</span>
+              </span>
+              <span className="tabular-nums font-bold">
+                −{formatPrice(discountAmount)}
+              </span>
+            </div>
           )}
 
           <div className="pt-2 border-t border-border/60 flex items-center justify-between">
             <span className="text-sm font-semibold text-foreground/90">Tổng thanh toán:</span>
             <span className="text-2xl font-extrabold text-oat-cream tracking-tight tabular-nums">
-              {formatPrice(totalPrice)}
+              {formatPrice(finalPrice)}
             </span>
           </div>
         </div>
