@@ -842,6 +842,7 @@ export const customAdapter: ProviderAdapter = {
     const base = config.baseUrl.trim().replace(/\/+$/, '')
     const possibleCatalogEndpoints = [
       '/api/v2/catalog',
+      '/api/products?format=flat',
       '/api/products',
       '/products',
       '/catalog',
@@ -865,7 +866,7 @@ export const customAdapter: ProviderAdapter = {
       if (res.ok) {
         const data = res.data
         const d = data?.data || data
-        const rawItems = Array.isArray(d?.products)
+        let rawItems: any[] = Array.isArray(d?.products)
           ? d.products
           : Array.isArray(d?.catalog)
           ? d.catalog
@@ -876,6 +877,17 @@ export const customAdapter: ProviderAdapter = {
           : Array.isArray(data?.products)
           ? data.products
           : []
+
+        if (rawItems.length === 0 && Array.isArray(d?.menus)) {
+          rawItems = []
+          for (const menu of d.menus) {
+            if (Array.isArray(menu?.products)) {
+              for (const p of menu.products) {
+                rawItems.push({ ...p, menu_name: p.menu_name || menu.name, menu_path: p.menu_path || menu.menu_path })
+              }
+            }
+          }
+        }
 
         if (rawItems.length === 0 && !Array.isArray(d)) {
           continue // Try next endpoint
@@ -901,9 +913,16 @@ export const customAdapter: ProviderAdapter = {
               ? 99
               : 0
 
+          const rawName = String(item.name || item.title || item.product_name || `Sản phẩm #${extId}`).trim()
+          const menuName = typeof item.menu_name === 'string' ? item.menu_name.trim() : ''
+          const displayName =
+            menuName && !rawName.toLowerCase().includes(menuName.toLowerCase())
+              ? `${menuName} - ${rawName}`
+              : rawName
+
           products.push({
             externalId: extId,
-            sourceName: item.name || item.title || item.product_name || `Sản phẩm #${extId}`,
+            sourceName: displayName,
             sourceDescription: desc,
             sourcePrice:
               typeof item.price === 'number'
@@ -916,6 +935,8 @@ export const customAdapter: ProviderAdapter = {
                 ? item.regular_price
                 : typeof item.regular_price_vnd === 'number'
                 ? item.regular_price_vnd
+                : typeof item.original_price_vnd === 'number'
+                ? item.original_price_vnd
                 : null,
             saleQty: typeof item.sale_qty === 'number' ? item.sale_qty : null,
             sourceStock: rawStock,
@@ -1066,11 +1087,148 @@ export const shoptoolAdapter: ProviderAdapter = {
   },
 }
 
+/**
+ * Hải Vân Kho Sỉ (Shop Bot API) Adapter Implementation
+ * Official Docs: https://webshop.haivankhosi.site/api/docs
+ * Uses:
+ * - Header: X-API-Key
+ * - GET /api/balance
+ * - GET /api/products?format=flat
+ */
+export const haivanAdapter: ProviderAdapter = {
+  id: 'haivan',
+  name: 'Hải Vân Kho Sỉ (Shop Bot API)',
+
+  validateHost(urlStr: string) {
+    return validateGeneralHttpsHost(urlStr)
+  },
+
+  async testConnection(config: ProviderConnectionConfig): Promise<TestConnectionResult> {
+    const hostCheck = this.validateHost(config.baseUrl)
+    if (!hostCheck.valid) return { ok: false, error: hostCheck.error }
+    if (!config.apiKey) return { ok: false, error: 'Thiếu API Key' }
+
+    const base = config.baseUrl.trim().replace(/\/+$/, '')
+    const balUrl = `${base}/api/balance`
+
+    const res = await safeFetchJson(balUrl, {
+      method: 'GET',
+      headers: {
+        'X-API-Key': config.apiKey.trim(),
+        Accept: 'application/json',
+      },
+      timeoutMs: config.timeoutMs || 8000,
+      validateHostFn: (u) => this.validateHost(u),
+    })
+
+    if (res.ok && res.data && res.data.success !== false) {
+      const d = res.data
+      const balanceVnd = typeof d.balance_vnd === 'number' ? d.balance_vnd : 0
+      const balanceUsdt = typeof d.balance_usdt === 'number' ? d.balance_usdt : 0
+
+      return {
+        ok: true,
+        balanceVnd,
+        balanceUsdt,
+        balanceStatus: 'supported',
+      }
+    }
+
+    return {
+      ok: false,
+      error: res.data?.error || res.error || 'Không thể kết nối đến máy chủ Hải Vân Kho Sỉ',
+    }
+  },
+
+  async fetchCatalog(config: ProviderConnectionConfig): Promise<FetchCatalogResult> {
+    const hostCheck = this.validateHost(config.baseUrl)
+    if (!hostCheck.valid) return { ok: false, error: hostCheck.error }
+    if (!config.apiKey) return { ok: false, error: 'Chưa cấu hình API Key' }
+
+    const base = config.baseUrl.trim().replace(/\/+$/, '')
+    const productsUrl = `${base}/api/products?format=flat`
+
+    const res = await safeFetchJson(productsUrl, {
+      method: 'GET',
+      headers: {
+        'X-API-Key': config.apiKey.trim(),
+        Accept: 'application/json',
+      },
+      timeoutMs: config.timeoutMs || 12000,
+      validateHostFn: (u) => this.validateHost(u),
+    })
+
+    if (!res.ok) {
+      return {
+        ok: false,
+        statusCode: res.status,
+        isNetworkOrTimeout: res.isNetworkOrTimeout,
+        error: res.error,
+      }
+    }
+
+    const data = res.data
+    let rawItems: any[] = []
+    if (Array.isArray(data?.products)) {
+      rawItems = data.products
+    } else if (Array.isArray(data?.menus)) {
+      for (const menu of data.menus) {
+        if (Array.isArray(menu?.products)) {
+          for (const p of menu.products) {
+            rawItems.push({
+              ...p,
+              menu_name: p.menu_name || menu.name,
+              menu_path: p.menu_path || menu.menu_path,
+            })
+          }
+        }
+      }
+    }
+
+    const products: SourceProductDTO[] = []
+    for (const item of rawItems) {
+      const extId = String(item?.id ?? item?.product_id ?? '').trim()
+      if (!extId) continue
+
+      const rawName = String(item.name || `Sản phẩm #${extId}`).trim()
+      const menuName = typeof item.menu_name === 'string' ? item.menu_name.trim() : ''
+      const displayName =
+        menuName && !rawName.toLowerCase().includes(menuName.toLowerCase())
+          ? `${menuName} - ${rawName}`
+          : rawName
+
+      const desc = typeof item.description === 'string' ? item.description.trim() : ''
+      const priceVnd = typeof item.price_vnd === 'number' ? Math.max(0, Math.round(item.price_vnd)) : 0
+      const origPriceVnd =
+        typeof item.original_price_vnd === 'number' && item.original_price_vnd > 0
+          ? Math.round(item.original_price_vnd)
+          : null
+      const stock = typeof item.stock === 'number' ? Math.max(0, Math.floor(item.stock)) : 0
+
+      products.push({
+        externalId: extId,
+        sourceName: displayName,
+        sourceDescription: desc,
+        sourcePrice: priceVnd,
+        sourceRegularPrice: origPriceVnd,
+        saleQty: null,
+        sourceStock: stock,
+        maxQuantity: 100, // API doc max quantity per /api/buy request is 100
+        rawJson: JSON.stringify(item),
+      })
+    }
+
+    return { ok: true, products }
+  },
+}
+
 const adapters: Record<string, ProviderAdapter> = {
   fatcat: fatcatAdapter,
   dino: dinoAdapter,
   shoptool: shoptoolAdapter,
   shoptoolgiare: shoptoolAdapter,
+  haivan: haivanAdapter,
+  shopbot: haivanAdapter,
   custom: customAdapter,
 }
 

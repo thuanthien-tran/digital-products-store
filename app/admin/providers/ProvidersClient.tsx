@@ -92,7 +92,7 @@ export function ProvidersClient({ initialConnections }: { initialConnections: Pr
     }
   }
 
-  const selectPreset = (type: "fatcat" | "dino" | "shoptool" | "custom") => {
+  const selectPreset = (type: "fatcat" | "dino" | "shoptool" | "haivan" | "custom") => {
     setModalTestResult(null)
     if (type === "fatcat") {
       setFormData((prev) => ({
@@ -115,11 +115,18 @@ export function ProvidersClient({ initialConnections }: { initialConnections: Pr
         baseUrl: "https://shoptoolgiare.com/api/v1",
         name: prev.name.trim() ? prev.name : "ShopTool Giá Rẻ",
       }))
+    } else if (type === "haivan") {
+      setFormData((prev) => ({
+        ...prev,
+        provider: "haivan",
+        baseUrl: "https://webshop.haivankhosi.site",
+        name: prev.name.trim() ? prev.name : "Hải Vân Kho Sỉ",
+      }))
     } else {
       setFormData((prev) => ({
         ...prev,
         provider: "custom",
-        baseUrl: prev.baseUrl === "https://api.fatcatstore.click" || prev.baseUrl === "https://api.abcxy.store" || prev.baseUrl.includes("shoptoolgiare") ? "https://" : prev.baseUrl,
+        baseUrl: prev.baseUrl === "https://api.fatcatstore.click" || prev.baseUrl === "https://api.abcxy.store" || prev.baseUrl.includes("shoptoolgiare") || prev.baseUrl.includes("haivankhosi") ? "https://" : prev.baseUrl,
         name: prev.name.trim() ? prev.name : "Đại Lý Mới",
       }))
     }
@@ -435,6 +442,7 @@ export function ProvidersClient({ initialConnections }: { initialConnections: Pr
           const isDino = c.provider === "dino" || c.name.toLowerCase().includes("dino")
           const isFatcat = c.provider === "fatcat"
           const isShopTool = c.provider === "shoptool" || c.provider === "shoptoolgiare" || c.name.toLowerCase().includes("shoptool")
+          const isHaiVan = c.provider === "haivan" || c.provider === "shopbot" || c.baseUrl.includes("haivankhosi")
 
           return (
             <div
@@ -452,6 +460,8 @@ export function ProvidersClient({ initialConnections }: { initialConnections: Pr
                       className={`px-2 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-wider flex items-center gap-1 ${
                         isShopTool
                           ? "bg-amber-500/10 text-amber-400 border-amber-500/30"
+                          : isHaiVan
+                          ? "bg-sky-500/10 text-sky-400 border-sky-500/30"
                           : isDino
                           ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
                           : isFatcat
@@ -460,9 +470,10 @@ export function ProvidersClient({ initialConnections }: { initialConnections: Pr
                       }`}
                     >
                       {isShopTool && <Zap className="size-2.5 text-amber-400" />}
+                      {isHaiVan && <Bot className="size-2.5 text-sky-400" />}
                       {isDino && <Sparkles className="size-2.5" />}
                       {isFatcat && <Zap className="size-2.5" />}
-                      {!isDino && !isFatcat && !isShopTool && <Bot className="size-2.5" />}
+                      {!isDino && !isFatcat && !isShopTool && !isHaiVan && <Bot className="size-2.5" />}
                       <span>{c.provider}</span>
                     </span>
                   </div>
@@ -668,11 +679,24 @@ export function ProvidersClient({ initialConnections }: { initialConnections: Pr
                 <span className="block text-[11px] font-semibold text-muted-foreground mb-2">
                   ⚡ Chọn nhanh mẫu đại lý có sẵn:
                 </span>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => selectPreset("haivan")}
+                    className={`py-2 px-2 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                      formData.provider === "haivan"
+                        ? "bg-sky-500/15 border-sky-500/50 text-sky-300 shadow-sm"
+                        : "bg-card border-border hover:bg-secondary text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <Bot className="size-3.5 text-sky-400" />
+                    <span>Hải Vân</span>
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => selectPreset("shoptool")}
-                    className={`py-2 px-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                    className={`py-2 px-2 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
                       formData.provider === "shoptool"
                         ? "bg-amber-500/15 border-amber-500/50 text-amber-300 shadow-sm"
                         : "bg-card border-border hover:bg-secondary text-muted-foreground hover:text-foreground"
@@ -685,7 +709,7 @@ export function ProvidersClient({ initialConnections }: { initialConnections: Pr
                   <button
                     type="button"
                     onClick={() => selectPreset("dino")}
-                    className={`py-2 px-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                    className={`py-2 px-2 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
                       formData.provider === "dino"
                         ? "bg-emerald-500/15 border-emerald-500/50 text-emerald-300 shadow-sm"
                         : "bg-card border-border hover:bg-secondary text-muted-foreground hover:text-foreground"
@@ -698,27 +722,27 @@ export function ProvidersClient({ initialConnections }: { initialConnections: Pr
                   <button
                     type="button"
                     onClick={() => selectPreset("fatcat")}
-                    className={`py-2 px-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                    className={`py-2 px-2 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
                       formData.provider === "fatcat"
                         ? "bg-purple-500/15 border-purple-500/50 text-purple-300 shadow-sm"
                         : "bg-card border-border hover:bg-secondary text-muted-foreground hover:text-foreground"
                     }`}
                   >
                     <Zap className="size-3.5 text-purple-400" />
-                    <span>FatCat Store</span>
+                    <span>FatCat</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => selectPreset("custom")}
-                    className={`py-2 px-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                    className={`py-2 px-2 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
                       formData.provider === "custom"
                         ? "bg-blue-500/15 border-blue-500/50 text-blue-300 shadow-sm"
                         : "bg-card border-border hover:bg-secondary text-muted-foreground hover:text-foreground"
                     }`}
                   >
                     <Bot className="size-3.5 text-blue-400" />
-                    <span>Đại lý khác</span>
+                    <span>Khác</span>
                   </button>
                 </div>
               </div>
@@ -731,6 +755,9 @@ export function ProvidersClient({ initialConnections }: { initialConnections: Pr
                   <span>Quy chuẩn kết nối:</span>
                   <span className="uppercase text-primary font-mono">{formData.provider}</span>
                 </div>
+                {formData.provider === "haivan" && (
+                  <p>• Dùng Header: <code className="text-sky-400 font-mono">X-API-Key: ...</code> · Tự động đọc số dư qua <code className="text-foreground font-mono">/api/balance</code>, tải danh mục qua <code className="text-foreground font-mono">/api/products?format=flat</code> và mua qua <code className="text-foreground font-mono">/api/buy</code></p>
+                )}
                 {formData.provider === "shoptool" && (
                   <p>• Dùng Header: <code className="text-amber-400 font-mono">Authorization: Bearer tg_sk_...</code> · Tự động đọc số dư/credit qua <code className="text-foreground font-mono">/api/v1/account</code> và lấy hàng qua <code className="text-foreground font-mono">/api/v1/products</code> (Buff Token & Kho Muse AI)</p>
                 )}

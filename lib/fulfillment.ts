@@ -106,6 +106,13 @@ export async function fulfillOrder(
       item.variant?.connection?.provider === 'shoptoolgiare' ||
       item.variant?.sourceProduct?.provider === 'shoptool' ||
       item.variant?.sourceProduct?.provider === 'shoptoolgiare'
+    const isHaiVan =
+      item.variant?.provider === 'haivan' ||
+      item.variant?.provider === 'shopbot' ||
+      item.variant?.connection?.provider === 'haivan' ||
+      item.variant?.connection?.provider === 'shopbot' ||
+      item.variant?.sourceProduct?.provider === 'haivan' ||
+      item.variant?.sourceProduct?.provider === 'shopbot'
     const isBuff = Boolean(
       item.tokenAmountB != null ||
       item.variant?.tokenAmountB != null ||
@@ -248,7 +255,7 @@ export async function fulfillOrder(
       continue
     }
 
-    const isSerialDelivery = item.product.deliveryType === 'serials' || isFatcat || isDino || isShopTool
+    const isSerialDelivery = item.product.deliveryType === 'serials' || isFatcat || isDino || isShopTool || isHaiVan
     const alreadyDelivered = item.serials.length
     const needed = isSerialDelivery ? Math.max(0, item.quantity - alreadyDelivered) : 0
 
@@ -541,6 +548,111 @@ export async function fulfillOrder(
         } catch (shopToolErr) {
           const msg = shopToolErr instanceof Error ? shopToolErr.message : 'ShopTool API Exception'
           console.error('[Fulfillment ShopTool Exception]', msg)
+          totalDelivered += alreadyDelivered + localDelivered
+        }
+      } else if (isHaiVan && remainingNeeded > 0) {
+        // 5. Hải Vân Kho Sỉ (Shop Bot API) live purchase
+        const haivanProductId =
+          item.variant?.sourceProduct?.externalId ||
+          (item.variant?.providerProductId ? String(item.variant.providerProductId) : '')
+
+        if (haivanProductId) {
+          try {
+            const { buyHaiVanProduct, getHaiVanActiveConnection } = await import('./haivan')
+            const { decryptSecret } = await import('./crypto')
+
+            let haivanConfig = null
+            if (item.variant?.connection?.isEnabled && item.variant.connection.apiKeyEncrypted) {
+              try {
+                haivanConfig = {
+                  baseUrl: item.variant.connection.baseUrl.trim().replace(/\/+$/, ''),
+                  apiKey: decryptSecret(item.variant.connection.apiKeyEncrypted),
+                }
+              } catch {
+                // fallback to active connection
+              }
+            }
+
+            if (!haivanConfig) {
+              const activeConn = await getHaiVanActiveConnection()
+              haivanConfig = activeConn.config
+            }
+
+            if (!haivanConfig) {
+              await db.order.update({
+                where: { id: orderId },
+                data: {
+                  note: '[Kênh giao hàng Hải Vân Kho Sỉ chưa kết nối]: Chưa tìm thấy cấu hình đại lý Hải Vân hợp lệ.',
+                },
+              })
+              totalDelivered += alreadyDelivered + localDelivered
+              continue
+            }
+
+            const buyRes = await buyHaiVanProduct(haivanConfig, {
+              product_id: haivanProductId,
+              quantity: remainingNeeded,
+              currency: 'vnd',
+            })
+
+            if (buyRes.success && buyRes.items && buyRes.items.length > 0) {
+              for (const cred of buyRes.items) {
+                await db.serial.create({
+                  data: {
+                    variantId: item.variantId,
+                    orderItemId: item.id,
+                    content: cred,
+                    status: 'sold',
+                  },
+                })
+              }
+              totalDelivered += alreadyDelivered + localDelivered + buyRes.items.length
+
+              const orderGroup = buyRes.order?.order_group || 'N/A'
+              const balText =
+                typeof buyRes.new_balance === 'number'
+                  ? ` · Số dư còn lại: ${buyRes.new_balance.toLocaleString('vi-VN')}đ`
+                  : ''
+              await db.order.update({
+                where: { id: orderId },
+                data: {
+                  note: `[Đã mua từ Hải Vân Kho Sỉ thành công]: Mã đơn: ${orderGroup}${balText}`,
+                },
+              })
+            } else {
+              if (buyRes.isOutOfStock) {
+                try {
+                  const { recordSourceStockUpdate } = await import('./inventory-pipeline')
+                  const connId = item.connectionId || item.variant?.connectionId
+                  if (connId) {
+                    await recordSourceStockUpdate({
+                      connectionId: connId,
+                      externalId: haivanProductId,
+                      sourceStock: 0,
+                      reason: 'fulfillment_out_of_stock',
+                    })
+                  }
+                } catch (reverseErr) {
+                  console.error('[Fulfillment HaiVan Reverse Sync Error]', reverseErr)
+                }
+              }
+
+              const noteMsg = buyRes.isInsufficientBalance
+                ? `[NGOẠI LỆ NGUỒN HÀNG HẢI VÂN]: Số dư ví Hải Vân không đủ (${buyRes.error}). Vui lòng nạp thêm tiền vào Hải Vân Kho Sỉ và bấm Giao Lại đơn hàng.`
+                : `[NGOẠI LỆ NGUỒN HÀNG HẢI VÂN]: Đại lý báo lỗi "${buyRes.error || 'Mua thất bại'}".`
+
+              await db.order.update({
+                where: { id: orderId },
+                data: { note: noteMsg },
+              })
+              totalDelivered += alreadyDelivered + localDelivered
+            }
+          } catch (haivanErr) {
+            const msg = haivanErr instanceof Error ? haivanErr.message : 'HaiVan API Exception'
+            console.error('[Fulfillment HaiVan Exception]', msg)
+            totalDelivered += alreadyDelivered + localDelivered
+          }
+        } else {
           totalDelivered += alreadyDelivered + localDelivered
         }
       } else {
