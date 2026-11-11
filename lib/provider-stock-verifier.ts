@@ -1,6 +1,6 @@
 import { prisma } from "./db"
 import { decryptSecret } from "./crypto"
-import { getProviderAdapter } from "./providers/registry"
+import { getProviderAdapter, normalizeProviderBaseUrl, resolveEffectiveProvider } from "./providers/registry"
 import { recordSourceStockUpdate } from "./inventory-pipeline"
 
 export interface LiveVerificationResult {
@@ -113,7 +113,9 @@ export async function verifyVariantLiveStock(
         }
       }
 
-      const adapter = getProviderAdapter(connection.provider)
+      const cleanBaseUrl = normalizeProviderBaseUrl(connection.baseUrl)
+      const effectiveProvider = resolveEffectiveProvider(connection.provider, cleanBaseUrl)
+      const adapter = getProviderAdapter(effectiveProvider, cleanBaseUrl)
 
       // Check short-term in-memory cache first
       let productsList: any[] | null = null
@@ -125,9 +127,9 @@ export async function verifyVariantLiveStock(
       } else {
         // Fetch live catalog from adapter
         const catalogRes = await adapter.fetchCatalog({
-          baseUrl: connection.baseUrl,
+          baseUrl: cleanBaseUrl,
           apiKey: rawApiKey,
-          provider: connection.provider,
+          provider: effectiveProvider,
           timeoutMs: 10000, // Generous 10s timeout for cross-region network latency
         })
 

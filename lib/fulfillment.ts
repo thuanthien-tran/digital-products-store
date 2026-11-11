@@ -94,11 +94,20 @@ export async function fulfillOrder(
   let totalNeeded = 0
 
   for (const item of order.items) {
+    const isHaiVan =
+      item.variant?.provider === 'haivan' ||
+      item.variant?.provider === 'shopbot' ||
+      item.variant?.connection?.provider === 'haivan' ||
+      item.variant?.connection?.provider === 'shopbot' ||
+      item.variant?.sourceProduct?.provider === 'haivan' ||
+      item.variant?.sourceProduct?.provider === 'shopbot' ||
+      Boolean(item.variant?.connection?.baseUrl?.toLowerCase().includes('haivankhosi'))
     const isFatcat = item.variant?.provider === 'fatcat' || item.product.deliveryType === 'fatcat'
     const isDino =
-      item.variant?.provider === 'dino' ||
-      item.variant?.connection?.provider === 'dino' ||
-      item.variant?.sourceProduct?.provider === 'dino'
+      !isHaiVan &&
+      (item.variant?.provider === 'dino' ||
+        item.variant?.connection?.provider === 'dino' ||
+        item.variant?.sourceProduct?.provider === 'dino')
     const isShopTool =
       item.variant?.provider === 'shoptool' ||
       item.variant?.provider === 'shoptoolgiare' ||
@@ -106,13 +115,6 @@ export async function fulfillOrder(
       item.variant?.connection?.provider === 'shoptoolgiare' ||
       item.variant?.sourceProduct?.provider === 'shoptool' ||
       item.variant?.sourceProduct?.provider === 'shoptoolgiare'
-    const isHaiVan =
-      item.variant?.provider === 'haivan' ||
-      item.variant?.provider === 'shopbot' ||
-      item.variant?.connection?.provider === 'haivan' ||
-      item.variant?.connection?.provider === 'shopbot' ||
-      item.variant?.sourceProduct?.provider === 'haivan' ||
-      item.variant?.sourceProduct?.provider === 'shopbot'
     const isBuff = Boolean(
       item.tokenAmountB != null ||
       item.variant?.tokenAmountB != null ||

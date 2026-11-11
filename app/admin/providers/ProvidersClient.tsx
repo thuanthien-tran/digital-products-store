@@ -146,12 +146,29 @@ export function ProvidersClient({ initialConnections }: { initialConnections: Pr
     setIsModalOpen(true)
   }
 
+  const cleanApiUrl = (rawUrl: string) =>
+    rawUrl
+      .trim()
+      .replace(/\/api\/docs\/?$/i, "")
+      .replace(/\/docs\/?$/i, "")
+      .replace(/\/+$/, "")
+
+  const detectProviderFromUrl = (url: string, currentProvider: string) => {
+    const lower = url.toLowerCase()
+    if (lower.includes("haivankhosi")) return "haivan"
+    if (lower.includes("shoptoolgiare")) return "shoptool"
+    if (lower.includes("fatcatstore")) return "fatcat"
+    if (lower.includes("abcxy.store")) return "dino"
+    return currentProvider
+  }
+
   const openEditModal = (conn: ProviderConnectionItem) => {
     setEditingConn(conn)
+    const cleanedUrl = cleanApiUrl(conn.baseUrl)
     setFormData({
       name: conn.name,
-      provider: conn.provider,
-      baseUrl: conn.baseUrl,
+      provider: detectProviderFromUrl(cleanedUrl, conn.provider),
+      baseUrl: cleanedUrl,
       apiKey: "", // leave empty to keep existing key
       isEnabled: conn.isEnabled,
     })
@@ -439,10 +456,10 @@ export function ProvidersClient({ initialConnections }: { initialConnections: Pr
       {/* Connection Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {connections.map((c) => {
-          const isDino = c.provider === "dino" || c.name.toLowerCase().includes("dino")
-          const isFatcat = c.provider === "fatcat"
-          const isShopTool = c.provider === "shoptool" || c.provider === "shoptoolgiare" || c.name.toLowerCase().includes("shoptool")
-          const isHaiVan = c.provider === "haivan" || c.provider === "shopbot" || c.baseUrl.includes("haivankhosi")
+          const isHaiVan = c.provider === "haivan" || c.provider === "shopbot" || c.baseUrl.toLowerCase().includes("haivankhosi")
+          const isShopTool = !isHaiVan && (c.provider === "shoptool" || c.provider === "shoptoolgiare" || c.name.toLowerCase().includes("shoptool"))
+          const isFatcat = !isHaiVan && c.provider === "fatcat"
+          const isDino = !isHaiVan && (c.provider === "dino" || c.name.toLowerCase().includes("dino"))
 
           return (
             <div
@@ -673,80 +690,78 @@ export function ProvidersClient({ initialConnections }: { initialConnections: Pr
               </button>
             </div>
 
-            {/* Quick Presets Bar (Chỉ hiển thị khi tạo mới) */}
-            {!editingConn && (
-              <div className="p-3 bg-secondary/20 border-b border-border/80">
-                <span className="block text-[11px] font-semibold text-muted-foreground mb-2">
-                  ⚡ Chọn nhanh mẫu đại lý có sẵn:
-                </span>
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => selectPreset("haivan")}
-                    className={`py-2 px-2 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
-                      formData.provider === "haivan"
-                        ? "bg-sky-500/15 border-sky-500/50 text-sky-300 shadow-sm"
-                        : "bg-card border-border hover:bg-secondary text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    <Bot className="size-3.5 text-sky-400" />
-                    <span>Hải Vân</span>
-                  </button>
+            {/* Quick Presets Bar (Cho phép chọn nhanh hoặc đổi chuẩn API) */}
+            <div className="p-3 bg-secondary/20 border-b border-border/80">
+              <span className="block text-[11px] font-semibold text-muted-foreground mb-2">
+                ⚡ {editingConn ? "Đổi chuẩn kết nối đại lý:" : "Chọn nhanh mẫu đại lý có sẵn:"}
+              </span>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                <button
+                  type="button"
+                  onClick={() => selectPreset("haivan")}
+                  className={`py-2 px-2 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                    formData.provider === "haivan"
+                      ? "bg-sky-500/15 border-sky-500/50 text-sky-300 shadow-sm"
+                      : "bg-card border-border hover:bg-secondary text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Bot className="size-3.5 text-sky-400" />
+                  <span>Hải Vân</span>
+                </button>
 
-                  <button
-                    type="button"
-                    onClick={() => selectPreset("shoptool")}
-                    className={`py-2 px-2 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
-                      formData.provider === "shoptool"
-                        ? "bg-amber-500/15 border-amber-500/50 text-amber-300 shadow-sm"
-                        : "bg-card border-border hover:bg-secondary text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    <Zap className="size-3.5 text-amber-400" />
-                    <span>ShopTool</span>
-                  </button>
+                <button
+                  type="button"
+                  onClick={() => selectPreset("shoptool")}
+                  className={`py-2 px-2 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                    formData.provider === "shoptool"
+                      ? "bg-amber-500/15 border-amber-500/50 text-amber-300 shadow-sm"
+                      : "bg-card border-border hover:bg-secondary text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Zap className="size-3.5 text-amber-400" />
+                  <span>ShopTool</span>
+                </button>
 
-                  <button
-                    type="button"
-                    onClick={() => selectPreset("dino")}
-                    className={`py-2 px-2 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
-                      formData.provider === "dino"
-                        ? "bg-emerald-500/15 border-emerald-500/50 text-emerald-300 shadow-sm"
-                        : "bg-card border-border hover:bg-secondary text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    <Sparkles className="size-3.5 text-emerald-400" />
-                    <span>Dino Store</span>
-                  </button>
+                <button
+                  type="button"
+                  onClick={() => selectPreset("dino")}
+                  className={`py-2 px-2 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                    formData.provider === "dino"
+                      ? "bg-emerald-500/15 border-emerald-500/50 text-emerald-300 shadow-sm"
+                      : "bg-card border-border hover:bg-secondary text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Sparkles className="size-3.5 text-emerald-400" />
+                  <span>Dino Store</span>
+                </button>
 
-                  <button
-                    type="button"
-                    onClick={() => selectPreset("fatcat")}
-                    className={`py-2 px-2 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
-                      formData.provider === "fatcat"
-                        ? "bg-purple-500/15 border-purple-500/50 text-purple-300 shadow-sm"
-                        : "bg-card border-border hover:bg-secondary text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    <Zap className="size-3.5 text-purple-400" />
-                    <span>FatCat</span>
-                  </button>
+                <button
+                  type="button"
+                  onClick={() => selectPreset("fatcat")}
+                  className={`py-2 px-2 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                    formData.provider === "fatcat"
+                      ? "bg-purple-500/15 border-purple-500/50 text-purple-300 shadow-sm"
+                      : "bg-card border-border hover:bg-secondary text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Zap className="size-3.5 text-purple-400" />
+                  <span>FatCat</span>
+                </button>
 
-                  <button
-                    type="button"
-                    onClick={() => selectPreset("custom")}
-                    className={`py-2 px-2 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
-                      formData.provider === "custom"
-                        ? "bg-blue-500/15 border-blue-500/50 text-blue-300 shadow-sm"
-                        : "bg-card border-border hover:bg-secondary text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    <Bot className="size-3.5 text-blue-400" />
-                    <span>Khác</span>
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => selectPreset("custom")}
+                  className={`py-2 px-2 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                    formData.provider === "custom"
+                      ? "bg-blue-500/15 border-blue-500/50 text-blue-300 shadow-sm"
+                      : "bg-card border-border hover:bg-secondary text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Bot className="size-3.5 text-blue-400" />
+                  <span>Khác</span>
+                </button>
               </div>
-            )}
+            </div>
 
             <form onSubmit={handleSubmit} className="p-5 space-y-4 text-xs">
               {/* Preset Info Hint */}
@@ -792,8 +807,17 @@ export function ProvidersClient({ initialConnections }: { initialConnections: Pr
                   placeholder="https://api.abcxy.store"
                   value={formData.baseUrl}
                   onChange={(e) => {
-                    setFormData({ ...formData, baseUrl: e.target.value })
+                    const raw = e.target.value
+                    const strippedDocs = raw.trim().replace(/\/api\/docs\/?$/i, "").replace(/\/docs\/?$/i, "")
+                    const nextProvider = detectProviderFromUrl(strippedDocs, formData.provider)
+                    setFormData({ ...formData, baseUrl: strippedDocs, provider: nextProvider })
                     setModalTestResult(null)
+                  }}
+                  onBlur={() => {
+                    setFormData((prev) => ({
+                      ...prev,
+                      baseUrl: cleanApiUrl(prev.baseUrl),
+                    }))
                   }}
                   className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground text-xs font-mono focus:outline-none focus:ring-1 focus:ring-primary"
                 />

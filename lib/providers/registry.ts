@@ -1104,12 +1104,12 @@ export const haivanAdapter: ProviderAdapter = {
   },
 
   async testConnection(config: ProviderConnectionConfig): Promise<TestConnectionResult> {
-    const hostCheck = this.validateHost(config.baseUrl)
+    const cleanBase = normalizeProviderBaseUrl(config.baseUrl)
+    const hostCheck = this.validateHost(cleanBase)
     if (!hostCheck.valid) return { ok: false, error: hostCheck.error }
     if (!config.apiKey) return { ok: false, error: 'Thiếu API Key' }
 
-    const base = config.baseUrl.trim().replace(/\/+$/, '')
-    const balUrl = `${base}/api/balance`
+    const balUrl = `${cleanBase}/api/balance`
 
     const res = await safeFetchJson(balUrl, {
       method: 'GET',
@@ -1141,12 +1141,12 @@ export const haivanAdapter: ProviderAdapter = {
   },
 
   async fetchCatalog(config: ProviderConnectionConfig): Promise<FetchCatalogResult> {
-    const hostCheck = this.validateHost(config.baseUrl)
+    const cleanBase = normalizeProviderBaseUrl(config.baseUrl)
+    const hostCheck = this.validateHost(cleanBase)
     if (!hostCheck.valid) return { ok: false, error: hostCheck.error }
     if (!config.apiKey) return { ok: false, error: 'Chưa cấu hình API Key' }
 
-    const base = config.baseUrl.trim().replace(/\/+$/, '')
-    const productsUrl = `${base}/api/products?format=flat`
+    const productsUrl = `${cleanBase}/api/products?format=flat`
 
     const res = await safeFetchJson(productsUrl, {
       method: 'GET',
@@ -1232,12 +1232,32 @@ const adapters: Record<string, ProviderAdapter> = {
   custom: customAdapter,
 }
 
+export function normalizeProviderBaseUrl(urlStr: string): string {
+  const trimmed = (urlStr || '').trim().replace(/\/+$/, '')
+  return trimmed
+    .replace(/\/api\/docs$/i, '')
+    .replace(/\/docs$/i, '')
+    .replace(/\/api\/products$/i, '')
+    .replace(/\/api\/balance$/i, '')
+    .replace(/\/+$/, '')
+}
+
+export function resolveEffectiveProvider(providerType: string, baseUrl?: string): string {
+  const lowerUrl = (baseUrl || '').toLowerCase()
+  if (lowerUrl.includes('haivankhosi')) return 'haivan'
+  if (lowerUrl.includes('shoptoolgiare')) return 'shoptool'
+  if (lowerUrl.includes('fatcatstore')) return 'fatcat'
+  if (lowerUrl.includes('abcxy.store')) return 'dino'
+  return (providerType || 'custom').trim().toLowerCase()
+}
+
 export function registerProviderAdapter(id: string, adapter: ProviderAdapter) {
   adapters[id.toLowerCase()] = adapter
 }
 
-export function getProviderAdapter(providerType: string): ProviderAdapter {
-  const adapter = adapters[providerType.toLowerCase()]
+export function getProviderAdapter(providerType: string, baseUrl?: string): ProviderAdapter {
+  const resolved = resolveEffectiveProvider(providerType, baseUrl)
+  const adapter = adapters[resolved] || adapters[providerType.toLowerCase()]
   if (!adapter) {
     throw new Error(`Nhà cung cấp "${providerType}" chưa được hỗ trợ adapter trong hệ thống`)
   }

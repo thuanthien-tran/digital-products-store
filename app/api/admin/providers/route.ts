@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { verifyAdminRequest } from '@/lib/auth'
 import { encryptSecret, maskApiKey } from '@/lib/crypto'
-import { getProviderAdapter } from '@/lib/providers/registry'
+import { getProviderAdapter, normalizeProviderBaseUrl, resolveEffectiveProvider } from '@/lib/providers/registry'
 
 export async function GET(req: Request) {
   try {
@@ -62,8 +62,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Vui lòng điền đầy đủ tên, loại nhà cung cấp, URL API và API key' }, { status: 400 })
     }
 
-    const adapter = getProviderAdapter(provider)
-    const hostCheck = adapter.validateHost(baseUrl)
+    const cleanBaseUrl = normalizeProviderBaseUrl(String(baseUrl))
+    const effectiveProvider = resolveEffectiveProvider(String(provider), cleanBaseUrl)
+    const adapter = getProviderAdapter(effectiveProvider, cleanBaseUrl)
+    const hostCheck = adapter.validateHost(cleanBaseUrl)
     if (!hostCheck.valid) {
       return NextResponse.json({ error: hostCheck.error || 'Địa chỉ URL API không hợp lệ hoặc không thuộc danh sách cho phép' }, { status: 400 })
     }
@@ -75,8 +77,8 @@ export async function POST(req: Request) {
     const newConnection = await prisma.providerConnection.create({
       data: {
         name: name.trim(),
-        provider: provider.trim().toLowerCase(),
-        baseUrl: baseUrl.trim().replace(/\/+$/, ''),
+        provider: effectiveProvider,
+        baseUrl: cleanBaseUrl,
         apiKeyEncrypted,
         apiKeyMasked,
         isEnabled: isEnabled !== undefined ? Boolean(isEnabled) : true,

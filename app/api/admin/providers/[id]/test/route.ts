@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { verifyAdminRequest } from '@/lib/auth'
 import { decryptSecret } from '@/lib/crypto'
-import { getProviderAdapter } from '@/lib/providers/registry'
+import { getProviderAdapter, normalizeProviderBaseUrl, resolveEffectiveProvider } from '@/lib/providers/registry'
 
 interface Params {
   params: Promise<{ id: string }>
@@ -28,11 +28,13 @@ export async function POST(req: Request, { params }: Params) {
       return NextResponse.json({ ok: false, success: false, error: 'Không thể giải mã khóa bí mật' }, { status: 500 })
     }
 
-    const adapter = getProviderAdapter(connection.provider)
+    const cleanBaseUrl = normalizeProviderBaseUrl(connection.baseUrl)
+    const effectiveProvider = resolveEffectiveProvider(connection.provider, cleanBaseUrl)
+    const adapter = getProviderAdapter(effectiveProvider, cleanBaseUrl)
     const testRes = await adapter.testConnection({
-      baseUrl: connection.baseUrl,
+      baseUrl: cleanBaseUrl,
       apiKey,
-      provider: connection.provider,
+      provider: effectiveProvider,
     })
 
     if (!testRes.ok) {
@@ -48,13 +50,18 @@ export async function POST(req: Request, { params }: Params) {
       )
     }
 
+    // Auto-heal provider / clean baseUrl & update live balance
+    const healData: Record<string, unknown> = {}
+    if (effectiveProvider !== connection.provider) healData.provider = effectiveProvider
+    if (cleanBaseUrl !== connection.baseUrl) healData.baseUrl = cleanBaseUrl
     if (testRes.balanceVnd !== undefined && testRes.balanceVnd !== null) {
+      healData.balanceVnd = testRes.balanceVnd
+      healData.balanceUsdt = testRes.balanceUsdt ?? 0
+    }
+    if (Object.keys(healData).length > 0) {
       await prisma.providerConnection.update({
         where: { id },
-        data: {
-          balanceVnd: testRes.balanceVnd,
-          balanceUsdt: testRes.balanceUsdt ?? 0,
-        },
+        data: healData,
       })
     }
 

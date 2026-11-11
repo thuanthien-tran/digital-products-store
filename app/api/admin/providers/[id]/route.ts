@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { verifyAdminRequest } from '@/lib/auth'
 import { encryptSecret, maskApiKey } from '@/lib/crypto'
-import { getProviderAdapter } from '@/lib/providers/registry'
+import { getProviderAdapter, normalizeProviderBaseUrl, resolveEffectiveProvider } from '@/lib/providers/registry'
 
 interface Params {
   params: Promise<{ id: string }>
@@ -62,7 +62,7 @@ export async function PUT(req: Request, { params }: Params) {
 
     const { id } = await params
     const body = await req.json()
-    const { name, baseUrl, apiKey, isEnabled } = body
+    const { name, provider, baseUrl, apiKey, isEnabled } = body
 
     const existing = await prisma.providerConnection.findUnique({ where: { id } })
     if (!existing) {
@@ -74,13 +74,17 @@ export async function PUT(req: Request, { params }: Params) {
     if (name !== undefined) updateData.name = name.trim()
     if (isEnabled !== undefined) updateData.isEnabled = Boolean(isEnabled)
 
-    if (baseUrl !== undefined) {
-      const adapter = getProviderAdapter(existing.provider)
-      const hostCheck = adapter.validateHost(baseUrl)
+    const targetUrl = baseUrl !== undefined ? normalizeProviderBaseUrl(String(baseUrl)) : normalizeProviderBaseUrl(existing.baseUrl)
+    const targetProvider = resolveEffectiveProvider(provider !== undefined ? String(provider) : existing.provider, targetUrl)
+    updateData.provider = targetProvider
+
+    if (baseUrl !== undefined || targetUrl !== existing.baseUrl) {
+      const adapter = getProviderAdapter(targetProvider, targetUrl)
+      const hostCheck = adapter.validateHost(targetUrl)
       if (!hostCheck.valid) {
         return NextResponse.json({ error: hostCheck.error || 'URL API không hợp lệ' }, { status: 400 })
       }
-      updateData.baseUrl = baseUrl.trim().replace(/\/+$/, '')
+      updateData.baseUrl = targetUrl
     }
 
     // Only update key if user actually typed a new key (not empty or masked placeholder)

@@ -71,6 +71,15 @@ export interface HaiVanBuyResult {
   isOutOfStock?: boolean
 }
 
+export function normalizeHaiVanUrl(url: string): string {
+  return (url || '')
+    .trim()
+    .replace(/\/+$/, '')
+    .replace(/\/api\/docs$/i, '')
+    .replace(/\/docs$/i, '')
+    .replace(/\/+$/, '')
+}
+
 /**
  * Lấy cấu hình kết nối Hải Vân Kho Sỉ đang kích hoạt trong Database
  */
@@ -82,8 +91,11 @@ export async function getHaiVanActiveConnection(): Promise<{
   try {
     const conn = await prisma.providerConnection.findFirst({
       where: {
-        provider: { in: ['haivan', 'shopbot'] },
         isEnabled: true,
+        OR: [
+          { provider: { in: ['haivan', 'shopbot'] } },
+          { baseUrl: { contains: 'haivankhosi' } },
+        ],
       },
       orderBy: { createdAt: 'asc' },
     })
@@ -107,7 +119,7 @@ export async function getHaiVanActiveConnection(): Promise<{
 
     return {
       config: {
-        baseUrl: conn.baseUrl.trim().replace(/\/+$/, ''),
+        baseUrl: normalizeHaiVanUrl(conn.baseUrl),
         apiKey,
       },
       connectionId: conn.id,
@@ -129,7 +141,8 @@ export async function getHaiVanBalance(
   const timer = setTimeout(() => controller.abort(), timeoutMs)
 
   try {
-    const res = await fetch(`${config.baseUrl}/api/balance`, {
+    const base = normalizeHaiVanUrl(config.baseUrl)
+    const res = await fetch(`${base}/api/balance`, {
       method: 'GET',
       headers: {
         'X-API-Key': config.apiKey,
@@ -177,7 +190,8 @@ export async function getHaiVanProducts(
   const timer = setTimeout(() => controller.abort(), timeoutMs)
 
   try {
-    const res = await fetch(`${config.baseUrl}/api/products?format=flat`, {
+    const base = normalizeHaiVanUrl(config.baseUrl)
+    const res = await fetch(`${base}/api/products?format=flat`, {
       method: 'GET',
       headers: {
         'X-API-Key': config.apiKey,
@@ -244,7 +258,8 @@ export async function buyHaiVanProduct(
     }
     const qty = Math.max(1, Math.min(100, Math.floor(params.quantity || 1)))
 
-    const res = await fetch(`${config.baseUrl}/api/buy`, {
+    const base = normalizeHaiVanUrl(config.baseUrl)
+    const res = await fetch(`${base}/api/buy`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -321,7 +336,8 @@ export async function getHaiVanOrders(
   const timer = setTimeout(() => controller.abort(), timeoutMs)
 
   try {
-    const res = await fetch(`${config.baseUrl}/api/orders`, {
+    const base = normalizeHaiVanUrl(config.baseUrl)
+    const res = await fetch(`${base}/api/orders`, {
       method: 'GET',
       headers: {
         'X-API-Key': config.apiKey,

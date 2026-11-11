@@ -1,6 +1,6 @@
 import { prisma, ensureDatabaseSchema } from './db'
 import { decryptSecret } from './crypto'
-import { getProviderAdapter, SourceProductDTO } from './providers/registry'
+import { getProviderAdapter, normalizeProviderBaseUrl, resolveEffectiveProvider, SourceProductDTO } from './providers/registry'
 import { recordSourceStockUpdate, touchGlobalInventoryTimestamp } from './inventory-pipeline'
 import crypto from 'crypto'
 
@@ -95,10 +95,23 @@ export async function syncProviderConnection(
   activeSyncLocks.add(connectionId)
   const startedAt = new Date()
 
+  const cleanBaseUrl = normalizeProviderBaseUrl(connection.baseUrl)
+  const effectiveProvider = resolveEffectiveProvider(connection.provider, cleanBaseUrl)
+
+  if (effectiveProvider !== connection.provider || cleanBaseUrl !== connection.baseUrl) {
+    await prisma.providerConnection.update({
+      where: { id: connectionId },
+      data: {
+        provider: effectiveProvider,
+        baseUrl: cleanBaseUrl,
+      },
+    })
+  }
+
   const syncLog = await prisma.syncLog.create({
     data: {
       connectionId,
-      provider: connection.provider,
+      provider: effectiveProvider,
       startedAt,
       status: 'running',
     },
@@ -117,11 +130,11 @@ export async function syncProviderConnection(
         throw new Error(`Không thể giải mã khóa bí mật của kết nối "${connection.name}"`)
       }
 
-      const adapter = getProviderAdapter(connection.provider)
+      const adapter = getProviderAdapter(effectiveProvider, cleanBaseUrl)
       const fetchRes = await adapter.fetchCatalog({
-        baseUrl: connection.baseUrl,
+        baseUrl: cleanBaseUrl,
         apiKey: rawApiKey,
-        provider: connection.provider,
+        provider: effectiveProvider,
       })
 
       if (!fetchRes.ok || !fetchRes.products) {
@@ -172,9 +185,9 @@ export async function syncProviderConnection(
       // Probe balance if supported
       try {
         const bal = await adapter.testConnection({
-          baseUrl: connection.baseUrl,
+          baseUrl: cleanBaseUrl,
           apiKey: rawApiKey,
-          provider: connection.provider,
+          provider: effectiveProvider,
         })
         if (bal.ok && bal.balanceVnd !== undefined) {
           await prisma.providerConnection.update({
@@ -237,7 +250,7 @@ export async function syncProviderConnection(
         await prisma.sourceProduct.create({
           data: {
             connectionId,
-            provider: connection.provider,
+            provider: effectiveProvider,
             externalId: fp.externalId,
             sourceName: fp.sourceName,
             sourceDescription: fp.sourceDescription,

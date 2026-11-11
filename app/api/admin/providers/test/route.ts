@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { verifyAdminRequest } from '@/lib/auth'
-import { getProviderAdapter } from '@/lib/providers/registry'
+import { getProviderAdapter, normalizeProviderBaseUrl, resolveEffectiveProvider } from '@/lib/providers/registry'
 
 export async function POST(req: Request) {
   try {
@@ -19,16 +19,18 @@ export async function POST(req: Request) {
       )
     }
 
-    const adapter = getProviderAdapter(provider)
-    const hostCheck = adapter.validateHost(baseUrl)
+    const cleanBaseUrl = normalizeProviderBaseUrl(String(baseUrl))
+    const effectiveProvider = resolveEffectiveProvider(String(provider), cleanBaseUrl)
+    const adapter = getProviderAdapter(effectiveProvider, cleanBaseUrl)
+    const hostCheck = adapter.validateHost(cleanBaseUrl)
     if (!hostCheck.valid) {
       return NextResponse.json({ ok: false, success: false, error: hostCheck.error || 'Địa chỉ URL API không hợp lệ' }, { status: 400 })
     }
 
     // 1. Test connection & balance
     const testRes = await adapter.testConnection({
-      provider,
-      baseUrl: String(baseUrl).trim().replace(/\/+$/, ''),
+      provider: effectiveProvider,
+      baseUrl: cleanBaseUrl,
       apiKey: String(apiKey).trim(),
       timeoutMs: 8000,
     })
@@ -48,8 +50,8 @@ export async function POST(req: Request) {
     let productCount = 0
     try {
       const catRes = await adapter.fetchCatalog({
-        provider,
-        baseUrl: String(baseUrl).trim().replace(/\/+$/, ''),
+        provider: effectiveProvider,
+        baseUrl: cleanBaseUrl,
         apiKey: String(apiKey).trim(),
         timeoutMs: 10000,
       })
