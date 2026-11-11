@@ -14,7 +14,9 @@ import {
   Eye, 
   X,
   PackagePlus,
-  RefreshCw
+  RefreshCw,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react"
 import Link from "next/link"
 
@@ -64,11 +66,14 @@ interface SourcesClientProps {
 
 export function SourcesClient({ initialConnections }: SourcesClientProps) {
   const [sources, setSources] = useState<SourceItem[]>([])
-  const [connections] = useState<ConnectionOption[]>(initialConnections)
+  const [connections, setConnections] = useState<ConnectionOption[]>(initialConnections)
   const [selectedConnection, setSelectedConnection] = useState<string>("")
   const [selectedStatus, setSelectedStatus] = useState<string>("")
   const [activeTab, setActiveTab] = useState<"unadded" | "added" | "review" | "ignored" | "all">("unadded")
   const [search, setSearch] = useState("")
+  const [page, setPage] = useState(1)
+  const [limit, setLimit] = useState<string>("100")
+  const [pagination, setPagination] = useState({ page: 1, limit: 100, total: 0, totalPages: 1 })
   const [loading, setLoading] = useState(true)
   const [refreshTrigger, setRefreshTrigger] = useState(0)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
@@ -89,12 +94,16 @@ export function SourcesClient({ initialConnections }: SourcesClientProps) {
         if (selectedStatus) params.set("status", selectedStatus)
         if (search) params.set("search", search)
         params.set("tab", activeTab)
+        params.set("page", String(page))
+        params.set("limit", limit)
 
         const res = await fetch(`/api/admin/sources?${params.toString()}`)
         if (res.ok && !ignore) {
           const data = await res.json()
           setSources(data.sources || [])
+          if (Array.isArray(data.connections)) setConnections(data.connections)
           if (data.counts) setCounts(data.counts)
+          if (data.pagination) setPagination(data.pagination)
         }
       } catch {
         // silent
@@ -107,7 +116,7 @@ export function SourcesClient({ initialConnections }: SourcesClientProps) {
     return () => {
       ignore = true
     }
-  }, [selectedConnection, selectedStatus, activeTab, search, refreshTrigger])
+  }, [selectedConnection, selectedStatus, activeTab, search, page, limit, refreshTrigger])
 
   const toggleSelectAll = () => {
     if (selectedIds.length === sources.length) {
@@ -232,7 +241,11 @@ export function SourcesClient({ initialConnections }: SourcesClientProps) {
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <select
             value={selectedConnection}
-            onChange={(e) => setSelectedConnection(e.target.value)}
+            onChange={(e) => {
+              setSelectedConnection(e.target.value)
+              setPage(1)
+              setSelectedIds([])
+            }}
             className="p-2 rounded-lg border border-border bg-card text-foreground focus:outline-none focus:ring-1 focus:ring-primary text-xs"
           >
             <option value="">Tất cả đại lý ({connections.length})</option>
@@ -245,7 +258,11 @@ export function SourcesClient({ initialConnections }: SourcesClientProps) {
 
           <select
             value={selectedStatus}
-            onChange={(e) => setSelectedStatus(e.target.value)}
+            onChange={(e) => {
+              setSelectedStatus(e.target.value)
+              setPage(1)
+              setSelectedIds([])
+            }}
             className="p-2 rounded-lg border border-border bg-card text-foreground focus:outline-none focus:ring-1 focus:ring-primary text-xs"
           >
             <option value="">Tất cả tình trạng</option>
@@ -260,7 +277,10 @@ export function SourcesClient({ initialConnections }: SourcesClientProps) {
               type="text"
               placeholder="Tìm theo mã hoặc tên..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => {
+                setSearch(e.target.value)
+                setPage(1)
+              }}
               className="pl-8 pr-3 py-2 rounded-lg border border-border bg-card text-foreground text-xs placeholder:text-muted-foreground w-40 sm:w-48 focus:outline-none focus:ring-1 focus:ring-primary"
             />
           </div>
@@ -280,7 +300,11 @@ export function SourcesClient({ initialConnections }: SourcesClientProps) {
       {/* Tabs */}
       <div className="flex items-center gap-1 border-b border-border/80 pb-2 overflow-x-auto text-xs">
         <button
-          onClick={() => setActiveTab("unadded")}
+          onClick={() => {
+            setActiveTab("unadded")
+            setPage(1)
+            setSelectedIds([])
+          }}
           className={`px-3 py-1.5 rounded-lg font-semibold flex items-center gap-1.5 transition-colors ${
             activeTab === "unadded"
               ? "bg-primary text-primary-foreground shadow-sm"
@@ -296,7 +320,11 @@ export function SourcesClient({ initialConnections }: SourcesClientProps) {
         </button>
 
         <button
-          onClick={() => setActiveTab("added")}
+          onClick={() => {
+            setActiveTab("added")
+            setPage(1)
+            setSelectedIds([])
+          }}
           className={`px-3 py-1.5 rounded-lg font-semibold flex items-center gap-1.5 transition-colors ${
             activeTab === "added"
               ? "bg-primary text-primary-foreground shadow-sm"
@@ -312,7 +340,11 @@ export function SourcesClient({ initialConnections }: SourcesClientProps) {
         </button>
 
         <button
-          onClick={() => setActiveTab("review")}
+          onClick={() => {
+            setActiveTab("review")
+            setPage(1)
+            setSelectedIds([])
+          }}
           className={`px-3 py-1.5 rounded-lg font-semibold flex items-center gap-1.5 transition-colors ${
             activeTab === "review"
               ? "bg-primary text-primary-foreground shadow-sm"
@@ -331,7 +363,11 @@ export function SourcesClient({ initialConnections }: SourcesClientProps) {
         </button>
 
         <button
-          onClick={() => setActiveTab("ignored")}
+          onClick={() => {
+            setActiveTab("ignored")
+            setPage(1)
+            setSelectedIds([])
+          }}
           className={`px-3 py-1.5 rounded-lg font-semibold flex items-center gap-1.5 transition-colors ${
             activeTab === "ignored"
               ? "bg-primary text-primary-foreground shadow-sm"
@@ -349,7 +385,11 @@ export function SourcesClient({ initialConnections }: SourcesClientProps) {
         </button>
 
         <button
-          onClick={() => setActiveTab("all")}
+          onClick={() => {
+            setActiveTab("all")
+            setPage(1)
+            setSelectedIds([])
+          }}
           className={`px-3 py-1.5 rounded-lg font-semibold flex items-center gap-1.5 transition-colors ${
             activeTab === "all"
               ? "bg-primary text-primary-foreground shadow-sm"
@@ -396,9 +436,9 @@ export function SourcesClient({ initialConnections }: SourcesClientProps) {
 
       {/* Sources Table */}
       <div className="bg-card rounded-2xl border border-border overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
+        <div className="overflow-auto max-h-[60vh]">
           <table className="w-full text-left text-xs">
-            <thead className="bg-secondary/40 text-muted-foreground uppercase text-[10px] tracking-wider border-b border-border">
+            <thead className="sticky top-0 z-10 bg-secondary/95 backdrop-blur-sm text-muted-foreground uppercase text-[10px] tracking-wider border-b border-border shadow-xs">
               <tr>
                 <th className="py-3 px-4 w-10 text-center">
                   <input
@@ -626,6 +666,74 @@ export function SourcesClient({ initialConnections }: SourcesClientProps) {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Pagination & Page-size Footer */}
+        <div className="px-4 py-3 border-t border-border bg-secondary/20 flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <span>
+              {pagination.total === 0
+                ? "Không có sản phẩm nào"
+                : limit === "all"
+                ? `Hiển thị tất cả ${sources.length} / ${pagination.total} sản phẩm`
+                : `Hiển thị ${(pagination.page - 1) * pagination.limit + 1}–${Math.min(
+                    pagination.page * pagination.limit,
+                    pagination.total
+                  )} / ${pagination.total} sản phẩm`}
+            </span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="flex items-center gap-1.5">
+              <span>Mỗi trang:</span>
+              <select
+                value={limit}
+                onChange={(e) => {
+                  setLimit(e.target.value)
+                  setPage(1)
+                  setSelectedIds([])
+                }}
+                className="px-2 py-1 rounded-lg border border-border bg-card text-foreground text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+              >
+                <option value="30">30</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+                <option value="all">Tất cả</option>
+              </select>
+            </label>
+
+            {limit !== "all" && pagination.totalPages > 1 && (
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  disabled={pagination.page <= 1 || loading}
+                  onClick={() => {
+                    setPage((p) => Math.max(1, p - 1))
+                    setSelectedIds([])
+                  }}
+                  className="p-1.5 rounded-lg border border-border bg-card hover:bg-secondary text-foreground disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  title="Trang trước"
+                >
+                  <ChevronLeft className="size-3.5" />
+                </button>
+                <span className="px-2 font-medium text-foreground">
+                  Trang {pagination.page} / {pagination.totalPages}
+                </span>
+                <button
+                  type="button"
+                  disabled={pagination.page >= pagination.totalPages || loading}
+                  onClick={() => {
+                    setPage((p) => Math.min(pagination.totalPages, p + 1))
+                    setSelectedIds([])
+                  }}
+                  className="p-1.5 rounded-lg border border-border bg-card hover:bg-secondary text-foreground disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  title="Trang sau"
+                >
+                  <ChevronRight className="size-3.5" />
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
