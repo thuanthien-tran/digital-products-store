@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { LayoutDashboard, Package, KeyRound, ShoppingBag, LogOut, ArrowLeft, Layers, Globe, Settings, Ticket } from "lucide-react"
+import { LayoutDashboard, Package, KeyRound, ShoppingBag, LogOut, ArrowLeft, Layers, Globe, Settings, Ticket, FileSpreadsheet } from "lucide-react"
 import { NotificationBell } from "@/components/admin/NotificationBell"
 import { ChangePasswordModal } from "@/components/admin/ChangePasswordModal"
 import { AdminAutoLogoutListener } from "@/components/admin/AdminAutoLogoutListener"
@@ -26,6 +26,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const navItems = [
     { href: "/admin", label: "Tổng quan", icon: LayoutDashboard },
     { href: "/admin/products", label: "Sản phẩm", icon: Package },
+    { href: "/admin/price-list", label: "Bảng giá & Menu", icon: FileSpreadsheet },
     { href: "/admin/sources", label: "Danh mục nguồn", icon: Layers },
     { href: "/admin/providers", label: "Đại lý & Kết nối", icon: Globe },
     { href: "/admin/serials", label: "Kho Serials", icon: KeyRound },

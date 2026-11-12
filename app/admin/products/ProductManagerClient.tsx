@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import Link from "next/link"
 import { 
   Package, 
   Edit3, 
@@ -15,7 +16,8 @@ import {
   Loader2,
   RefreshCw,
   UploadCloud,
-  Star
+  Star,
+  FileSpreadsheet
 } from "lucide-react"
 import { ProductCard } from "@/components/storefront/ProductCard"
 import { MUSE_BUFF_STANDARD_PACKAGES, calculateExpectedBuffCost } from "@/lib/buff-pricing"
@@ -1066,6 +1068,15 @@ export function ProductManagerClient({ groups }: Props) {
             <RefreshCw className={`size-3.5 text-primary ${isSyncing ? "animate-spin" : ""}`} />
             <span>{isSyncing ? "Đang đồng bộ..." : "Đồng bộ đại lý"}</span>
           </button>
+
+          <Link
+            href="/admin/price-list"
+            className="px-3 py-1.5 rounded-lg border border-caramel/40 bg-caramel/10 hover:bg-caramel/20 text-caramel text-xs font-semibold transition-all flex items-center gap-1.5 shrink-0 shadow-sm"
+            title="Tạo bảng giá sản phẩm & xuất ảnh gửi khách hàng"
+          >
+            <FileSpreadsheet className="size-3.5" />
+            <span>Bảng giá & Xuất menu</span>
+          </Link>
 
           <button
             onClick={() => setIsAddManualOpen(true)}
