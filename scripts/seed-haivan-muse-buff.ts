@@ -2,31 +2,34 @@
 
 const prisma = new PrismaClient()
 
-export async function seedMergedHaiVanMuse() {
+export async function seedMergedAllBuffMuse() {
+  const shoptoolConn = await prisma.providerConnection.findFirst({
+    where: { provider: { in: ['shoptool', 'shoptoolgiare'] } },
+  })
+  const shoptoolSource = await prisma.sourceProduct.findFirst({
+    where: { externalId: 'buff_muse' },
+  })
+
   const haivanConn = await prisma.providerConnection.findFirst({
     where: { provider: 'haivan' },
   })
-  if (!haivanConn) {
-    console.log('[Seed] HaiVan connection not found, skipping seed.')
-    return
+
+  let s10 = null
+  let s20 = null
+  let s30 = null
+  if (haivanConn) {
+    s10 = await prisma.sourceProduct.findFirst({
+      where: { connectionId: haivanConn.id, externalId: 'zz6yyexp' },
+    })
+    s20 = await prisma.sourceProduct.findFirst({
+      where: { connectionId: haivanConn.id, externalId: 'qw736qpf' },
+    })
+    s30 = await prisma.sourceProduct.findFirst({
+      where: { connectionId: haivanConn.id, externalId: '6ppl02zg' },
+    })
   }
 
-  const s10 = await prisma.sourceProduct.findFirst({
-    where: { connectionId: haivanConn.id, externalId: 'zz6yyexp' },
-  })
-  const s20 = await prisma.sourceProduct.findFirst({
-    where: { connectionId: haivanConn.id, externalId: 'qw736qpf' },
-  })
-  const s30 = await prisma.sourceProduct.findFirst({
-    where: { connectionId: haivanConn.id, externalId: '6ppl02zg' },
-  })
-
-  if (!s10 || !s20 || !s30) {
-    console.log('[Seed] Missing one or more of the 3 HaiVan Muse source products, skipping seed.')
-    return
-  }
-
-  const productName = 'MUSE AI - Buff Token Chính Chủ (10B - 20B - 30B)'
+  const productName = 'MUSE AI - Buff Token Chính Chủ (1B - 10B - 20B - 30B)'
   const slug = 'muse-ai---buff-token-chinh-chu-10b-20b-30b'
   const group = await prisma.productGroup.findFirst({
     where: { name: 'AI' },
@@ -37,7 +40,7 @@ export async function seedMergedHaiVanMuse() {
   ])
 
   const description = [
-    '**Thông tin & Quyền lợi:**\n- Nạp token trực tiếp vào tài khoản Muse AI thông qua Mã mời (Invite Code).\n- Đầy đủ các gói dung lượng lớn: 10 Tỷ (~10B), 20 Tỷ (~20B), 30 Tỷ (~30B) Token.\n- Xử lý tự động qua hệ thống đại lý Hải Vân Kho Sỉ, an toàn 100% không yêu cầu mật khẩu.',
+    '**Thông tin & Quyền lợi:**\n- Nạp token trực tiếp vào tài khoản Muse AI thông qua Mã mời (Invite Code).\n- Đầy đủ các gói dung lượng linh hoạt: 1 Tỷ (~1B), 10 Tỷ (~10B), 20 Tỷ (~20B), 30 Tỷ (~30B) Token.\n- Xử lý tự động hóa 24/7 qua kết nối đại lý chuyên biệt, an toàn 100% không yêu cầu mật khẩu.',
     '**Hướng dẫn nhận hàng:**\n1. Lấy Mã Mời (Invite Code dạng 6 ký tự, ví dụ: 0FBALX) trong tài khoản Muse AI của bạn.\n2. Điền chính xác Mã Mời khi thanh toán.\n3. Hệ thống sẽ tự động gửi lệnh nạp token vào tài khoản Muse AI của bạn ngay sau khi hoàn tất thanh toán.',
     '**Chính sách bảo hành:**\nBảo hành đủ số lượng token tương ứng theo đúng gói dung lượng đã chọn.',
     '**Lưu ý quan trọng:**\n- Kiểm tra chính xác mã mời trước khi xác nhận đơn hàng.\n- Một đơn hàng nạp tương ứng vào một mã mời duy nhất.',
@@ -50,31 +53,52 @@ export async function seedMergedHaiVanMuse() {
 
   const variantConfigs = [
     {
+      name: 'Buff Token 1B (~1 Tỷ Tokens)',
+      tokenAmountB: 1,
+      provider: 'shoptool',
+      providerPrice: 2500,
+      priceCents: 5000,
+      compareAtPriceCents: 8000,
+      sortOrder: 1,
+      connectionId: shoptoolConn?.id || null,
+      sourceProductId: shoptoolSource?.id || null,
+      providerStock: 999,
+    },
+    {
       name: 'Buff Token 10B (~10 Tỷ Tokens)',
       tokenAmountB: 10,
+      provider: 'haivan',
       providerPrice: 14000,
       priceCents: 21000,
       compareAtPriceCents: 28000,
-      sortOrder: 1,
-      sourceProduct: s10,
+      sortOrder: 2,
+      connectionId: haivanConn?.id || null,
+      sourceProductId: s10?.id || null,
+      providerStock: s10?.sourceStock || 59,
     },
     {
       name: 'Buff Token 20B (~20 Tỷ Tokens)',
       tokenAmountB: 20,
+      provider: 'haivan',
       providerPrice: 24000,
       priceCents: 32000,
       compareAtPriceCents: 45000,
-      sortOrder: 2,
-      sourceProduct: s20,
+      sortOrder: 3,
+      connectionId: haivanConn?.id || null,
+      sourceProductId: s20?.id || null,
+      providerStock: s20?.sourceStock || 25,
     },
     {
       name: 'Buff Token 30B (~30 Tỷ Tokens)',
       tokenAmountB: 30,
+      provider: 'haivan',
       providerPrice: 29000,
       priceCents: 39000,
       compareAtPriceCents: 55000,
-      sortOrder: 3,
-      sourceProduct: s30,
+      sortOrder: 4,
+      connectionId: haivanConn?.id || null,
+      sourceProductId: s30?.id || null,
+      providerStock: s30?.sourceStock || 29,
     },
   ]
 
@@ -103,7 +127,7 @@ export async function seedMergedHaiVanMuse() {
           create: variantConfigs.map((vc) => ({
             name: vc.name,
             tokenAmountB: vc.tokenAmountB,
-            provider: 'haivan',
+            provider: vc.provider,
             providerPrice: vc.providerPrice,
             priceCents: vc.priceCents,
             compareAtPriceCents: vc.compareAtPriceCents,
@@ -111,9 +135,9 @@ export async function seedMergedHaiVanMuse() {
             maxQuantity: 1,
             isActive: true,
             sortOrder: vc.sortOrder,
-            connectionId: haivanConn.id,
-            sourceProductId: vc.sourceProduct.id,
-            providerStock: vc.sourceProduct.sourceStock,
+            connectionId: vc.connectionId,
+            sourceProductId: vc.sourceProductId,
+            providerStock: vc.providerStock,
           })),
         },
       },
@@ -146,10 +170,10 @@ export async function seedMergedHaiVanMuse() {
             providerPrice: vc.providerPrice,
             priceCents: vc.priceCents,
             compareAtPriceCents: vc.compareAtPriceCents,
-            provider: 'haivan',
-            connectionId: haivanConn.id,
-            sourceProductId: vc.sourceProduct.id,
-            providerStock: vc.sourceProduct.sourceStock,
+            provider: vc.provider,
+            connectionId: vc.connectionId,
+            sourceProductId: vc.sourceProductId,
+            providerStock: vc.providerStock,
             isActive: true,
             sortOrder: vc.sortOrder,
           },
@@ -163,10 +187,10 @@ export async function seedMergedHaiVanMuse() {
             providerPrice: vc.providerPrice,
             priceCents: vc.priceCents,
             compareAtPriceCents: vc.compareAtPriceCents,
-            provider: 'haivan',
-            connectionId: haivanConn.id,
-            sourceProductId: vc.sourceProduct.id,
-            providerStock: vc.sourceProduct.sourceStock,
+            provider: vc.provider,
+            connectionId: vc.connectionId,
+            sourceProductId: vc.sourceProductId,
+            providerStock: vc.providerStock,
             minQuantity: 1,
             maxQuantity: 1,
             isActive: true,
@@ -177,23 +201,22 @@ export async function seedMergedHaiVanMuse() {
     }
   }
 
-  // Mark 3 source products as added
-  for (const vc of variantConfigs) {
-    await prisma.sourceProduct.updateMany({
-      where: { id: vc.sourceProduct.id },
-      data: {
-        isAddedToStore: true,
-        editorialStatus: 'published',
-        customPrice: vc.priceCents,
-      },
+  // Hide older separate products to keep catalog clean
+  const oldProd = await prisma.product.findUnique({
+    where: { slug: 'dich-vu-bo-sung-token-muse-ai' },
+  })
+  if (oldProd) {
+    await prisma.product.update({
+      where: { id: oldProd.id },
+      data: { visibility: 'hidden', editorialStatus: 'hidden', isFeatured: false },
     })
   }
 
-  console.log('[Seed] Successfully ensured merged HaiVan Muse Buff product and variants.')
+  console.log('[Seed] Successfully ensured merged 4-tier Muse Buff product (1B, 10B, 20B, 30B).')
 }
 
 async function main() {
-  await seedMergedHaiVanMuse()
+  await seedMergedAllBuffMuse()
 }
 
 main()
