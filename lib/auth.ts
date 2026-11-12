@@ -58,6 +58,46 @@ export async function verifyAdminRequest(req: Request): Promise<{ authenticated:
   return { authenticated: false }
 }
 
+export async function createCtvToken(): Promise<string> {
+  return new SignJWT({ role: 'ctv' })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime('30d')
+    .sign(getJwtSecret())
+}
+
+export async function verifyCtvToken(token: string): Promise<boolean> {
+  try {
+    const { payload } = await jwtVerify(token, getJwtSecret())
+    return payload.role === 'ctv' || payload.role === 'admin'
+  } catch {
+    return false
+  }
+}
+
+export async function verifyCtvRequest(req: Request): Promise<boolean> {
+  // Admin always has access
+  const adminAuth = await verifyAdminRequest(req)
+  if (adminAuth.authenticated) return true
+
+  // Check Authorization Header
+  const authHeader = req.headers.get('authorization')
+  if (authHeader?.startsWith('Bearer ')) {
+    const token = authHeader.slice(7).trim()
+    if (await verifyCtvToken(token)) return true
+  }
+
+  // Check Cookie
+  const cookieHeader = req.headers.get('cookie') || ''
+  const match = cookieHeader.match(/ctv_token=([^;]+)/)
+  if (match) {
+    const token = decodeURIComponent(match[1])
+    if (await verifyCtvToken(token)) return true
+  }
+
+  return false
+}
+
 // In-memory brute force protection for admin login
 const loginAttempts = new Map<string, { count: number; resetAt: number }>()
 

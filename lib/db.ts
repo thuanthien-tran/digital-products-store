@@ -89,6 +89,15 @@ export async function ensureDatabaseSchema(): Promise<void> {
           if (!cols.has('heroCtaText')) {
             await prisma.$executeRawUnsafe(`ALTER TABLE "SiteSettings" ADD COLUMN "heroCtaText" TEXT DEFAULT 'Khám phá các gói';`)
           }
+          if (!cols.has('ctvPin')) {
+            try { await prisma.$executeRawUnsafe(`ALTER TABLE "SiteSettings" ADD COLUMN "ctvPin" TEXT DEFAULT '888888';`) } catch {}
+          }
+          if (!cols.has('ctvAccessEnabled')) {
+            try { await prisma.$executeRawUnsafe(`ALTER TABLE "SiteSettings" ADD COLUMN "ctvAccessEnabled" BOOLEAN NOT NULL DEFAULT 1;`) } catch {}
+          }
+          if (!cols.has('priceListConfig')) {
+            try { await prisma.$executeRawUnsafe(`ALTER TABLE "SiteSettings" ADD COLUMN "priceListConfig" TEXT;`) } catch {}
+          }
         }
 
         // Check Order table columns & backfill

@@ -288,6 +288,9 @@ model SiteSettings {
   heroHighlightColor String?  @default("#E6A66F")
   heroCtaText        String?  @default("Khám phá các gói")
   showVisitorStats   Boolean  @default(true)
+  ctvPin             String?  @default("888888")
+  ctvAccessEnabled   Boolean  @default(true)
+  priceListConfig    String?
   version            Int      @default(1)
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt

@@ -74,7 +74,7 @@ export async function GET(req: Request) {
       prisma.siteSettings.findFirst(),
     ])
 
-    // Build flat catalog for linking / binding picker
+    // Build flat catalog for linking
     const catalog: StoreCatalogOption[] = []
 
     // Group products into organized sections
@@ -178,7 +178,7 @@ export async function GET(req: Request) {
       }
     }
 
-    const resultGroups: PriceMenuGroup[] = Array.from(groupMap.values())
+    const defaultGroups: PriceMenuGroup[] = Array.from(groupMap.values())
       .filter((g) => g.items.length > 0)
       .map((g) => ({
         id: g.id,
@@ -189,16 +189,75 @@ export async function GET(req: Request) {
       }))
       .sort((a, b) => a.sortOrder - b.sortOrder)
 
+    // Check if admin previously saved a custom configuration to database
+    let savedConfig = null
+    const rawConfig = (settings as any)?.priceListConfig
+    if (rawConfig && typeof rawConfig === "string") {
+      try {
+        savedConfig = JSON.parse(rawConfig)
+      } catch {}
+    }
+
+    const ctvPin = (settings as any)?.ctvPin || "888888"
+    const ctvAccessEnabled = (settings as any)?.ctvAccessEnabled !== false
+
     return NextResponse.json({
       success: true,
-      groups: resultGroups,
+      groups: defaultGroups,
+      savedConfig,
       catalog,
+      ctvPin,
+      ctvAccessEnabled,
       meta: {
         siteName: settings?.siteName || "CAPYGO STORE",
         domain: "capygo.id.vn",
         hotline: process.env.NEXT_PUBLIC_ZALO_PHONE_1 || "0356.970.964",
         warrantyNote: "KBH: Không bảo hành • Giá và tình trạng có thể thay đổi theo thời điểm",
       },
+    })
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Internal error"
+    return NextResponse.json({ error: msg }, { status: 500 })
+  }
+}
+
+export async function POST(req: Request) {
+  try {
+    await ensureDatabaseSchema()
+    const auth = await verifyAdminRequest(req)
+    if (!auth.authenticated) {
+      return NextResponse.json({ error: "Unauthorized: Admin privileges required" }, { status: 401 })
+    }
+
+    const body = await req.json()
+    const { config, ctvPin, ctvAccessEnabled } = body
+
+    const updateData: Record<string, any> = {}
+    if (config !== undefined) {
+      updateData.priceListConfig = typeof config === "string" ? config : JSON.stringify(config)
+    }
+    if (typeof ctvPin === "string") {
+      updateData.ctvPin = ctvPin.trim() || "888888"
+    }
+    if (typeof ctvAccessEnabled === "boolean") {
+      updateData.ctvAccessEnabled = ctvAccessEnabled
+    }
+
+    const settings = await prisma.siteSettings.upsert({
+      where: { id: "default" },
+      create: {
+        id: "default",
+        shopId: "main",
+        ...updateData,
+      },
+      update: updateData,
+    })
+
+    return NextResponse.json({
+      success: true,
+      message: "Đã lưu bảng giá và cấu hình CTV lên hệ thống thành công!",
+      ctvPin: (settings as any).ctvPin,
+      ctvAccessEnabled: (settings as any).ctvAccessEnabled,
     })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Internal error"

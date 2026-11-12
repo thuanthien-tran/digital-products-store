@@ -24,7 +24,13 @@ export function VisitorTracker() {
   const lastPingAtRef = useRef<number>(0)
 
   useEffect(() => {
-    if (!pathname || pathname.startsWith("/admin")) return
+    if (
+      !pathname ||
+      pathname.startsWith("/admin") ||
+      pathname.startsWith("/ktv") ||
+      pathname.startsWith("/bang-gia") ||
+      pathname.startsWith("/ctv")
+    ) return
 
     let cancelled = false
 

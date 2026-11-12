@@ -17,15 +17,22 @@ import {
   Sliders, 
   Layers, 
   Loader2, 
-  Link2,
-  Unlink,
-  RefreshCw,
-  Search,
-  X,
-  ArrowUpDown
+  Link2, 
+  Unlink, 
+  RefreshCw, 
+  Search, 
+  X, 
+  KeyRound, 
+  Save, 
+  ShieldCheck, 
+  ExternalLink,
+  Share2,
+  Lock,
+  Pipette
 } from "lucide-react"
 import { toPng, toBlob } from "html-to-image"
 import { StoreCatalogOption } from "@/app/api/admin/price-list/route"
+import { THEMES, ThemeConfig, resolveTheme, CustomColors } from "@/lib/ktv"
 
 export interface PriceMenuItem {
   id: string
@@ -47,77 +54,13 @@ export interface PriceMenuGroup {
   items: PriceMenuItem[]
 }
 
-interface ThemeConfig {
-  id: string
-  name: string
-  bgColor: string
-  containerBg: string
-  textColor: string
-  accentColor: string
-  dividerColor: string
-  mutedColor: string
-  priceColor: string
-  badgeBg: string
-}
-
-const THEMES: ThemeConfig[] = [
-  {
-    id: "luxury-dark",
-    name: "Luxury Dark (Mẫu Capygo)",
-    bgColor: "#090A0C",
-    containerBg: "#0F1115",
-    textColor: "#FAF4ED",
-    accentColor: "#E6A66F",
-    dividerColor: "#D4955B",
-    mutedColor: "#9E9A95",
-    priceColor: "#FAF4ED",
-    badgeBg: "rgba(230, 166, 111, 0.15)",
-  },
-  {
-    id: "obsidian-gold",
-    name: "Obsidian Gold",
-    bgColor: "#000000",
-    containerBg: "#0B0B0B",
-    textColor: "#FFFFFF",
-    accentColor: "#F59E0B",
-    dividerColor: "#B45309",
-    mutedColor: "#A1A1AA",
-    priceColor: "#FDE68A",
-    badgeBg: "rgba(245, 158, 11, 0.15)",
-  },
-  {
-    id: "deep-navy",
-    name: "Deep Midnight",
-    bgColor: "#070D1E",
-    containerBg: "#0D1836",
-    textColor: "#F8FAFC",
-    accentColor: "#38BDF8",
-    dividerColor: "#0284C7",
-    mutedColor: "#94A3B8",
-    priceColor: "#E0F2FE",
-    badgeBg: "rgba(56, 189, 248, 0.15)",
-  },
-  {
-    id: "clean-light",
-    name: "Minimal White",
-    bgColor: "#F1F5F9",
-    containerBg: "#FFFFFF",
-    textColor: "#0F172A",
-    accentColor: "#D97706",
-    dividerColor: "#E2E8F0",
-    mutedColor: "#64748B",
-    priceColor: "#0F172A",
-    badgeBg: "rgba(217, 119, 6, 0.1)",
-  },
-]
-
 const LOCAL_STORAGE_KEY = "capygo_price_list_v2"
 
 export function PriceListClient() {
   const [groups, setGroups] = useState<PriceMenuGroup[]>([])
   const [catalog, setCatalog] = useState<StoreCatalogOption[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<"items" | "settings">("items")
+  const [activeTab, setActiveTab] = useState<"items" | "settings" | "ctv">("items")
 
   // Header & Footer Customization
   const [menuTitle, setMenuTitle] = useState("BẢNG GIÁ")
@@ -132,6 +75,17 @@ export function PriceListClient() {
   const [showLeaderDots, setShowLeaderDots] = useState(false)
   const [currencyUnit, setCurrencyUnit] = useState<"đ" | "VNĐ" | "k">("đ")
   const [selectedThemeId, setSelectedThemeId] = useState("luxury-dark")
+  const [customColors, setCustomColors] = useState<CustomColors>({
+    containerBg: THEMES[0].containerBg,
+    accentColor: THEMES[0].accentColor,
+    textColor: THEMES[0].textColor,
+  })
+
+  // CTV Live Portal & Security Settings
+  const [ctvPin, setCtvPin] = useState("888888")
+  const [ctvAccessEnabled, setCtvAccessEnabled] = useState(true)
+  const [isSavingPublish, setIsSavingPublish] = useState(false)
+  const [copiedCtvLink, setCopiedCtvLink] = useState(false)
 
   // Search filter inside editor
   const [editorSearch, setEditorSearch] = useState("")
@@ -150,7 +104,7 @@ export function PriceListClient() {
   const previewCardRef = useRef<HTMLDivElement>(null)
   const pickerInputRef = useRef<HTMLInputElement>(null)
 
-  const activeTheme = THEMES.find((t) => t.id === selectedThemeId) || THEMES[0]
+  const activeTheme = resolveTheme(selectedThemeId, customColors)
 
   // Focus picker search input when modal opens
   useEffect(() => {
@@ -164,7 +118,7 @@ export function PriceListClient() {
     setLoading(true)
     setMessage(null)
     try {
-      // Fetch latest catalog from API
+      // Fetch latest catalog and saved settings from API
       const res = await fetch("/api/admin/price-list")
       const data = await res.json()
       if (!res.ok || !data.success) {
@@ -174,37 +128,52 @@ export function PriceListClient() {
       const freshCatalog: StoreCatalogOption[] = data.catalog || []
       setCatalog(freshCatalog)
 
+      if (data.ctvPin) setCtvPin(data.ctvPin)
+      if (data.ctvAccessEnabled !== undefined) setCtvAccessEnabled(data.ctvAccessEnabled)
       if (data.meta?.domain) setFooterDomain(data.meta.domain)
       if (data.meta?.hotline) setHotline(data.meta.hotline)
       if (data.meta?.warrantyNote) setFooterNote(data.meta.warrantyNote)
 
-      // Check localStorage first if not forced fresh
+      // 1. If user previously saved config in database, use it as baseline
+      const savedDbConfig = data.savedConfig
+
+      // 2. Check localStorage (local edits take priority unless forced)
+      let candidateConfig = savedDbConfig
       if (!forceFresh && typeof window !== "undefined") {
-        const saved = localStorage.getItem(LOCAL_STORAGE_KEY)
-        if (saved) {
+        const localSaved = localStorage.getItem(LOCAL_STORAGE_KEY)
+        if (localSaved) {
           try {
-            const parsed = JSON.parse(saved)
-            if (Array.isArray(parsed.groups) && parsed.groups.length > 0) {
-              setGroups(parsed.groups)
-              if (parsed.menuTitle) setMenuTitle(parsed.menuTitle)
-              if (parsed.menuSubtitle) setMenuSubtitle(parsed.menuSubtitle)
-              if (parsed.footerDomain) setFooterDomain(parsed.footerDomain)
-              if (parsed.footerNote) setFooterNote(parsed.footerNote)
-              if (parsed.hotline) setHotline(parsed.hotline)
-              if (parsed.showStock !== undefined) setShowStock(parsed.showStock)
-              if (parsed.showNotes !== undefined) setShowNotes(parsed.showNotes)
-              if (parsed.showLeaderDots !== undefined) setShowLeaderDots(parsed.showLeaderDots)
-              if (parsed.currencyUnit) setCurrencyUnit(parsed.currencyUnit)
-              if (parsed.selectedThemeId) setSelectedThemeId(parsed.selectedThemeId)
-              setLoading(false)
-              return
-            }
+            candidateConfig = JSON.parse(localSaved)
           } catch {}
         }
       }
 
-      // Default: use server-generated groups
-      setGroups(data.groups || [])
+      if (candidateConfig && Array.isArray(candidateConfig.groups) && candidateConfig.groups.length > 0) {
+        setGroups(candidateConfig.groups)
+        if (candidateConfig.menuTitle) setMenuTitle(candidateConfig.menuTitle)
+        if (candidateConfig.menuSubtitle !== undefined) setMenuSubtitle(candidateConfig.menuSubtitle)
+        if (candidateConfig.footerDomain) setFooterDomain(candidateConfig.footerDomain)
+        if (candidateConfig.footerNote) setFooterNote(candidateConfig.footerNote)
+        if (candidateConfig.hotline) setHotline(candidateConfig.hotline)
+        if (candidateConfig.showStock !== undefined) setShowStock(candidateConfig.showStock)
+        if (candidateConfig.showNotes !== undefined) setShowNotes(candidateConfig.showNotes)
+        if (candidateConfig.showLeaderDots !== undefined) setShowLeaderDots(candidateConfig.showLeaderDots)
+        if (candidateConfig.currencyUnit) setCurrencyUnit(candidateConfig.currencyUnit)
+        if (candidateConfig.selectedThemeId) setSelectedThemeId(candidateConfig.selectedThemeId)
+        if (candidateConfig.customColors) {
+          setCustomColors(candidateConfig.customColors)
+        } else if (candidateConfig.selectedThemeId) {
+          const found = THEMES.find((t) => t.id === candidateConfig.selectedThemeId) || THEMES[0]
+          setCustomColors({
+            containerBg: found.containerBg,
+            accentColor: found.accentColor,
+            textColor: found.textColor,
+          })
+        }
+      } else {
+        // Fallback: default generated groups from store catalog
+        setGroups(data.groups || [])
+      }
     } catch (err: any) {
       setMessage({ text: err.message || "Lỗi kết nối khi tải bảng giá", type: "error" })
     } finally {
@@ -232,6 +201,7 @@ export function PriceListClient() {
         showLeaderDots,
         currencyUnit,
         selectedThemeId,
+        customColors,
       }
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(state))
     } catch {}
@@ -247,6 +217,7 @@ export function PriceListClient() {
     showLeaderDots,
     currencyUnit,
     selectedThemeId,
+    customColors,
     loading,
   ])
 
@@ -256,6 +227,66 @@ export function PriceListClient() {
       return `${Math.round(cents / 1000)}k`
     }
     return `${cents.toLocaleString("vi-VN")}${currencyUnit}`
+  }
+
+  // Save current menu config and publish to CTV live portal
+  const handleSaveAndPublishCtv = async () => {
+    setIsSavingPublish(true)
+    setMessage(null)
+    try {
+      const config = {
+        groups,
+        menuTitle,
+        menuSubtitle,
+        footerDomain,
+        footerNote,
+        hotline,
+        showStock,
+        showNotes,
+        showLeaderDots,
+        currencyUnit,
+        selectedThemeId,
+        customColors,
+      }
+
+      const res = await fetch("/api/admin/price-list", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          config,
+          ctvPin,
+          ctvAccessEnabled,
+        }),
+      })
+
+      const data = await res.json()
+      if (res.ok && data.success) {
+        setMessage({
+          type: "success",
+          text: "Đã lưu bảng giá và xuất bản thành công! Trang KTV (/ktv) sẽ hiển thị chuẩn xác 100% theo tùy chỉnh của bạn.",
+        })
+      } else {
+        throw new Error(data.error || "Không thể lưu bảng giá")
+      }
+    } catch (err: any) {
+      setMessage({ type: "error", text: err.message || "Lỗi lưu cấu hình bảng giá" })
+    } finally {
+      setIsSavingPublish(false)
+    }
+  }
+
+  // Copy invitation link & PIN for KTVs
+  const handleCopyCtvShare = async () => {
+    try {
+      const origin = typeof window !== "undefined" ? window.location.origin : "https://capygo.id.vn"
+      const text = `🌟 BẢNG GIÁ SẢN PHẨM TRỰC TIẾP DÀNH CHO KTV & ĐẠI LÝ 🌟\n🔗 Link xem kho & giá: ${origin}/ktv\n🔑 Mã PIN truy cập: ${ctvPin}\n(Bảng giá tự động cập nhật số lượng tồn kho và giá bán mới nhất theo thời gian thực)`
+      await navigator.clipboard.writeText(text)
+      setCopiedCtvLink(true)
+      setTimeout(() => setCopiedCtvLink(false), 3000)
+      setMessage({ type: "success", text: "Đã sao chép link và mã PIN gửi KTV thành công!" })
+    } catch {
+      setMessage({ type: "error", text: "Không thể sao chép văn bản" })
+    }
   }
 
   // Synchronize prices & stock from website for all linked items, KEEPING custom names!
@@ -277,7 +308,6 @@ export function PriceListClient() {
           items: group.items.map((item) => {
             if (!item.linkedProductId) return item
 
-            // Find matching product in fresh catalog
             const target = freshCatalog.find((c) =>
               item.linkedVariantId
                 ? c.productId === item.linkedProductId && c.variantId === item.linkedVariantId
@@ -421,7 +451,6 @@ export function PriceListClient() {
           items: g.items.map((i) => {
             if (i.id !== linkingTarget.itemId) return i
 
-            // If the item has default name or user wants, keep custom name or update if empty
             const shouldUpdateName = !i.name || i.name === "Sản phẩm mới" || i.name.trim() === ""
 
             return {
@@ -622,7 +651,19 @@ export function PriceListClient() {
 
         {/* Global Action Buttons */}
         <div className="flex flex-wrap items-center gap-2">
-          {/* Sync Prices from Web while preserving custom names */}
+          {/* Save & Publish to KTV Live Page */}
+          <button
+            type="button"
+            onClick={handleSaveAndPublishCtv}
+            disabled={isSavingPublish}
+            className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm disabled:opacity-50"
+            title="Lưu cấu hình menu hiện tại lên trang xem của KTV (/ktv)"
+          >
+            {isSavingPublish ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
+            <span>{isSavingPublish ? "Đang lưu..." : "Lưu menu"}</span>
+          </button>
+
+          {/* Sync Prices from Web */}
           <button
             type="button"
             onClick={handleSyncLinkedPrices}
@@ -724,6 +765,17 @@ export function PriceListClient() {
             >
               <Sliders className="size-3.5" />
               <span>Giao diện & Cột</span>
+            </button>
+            <button
+              onClick={() => setActiveTab("ctv")}
+              className={`px-3 py-1.5 rounded-lg font-semibold flex items-center gap-1.5 transition-colors ${
+                activeTab === "ctv"
+                  ? "bg-caramel text-espresso font-bold shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <KeyRound className="size-3.5" />
+              <span>Cổng KTV & Mã PIN</span>
             </button>
           </div>
 
@@ -1032,7 +1084,14 @@ export function PriceListClient() {
                       <button
                         key={theme.id}
                         type="button"
-                        onClick={() => setSelectedThemeId(theme.id)}
+                        onClick={() => {
+                          setSelectedThemeId(theme.id)
+                          setCustomColors({
+                            containerBg: theme.containerBg,
+                            accentColor: theme.accentColor,
+                            textColor: theme.textColor,
+                          })
+                        }}
                         className={`p-3 rounded-xl border text-left text-xs transition-all flex flex-col justify-between gap-2 ${
                           isSelected
                             ? "border-caramel bg-caramel/10 ring-1 ring-caramel"
@@ -1060,6 +1119,114 @@ export function PriceListClient() {
                       </button>
                     )
                   })}
+                </div>
+
+                {/* 3 Custom Color Pickers */}
+                <div className="pt-3 border-t border-border/60 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-foreground flex items-center gap-1.5">
+                      <Pipette className="size-3.5 text-caramel" />
+                      <span>Tùy chỉnh 3 màu menu theo ý bạn:</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const def = THEMES[0]
+                        setSelectedThemeId(def.id)
+                        setCustomColors({
+                          containerBg: def.containerBg,
+                          accentColor: def.accentColor,
+                          textColor: def.textColor,
+                        })
+                      }}
+                      className="text-[10.5px] text-muted-foreground hover:text-caramel transition-colors"
+                    >
+                      Đặt lại mặc định
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                    {/* Color 1: Container Background */}
+                    <div className="p-2.5 rounded-xl border border-border bg-background space-y-1.5">
+                      <label className="text-[10.5px] font-semibold text-muted-foreground block truncate">
+                        1. Màu nền menu
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={customColors.containerBg}
+                          onChange={(e) => {
+                            setCustomColors((prev) => ({ ...prev, containerBg: e.target.value }))
+                            setSelectedThemeId("custom")
+                          }}
+                          className="size-7 rounded-lg border border-border cursor-pointer bg-transparent p-0.5 shrink-0"
+                        />
+                        <input
+                          type="text"
+                          value={customColors.containerBg}
+                          onChange={(e) => {
+                            setCustomColors((prev) => ({ ...prev, containerBg: e.target.value }))
+                            setSelectedThemeId("custom")
+                          }}
+                          className="w-full font-mono text-[11px] px-2 py-1 rounded bg-secondary/30 border border-border uppercase font-semibold text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Color 2: Accent / Highlight Color */}
+                    <div className="p-2.5 rounded-xl border border-border bg-background space-y-1.5">
+                      <label className="text-[10.5px] font-semibold text-muted-foreground block truncate">
+                        2. Màu điểm nhấn
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={customColors.accentColor}
+                          onChange={(e) => {
+                            setCustomColors((prev) => ({ ...prev, accentColor: e.target.value }))
+                            setSelectedThemeId("custom")
+                          }}
+                          className="size-7 rounded-lg border border-border cursor-pointer bg-transparent p-0.5 shrink-0"
+                        />
+                        <input
+                          type="text"
+                          value={customColors.accentColor}
+                          onChange={(e) => {
+                            setCustomColors((prev) => ({ ...prev, accentColor: e.target.value }))
+                            setSelectedThemeId("custom")
+                          }}
+                          className="w-full font-mono text-[11px] px-2 py-1 rounded bg-secondary/30 border border-border uppercase font-semibold text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Color 3: Text & Price Color */}
+                    <div className="p-2.5 rounded-xl border border-border bg-background space-y-1.5">
+                      <label className="text-[10.5px] font-semibold text-muted-foreground block truncate">
+                        3. Màu chữ & giá
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={customColors.textColor}
+                          onChange={(e) => {
+                            setCustomColors((prev) => ({ ...prev, textColor: e.target.value }))
+                            setSelectedThemeId("custom")
+                          }}
+                          className="size-7 rounded-lg border border-border cursor-pointer bg-transparent p-0.5 shrink-0"
+                        />
+                        <input
+                          type="text"
+                          value={customColors.textColor}
+                          onChange={(e) => {
+                            setCustomColors((prev) => ({ ...prev, textColor: e.target.value }))
+                            setSelectedThemeId("custom")
+                          }}
+                          className="w-full font-mono text-[11px] px-2 py-1 rounded bg-secondary/30 border border-border uppercase font-semibold text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -1188,6 +1355,115 @@ export function PriceListClient() {
               </div>
             </div>
           )}
+
+          {/* TAB 3: CTV PORTAL & SECURITY PIN */}
+          {activeTab === "ctv" && (
+            <div className="space-y-4">
+              {/* Card 1: PIN Management & Activation */}
+              <div className="p-4 rounded-xl border border-border bg-card space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-border">
+                  <div className="flex items-center gap-2">
+                    <div className="size-8 rounded-lg bg-caramel/15 border border-caramel/30 flex items-center justify-center">
+                      <KeyRound className="size-4 text-caramel" />
+                    </div>
+                    <div>
+                      <h3 className="text-xs font-bold text-foreground">Mã PIN & Quyền truy cập KTV</h3>
+                      <p className="text-[10.5px] text-muted-foreground">
+                        KTV truy cập /ktv cần nhập đúng mã PIN này để xem kho & giá trực tiếp.
+                      </p>
+                    </div>
+                  </div>
+
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold">
+                    <span className={ctvAccessEnabled ? "text-emerald-400" : "text-muted-foreground"}>
+                      {ctvAccessEnabled ? "Đang bật" : "Đang tắt"}
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={ctvAccessEnabled}
+                      onChange={(e) => setCtvAccessEnabled(e.target.checked)}
+                      className="size-4 rounded border-border text-primary cursor-pointer accent-primary"
+                    />
+                  </label>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-semibold text-foreground flex items-center gap-1">
+                      <Lock className="size-3 text-caramel" />
+                      <span>Mã PIN bảo mật hiện tại:</span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={ctvPin}
+                        onChange={(e) => setCtvPin(e.target.value)}
+                        placeholder="Ví dụ: 888888 hoặc ctv2024"
+                        className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm font-mono font-bold tracking-widest text-foreground focus:outline-none focus:ring-1 focus:ring-primary text-center"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleSaveAndPublishCtv}
+                    disabled={isSavingPublish}
+                    className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-sm disabled:opacity-50"
+                  >
+                    {isSavingPublish ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
+                    <span>{isSavingPublish ? "Đang lưu..." : "Lưu mã PIN"}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Card 2: Share Links & Live Test */}
+              <div className="p-4 rounded-xl border border-border bg-card space-y-4">
+                <span className="text-xs font-bold text-foreground block">
+                  Đường dẫn & Tin nhắn mời KTV
+                </span>
+
+                <div className="p-3 rounded-xl bg-secondary/30 border border-border space-y-2 text-xs">
+                  <div className="flex items-center justify-between text-muted-foreground text-[11px]">
+                    <span className="font-semibold text-foreground">Link xem trực tiếp cho KTV:</span>
+                    <a
+                      href="/ktv"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-caramel hover:underline flex items-center gap-1 font-semibold"
+                    >
+                      <span>Xem thử trang KTV</span>
+                      <ExternalLink className="size-3" />
+                    </a>
+                  </div>
+                  <div className="p-2 rounded-lg bg-background border border-border font-mono text-[11px] text-foreground select-all break-all">
+                    {typeof window !== "undefined" ? window.location.origin : "https://capygo.id.vn"}/ktv
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleCopyCtvShare}
+                  className="w-full py-2.5 rounded-xl border border-caramel/40 bg-caramel/10 hover:bg-caramel/20 text-caramel text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-sm"
+                >
+                  {copiedCtvLink ? <Check className="size-4 text-emerald-400" /> : <Share2 className="size-4" />}
+                  <span>{copiedCtvLink ? "Đã copy tin nhắn kèm PIN!" : "📋 Sao chép Link & Mã PIN gửi KTV"}</span>
+                </button>
+              </div>
+
+              {/* Card 3: Notice */}
+              <div className="p-3.5 rounded-xl bg-primary/5 border border-primary/20 text-xs text-muted-foreground space-y-1.5">
+                <p className="font-semibold text-foreground flex items-center gap-1.5">
+                  <ShieldCheck className="size-4 text-primary" />
+                  <span>Cơ chế đồng bộ bảo mật cho KTV:</span>
+                </p>
+                <ul className="list-disc list-inside space-y-1 text-[11px] leading-relaxed">
+                  <li>Trang <strong>/ktv</strong> chỉ hiển thị các nhóm và sản phẩm mà bạn đã bật (tích chọn) ở tab <em>Sản phẩm & Giá</em>.</li>
+                  <li>Tên món sẽ hiển thị đúng theo <strong>tên bạn tự đặt</strong>, tồn kho và giá sẽ tự động lấy theo <strong>sản phẩm bạn ghim</strong>.</li>
+                  <li>KTV chỉ cần nhập mã PIN 1 lần, phiên đăng nhập được lưu bảo mật trong 30 ngày.</li>
+                </ul>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* ===================== RIGHT COLUMN: LIVE PREVIEW & EXPORT CONTAINER ===================== */}
@@ -1294,7 +1570,7 @@ export function PriceListClient() {
                                       backgroundColor: activeTheme.badgeBg,
                                       color: activeTheme.accentColor,
                                     }}
-                                    className="text-[10px] font-bold px-1.5 py-0.5 rounded"
+                                    className="text-[10px] font-bold px-1.5 py-0.5 rounded font-mono"
                                   >
                                     {item.stock > 0 ? `Còn ${item.stock}` : "Hết"}
                                   </span>
