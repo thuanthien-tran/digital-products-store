@@ -116,10 +116,12 @@ export async function fulfillOrder(
       item.variant?.sourceProduct?.provider === 'shoptool' ||
       item.variant?.sourceProduct?.provider === 'shoptoolgiare'
     const isBuff = Boolean(
-      item.tokenAmountB != null ||
-      item.variant?.tokenAmountB != null ||
-      item.product.fulfillmentType === 'buff' ||
-      item.variant?.sourceProduct?.externalId === 'buff_muse'
+      !isHaiVan && (
+        item.tokenAmountB != null ||
+        item.variant?.tokenAmountB != null ||
+        item.product.fulfillmentType === 'buff' ||
+        item.variant?.sourceProduct?.externalId === 'buff_muse'
+      )
     )
 
     totalNeeded += item.quantity
