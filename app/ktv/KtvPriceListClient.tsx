@@ -5,7 +5,6 @@ import {
   Lock, 
   KeyRound, 
   RotateCw, 
-  Copy, 
   Check, 
   LogOut, 
   ShieldCheck, 
@@ -160,13 +159,123 @@ export function KtvPriceListClient({ initialAuth, initialData }: KtvPriceListCli
   const [lastUpdated, setLastUpdated] = useState<string>(formatTimeString(initialData?.updatedAt))
   const [isRefreshing, setIsRefreshing] = useState(false)
 
-  // Quick Copy state
-  const [copiedItemId, setCopiedItemId] = useState<string | null>(null)
-
   const pinInputRef = useRef<HTMLInputElement>(null)
+  const lastActiveRef = useRef<number>(Date.now())
+
+  const INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000 // 10 minutes
 
   // Current active theme resolved dynamically
   const activeTheme: ThemeConfig = meta.theme || resolveTheme(meta.selectedThemeId, meta.customColors)
+
+  // Perform logout (clears session cookie on server & local state)
+  const performLogout = async () => {
+    try {
+      await fetch("/api/ctv/auth", { method: "DELETE" })
+    } catch {}
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.removeItem("ktv_last_active_at")
+      } catch {}
+    }
+    setIsAuthenticated(false)
+    setGroups([])
+  }
+
+  // Handle manual Logout button (with confirmation)
+  const handleManualLogout = async () => {
+    if (!confirm("Bạn có muốn đăng xuất khỏi cổng xem bảng giá KTV?")) return
+    await performLogout()
+  }
+
+  // Auto-logout after 10 minutes of inactivity
+  useEffect(() => {
+    if (!isAuthenticated) return
+
+    const recordActivity = () => {
+      const now = Date.now()
+      lastActiveRef.current = now
+      try {
+        localStorage.setItem("ktv_last_active_at", String(now))
+      } catch {}
+    }
+
+    // Check immediately on mount if user was already inactive for > 10m
+    try {
+      const stored = localStorage.getItem("ktv_last_active_at")
+      if (stored) {
+        const parsed = parseInt(stored, 10)
+        if (!isNaN(parsed) && Date.now() - parsed >= INACTIVITY_TIMEOUT_MS) {
+          void performLogout()
+          return
+        }
+      }
+    } catch {}
+
+    recordActivity()
+
+    // Periodic check every 5 seconds
+    const intervalId = setInterval(() => {
+      const now = Date.now()
+      let lastActive = lastActiveRef.current
+      try {
+        const stored = localStorage.getItem("ktv_last_active_at")
+        if (stored) {
+          const parsed = parseInt(stored, 10)
+          if (!isNaN(parsed) && parsed > lastActive) {
+            lastActive = parsed
+            lastActiveRef.current = parsed
+          }
+        }
+      } catch {}
+
+      if (now - lastActive >= INACTIVITY_TIMEOUT_MS) {
+        clearInterval(intervalId)
+        void performLogout()
+      }
+    }, 5000)
+
+    // User interaction listeners (throttled to once every 3s to save CPU)
+    let lastThrottledTime = 0
+    const handleUserActivity = () => {
+      const now = Date.now()
+      if (now - lastThrottledTime > 3000) {
+        lastThrottledTime = now
+        recordActivity()
+      }
+    }
+
+    // Immediate check on tab visibility change (e.g. mobile locked screen unlocked after 15m)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        const now = Date.now()
+        let lastActive = lastActiveRef.current
+        try {
+          const stored = localStorage.getItem("ktv_last_active_at")
+          if (stored) {
+            const parsed = parseInt(stored, 10)
+            if (!isNaN(parsed)) lastActive = parsed
+          }
+        } catch {}
+
+        if (now - lastActive >= INACTIVITY_TIMEOUT_MS) {
+          clearInterval(intervalId)
+          void performLogout()
+        } else {
+          recordActivity()
+        }
+      }
+    }
+
+    const events = ["mousedown", "mousemove", "keydown", "scroll", "touchstart", "click"]
+    events.forEach((evt) => window.addEventListener(evt, handleUserActivity, { passive: true }))
+    document.addEventListener("visibilitychange", handleVisibilityChange)
+
+    return () => {
+      clearInterval(intervalId)
+      events.forEach((evt) => window.removeEventListener(evt, handleUserActivity))
+      document.removeEventListener("visibilitychange", handleVisibilityChange)
+    }
+  }, [isAuthenticated])
 
   // Auto-focus PIN input if not authenticated
   useEffect(() => {
@@ -220,6 +329,11 @@ export function KtvPriceListClient({ initialAuth, initialData }: KtvPriceListCli
       if (res.ok && data.success) {
         setPinInput("")
         setIsAuthenticated(true)
+        if (typeof window !== "undefined") {
+          try {
+            localStorage.setItem("ktv_last_active_at", String(Date.now()))
+          } catch {}
+        }
         // Load data immediately
         await fetchLiveMenu()
       } else {
@@ -232,33 +346,12 @@ export function KtvPriceListClient({ initialAuth, initialData }: KtvPriceListCli
     }
   }
 
-  // Handle Logout (Clear PIN session)
-  const handleLogout = async () => {
-    if (!confirm("Bạn có muốn đăng xuất khỏi cổng xem bảng giá KTV?")) return
-    try {
-      await fetch("/api/ctv/auth", { method: "DELETE" })
-      setIsAuthenticated(false)
-      setGroups([])
-    } catch {}
-  }
-
   // Format price
   const formatPrice = (price: number) => {
     if (meta.currencyUnit === "k") {
       return `${Math.round(price / 1000)}k`
     }
     return `${price.toLocaleString("vi-VN")}${meta.currencyUnit}`
-  }
-
-  // Copy quick quote text for a single item
-  const handleCopyItemQuote = async (item: KtvItem) => {
-    try {
-      const stockText = item.stock > 0 ? `Còn ${item.stock}` : "Tạm hết"
-      const text = `${item.name}${item.note ? ` (${item.note})` : ""}: ${formatPrice(item.price)} (${stockText})`
-      await navigator.clipboard.writeText(text)
-      setCopiedItemId(item.id)
-      setTimeout(() => setCopiedItemId(null), 2500)
-    } catch {}
   }
 
   // SCREEN 1: PIN ENTRY LOCK SCREEN (Ultra-modern, sleek, compact)
@@ -424,7 +517,7 @@ export function KtvPriceListClient({ initialAuth, initialData }: KtvPriceListCli
 
             <button
               type="button"
-              onClick={handleLogout}
+              onClick={handleManualLogout}
               style={{ color: activeTheme.mutedColor }}
               className="p-1.5 rounded-lg hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
               title="Đăng xuất khỏi bảng giá"
@@ -500,7 +593,6 @@ export function KtvPriceListClient({ initialAuth, initialData }: KtvPriceListCli
                     <div className="space-y-1.5 pl-0.5">
                       {group.items.map((item) => {
                         const inStock = item.stock > 0
-                        const isCopied = copiedItemId === item.id
 
                         return (
                           <div
@@ -555,21 +647,6 @@ export function KtvPriceListClient({ initialAuth, initialData }: KtvPriceListCli
                               >
                                 {formatPrice(item.price)}
                               </span>
-
-                              {/* Quick Quote Copy Button */}
-                              <button
-                                type="button"
-                                onClick={() => handleCopyItemQuote(item)}
-                                className={`p-1 rounded transition-all ${
-                                  isCopied
-                                    ? "text-emerald-400 bg-emerald-500/20"
-                                    : "opacity-60 hover:opacity-100 group-hover:opacity-100"
-                                }`}
-                                style={{ color: isCopied ? undefined : activeTheme.mutedColor }}
-                                title="Sao chép cú pháp báo giá gửi khách"
-                              >
-                                {isCopied ? <Check className="size-3" /> : <Copy className="size-3" />}
-                              </button>
                             </div>
                           </div>
                         )
