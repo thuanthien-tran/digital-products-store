@@ -40,17 +40,27 @@ export async function PATCH(req: Request, { params }: Params) {
     const result = await prisma.$transaction(async (tx) => {
       const existing = await tx.product.findUnique({
         where: { id },
-        select: { id: true, name: true, isFeatured: true, slug: true },
+        select: { id: true, name: true, isFeatured: true, slug: true, visibility: true, editorialStatus: true },
       })
 
       if (!existing) {
         throw new Error('PRODUCT_NOT_FOUND')
       }
 
+      if (targetIsFeatured) {
+        if (existing.editorialStatus !== 'published' || existing.visibility !== 'public') {
+          throw new Error('PRODUCT_NOT_PUBLISHED')
+        }
+      }
+
       // If turning ON featured, check that total featured count won't exceed 6
       if (targetIsFeatured && !existing.isFeatured) {
         const currentFeaturedCount = await tx.product.count({
-          where: { isFeatured: true },
+          where: {
+            isFeatured: true,
+            editorialStatus: 'published',
+            visibility: 'public',
+          },
         })
 
         if (currentFeaturedCount >= 6) {
@@ -65,7 +75,11 @@ export async function PATCH(req: Request, { params }: Params) {
       })
 
       const totalFeatured = await tx.product.count({
-        where: { isFeatured: true },
+        where: {
+          isFeatured: true,
+          editorialStatus: 'published',
+          visibility: 'public',
+        },
       })
 
       return { product: updated, featuredCount: totalFeatured }
@@ -90,11 +104,17 @@ export async function PATCH(req: Request, { params }: Params) {
       if (err.message === 'PRODUCT_NOT_FOUND') {
         return NextResponse.json({ error: 'Không tìm thấy sản phẩm' }, { status: 404 })
       }
+      if (err.message === 'PRODUCT_NOT_PUBLISHED') {
+        return NextResponse.json(
+          { error: 'Chỉ có thể chọn nổi bật cho sản phẩm đang đăng bán công khai trên website.' },
+          { status: 400 }
+        )
+      }
       if (err.message === 'FEATURED_LIMIT_EXCEEDED') {
         return NextResponse.json(
           {
             error:
-              'Đã đạt giới hạn tối đa 6 sản phẩm nổi bật (tính cả bản nháp và sản phẩm đang ẩn). Vui lòng bỏ chọn bớt sản phẩm khác trước khi thêm mới.',
+              'Đã đạt giới hạn tối đa 6 sản phẩm nổi bật trên trang chủ. Vui lòng bỏ chọn bớt sản phẩm khác trước khi thêm mới.',
           },
           { status: 400 }
         )

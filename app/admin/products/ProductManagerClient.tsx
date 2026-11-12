@@ -406,11 +406,20 @@ export function ProductManagerClient({ groups }: Props) {
   const handleToggleFeatured = async (product: ProductItem) => {
     const nextVal = !product.isFeatured
 
+    const isCurrentlyPublished = product.editorialStatus === "published" && product.visibility === "public"
+    if (nextVal && !isCurrentlyPublished) {
+      setMessage({
+        type: "error",
+        text: "Chỉ có thể chọn nổi bật cho sản phẩm đang đăng bán công khai trên website.",
+      })
+      return
+    }
+
     // Client-side guard against exceeding 6 featured products
     if (nextVal && counts.featured >= 6) {
       setMessage({
         type: "error",
-        text: "Đã đạt giới hạn tối đa 6 sản phẩm nổi bật (bao gồm cả bản nháp và sản phẩm ẩn). Vui lòng bỏ chọn bớt sản phẩm khác trước.",
+        text: "Đã đạt giới hạn tối đa 6 sản phẩm nổi bật trên trang chủ. Vui lòng bỏ chọn bớt sản phẩm khác trước.",
       })
       return
     }
@@ -1003,7 +1012,13 @@ export function ProductManagerClient({ groups }: Props) {
           <div className="flex items-center gap-1.5 p-1 rounded-xl bg-secondary/50 border border-border w-fit text-xs">
             <button
               type="button"
-              onClick={() => setFeaturedFilter(featuredFilter === "featured" ? "all" : "featured")}
+              onClick={() => {
+                const nextVal = featuredFilter === "featured" ? "all" : "featured"
+                setFeaturedFilter(nextVal)
+                if (nextVal === "featured" && activeTab !== "published" && activeTab !== "all") {
+                  setActiveTab("published")
+                }
+              }}
               className={`px-3 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1.5 ${
                 featuredFilter === "featured"
                   ? "bg-caramel text-espresso font-bold shadow-sm"
@@ -1021,7 +1036,7 @@ export function ProductManagerClient({ groups }: Props) {
                   ? "bg-caramel/20 text-caramel border-caramel/40"
                   : "bg-background/80 text-muted-foreground border-border"
               }`}
-              title="Số sản phẩm nổi bật đã chọn (tối đa 6)"
+              title="Số sản phẩm nổi bật đang hiển thị trên trang chủ (tối đa 6)"
             >
               <Star className="size-3 text-caramel fill-caramel" />
               <span>Đã chọn <strong>{counts.featured}/6</strong></span>
@@ -1211,11 +1226,18 @@ export function ProductManagerClient({ groups }: Props) {
                               type="checkbox"
                               checked={Boolean(p.isFeatured)}
                               onChange={() => handleToggleFeatured(p)}
-                              disabled={savingFeaturedIds.has(p.id) || (!p.isFeatured && counts.featured >= 6)}
+                              disabled={
+                                savingFeaturedIds.has(p.id) ||
+                                p.editorialStatus !== "published" ||
+                                p.visibility !== "public" ||
+                                (!p.isFeatured && counts.featured >= 6)
+                              }
                               aria-label={`Chọn ${p.name} làm sản phẩm nổi bật`}
                               title={
-                                !p.isFeatured && counts.featured >= 6
-                                  ? "Đã đạt giới hạn tối đa 6 sản phẩm nổi bật. Bỏ chọn sản phẩm khác trước."
+                                p.editorialStatus !== "published" || p.visibility !== "public"
+                                  ? "Chỉ có thể chọn nổi bật cho sản phẩm đang đăng bán"
+                                  : !p.isFeatured && counts.featured >= 6
+                                  ? "Đã đạt giới hạn tối đa 6 sản phẩm nổi bật trên trang chủ. Bỏ chọn sản phẩm khác trước."
                                   : p.isFeatured
                                   ? `Bỏ chọn nổi bật cho ${p.name}`
                                   : `Chọn ${p.name} làm sản phẩm nổi bật`

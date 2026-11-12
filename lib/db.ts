@@ -46,6 +46,12 @@ export async function ensureDatabaseSchema(): Promise<void> {
               `ALTER TABLE "Product" ADD COLUMN "requiresInviteCode" BOOLEAN NOT NULL DEFAULT 0;`
             )
           }
+          // Clean up orphaned isFeatured flags on non-published or hidden/draft products
+          try {
+            await prisma.$executeRawUnsafe(
+              `UPDATE "Product" SET "isFeatured" = 0 WHERE "isFeatured" = 1 AND ("editorialStatus" != 'published' OR "visibility" != 'public');`
+            )
+          } catch {}
         }
 
         // Check Variant table columns

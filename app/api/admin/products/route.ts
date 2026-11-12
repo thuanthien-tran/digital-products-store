@@ -30,20 +30,22 @@ export async function GET(req: Request) {
 
     if (featuredOnly) {
       where.isFeatured = true
-    }
-
-    if (customizedOnly || tab === "customized") {
-      where.isCustomized = true
-    } else if (tab === "draft") {
-      where.editorialStatus = "draft"
-    } else if (tab === "published") {
       where.editorialStatus = "published"
       where.visibility = "public"
-    } else if (tab === "hidden") {
-      where.OR = [
-        { editorialStatus: "hidden" },
-        { visibility: "hidden", editorialStatus: { not: "draft" } },
-      ]
+    } else {
+      if (customizedOnly || tab === "customized") {
+        where.isCustomized = true
+      } else if (tab === "draft") {
+        where.editorialStatus = "draft"
+      } else if (tab === "published") {
+        where.editorialStatus = "published"
+        where.visibility = "public"
+      } else if (tab === "hidden") {
+        where.OR = [
+          { editorialStatus: "hidden" },
+          { visibility: "hidden", editorialStatus: { not: "draft" } },
+        ]
+      }
     }
 
     const [products, total, draftCount, publishedCount, hiddenCount, featuredCount, customizedCount] = await Promise.all([
@@ -74,7 +76,7 @@ export async function GET(req: Request) {
       prisma.product.count({ where: { editorialStatus: "draft" } }),
       prisma.product.count({ where: { editorialStatus: "published", visibility: "public" } }),
       prisma.product.count({ where: { OR: [{ editorialStatus: "hidden" }, { visibility: "hidden", editorialStatus: { not: "draft" } }] } }),
-      prisma.product.count({ where: { isFeatured: true } }),
+      prisma.product.count({ where: { isFeatured: true, editorialStatus: "published", visibility: "public" } }),
       prisma.product.count({ where: { isCustomized: true } }),
     ])
 

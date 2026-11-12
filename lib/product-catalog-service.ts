@@ -227,10 +227,14 @@ export async function updateProductDetails(
   } else if (input.action === 'save_draft') {
     updatedData.visibility = 'hidden'
     updatedData.editorialStatus = 'draft'
+    updatedData.isFeatured = false
   }
 
   if (input.visibility !== undefined) updatedData.visibility = input.visibility
   if (input.editorialStatus !== undefined) updatedData.editorialStatus = input.editorialStatus
+  if (updatedData.visibility === 'hidden' || updatedData.editorialStatus === 'hidden' || updatedData.editorialStatus === 'draft') {
+    updatedData.isFeatured = false
+  }
   if (input.sortOrder !== undefined) updatedData.sortOrder = Number(input.sortOrder)
 
   const updatedProduct = await prisma.product.update({
@@ -418,6 +422,7 @@ export async function hideProductFromStore(productId: string, _actorUsername?: s
     data: {
       visibility: 'hidden',
       editorialStatus: 'hidden',
+      isFeatured: false,
     },
   })
   return hidden
