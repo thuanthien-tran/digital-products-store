@@ -18,8 +18,24 @@ import {
   Lock, 
   X, 
   CheckCircle2,
-  Ticket
+  Ticket,
+  PlusCircle,
+  Wallet,
+  Check
 } from "lucide-react"
+
+export interface ProductOptionVariant {
+  id: string
+  name: string
+  priceCents: number
+  availableSerials: number
+}
+
+export interface ProductOption {
+  id: string
+  name: string
+  variants: ProductOptionVariant[]
+}
 
 export interface PaymentItem {
   id: string
@@ -54,7 +70,13 @@ export interface OrderItem {
   }>
 }
 
-export function OrderManagerClient({ orders }: { orders: OrderItem[] }) {
+export function OrderManagerClient({
+  orders,
+  products = [],
+}: {
+  orders: OrderItem[]
+  products?: ProductOption[]
+}) {
   const router = useRouter()
   const { toast } = useToast()
   const [currentOrders, setCurrentOrders] = useState<OrderItem[]>(orders)
@@ -62,6 +84,36 @@ export function OrderManagerClient({ orders }: { orders: OrderItem[] }) {
   const [filterStatus, setFilterStatus] = useState("all")
   const [refreshing, setRefreshing] = useState(false)
   const [cleaningTests, setCleaningTests] = useState(false)
+
+  // Modal State for Manual Order Creation (Bán Ngoài)
+  const [createManualModal, setCreateManualModal] = useState<{
+    isOpen: boolean
+    customerName: string
+    customerContact: string
+    selectedVariantId: string
+    customItemName: string
+    quantity: number
+    amountVnd: string
+    paymentMethod: "bank" | "cash" | "momo" | "zalo"
+    note: string
+    deductSerial: boolean
+    serialContent: string
+    isSubmitting: boolean
+    error?: string
+  }>({
+    isOpen: false,
+    customerName: "",
+    customerContact: "",
+    selectedVariantId: "",
+    customItemName: "",
+    quantity: 1,
+    amountVnd: "",
+    paymentMethod: "bank",
+    note: "",
+    deductSerial: false,
+    serialContent: "",
+    isSubmitting: false,
+  })
 
   // Modal State for Manual Settlement
   const [settleModal, setSettleModal] = useState<{
@@ -293,6 +345,82 @@ export function OrderManagerClient({ orders }: { orders: OrderItem[] }) {
     }
   }
 
+  const handleCreateManualOrder = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (isSubmittingRef.current) return
+
+    const rawAmount = parseInt(createManualModal.amountVnd.replace(/\D/g, ""), 10)
+    if (!rawAmount || rawAmount <= 0) {
+      setCreateManualModal((prev) => ({ ...prev, error: "Vui lòng nhập số tiền hợp lệ (> 0đ)" }))
+      return
+    }
+
+    if (!createManualModal.selectedVariantId && !createManualModal.customItemName.trim()) {
+      setCreateManualModal((prev) => ({
+        ...prev,
+        error: "Vui lòng chọn một gói sản phẩm hoặc nhập tên dịch vụ bán ngoài",
+      }))
+      return
+    }
+
+    isSubmittingRef.current = true
+    setCreateManualModal((prev) => ({ ...prev, isSubmitting: true, error: undefined }))
+
+    try {
+      const res = await fetch("/api/admin/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customerName: createManualModal.customerName.trim(),
+          customerContact: createManualModal.customerContact.trim(),
+          variantId: createManualModal.selectedVariantId || null,
+          customItemName: createManualModal.customItemName.trim() || null,
+          quantity: createManualModal.quantity,
+          amountVnd: rawAmount,
+          paymentMethod: createManualModal.paymentMethod,
+          note: createManualModal.note.trim(),
+          deductSerial: createManualModal.deductSerial,
+          serialContent: createManualModal.serialContent.trim(),
+        }),
+      })
+
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || "Không thể tạo đơn bán ngoài")
+      }
+
+      toast({
+        title: "Tạo đơn thành công",
+        description: json.message || "Đã ghi nhận đơn hàng và cộng vào doanh thu!",
+        variant: "default",
+      })
+
+      setCreateManualModal({
+        isOpen: false,
+        customerName: "",
+        customerContact: "",
+        selectedVariantId: "",
+        customItemName: "",
+        quantity: 1,
+        amountVnd: "",
+        paymentMethod: "bank",
+        note: "",
+        deductSerial: false,
+        serialContent: "",
+        isSubmitting: false,
+      })
+
+      await refreshOrders()
+      router.refresh()
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Đã có lỗi xảy ra"
+      setCreateManualModal((prev) => ({ ...prev, error: msg, isSubmitting: false }))
+      toast({ title: "Lỗi tạo đơn", description: msg, variant: "destructive" })
+    } finally {
+      isSubmittingRef.current = false
+    }
+  }
+
   const filteredOrders = currentOrders.filter((o) => {
     const matchSearch =
       o.code.toLowerCase().includes(search.toLowerCase()) ||
@@ -315,6 +443,16 @@ export function OrderManagerClient({ orders }: { orders: OrderItem[] }) {
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
+
+          <Button
+            size="sm"
+            onClick={() => setCreateManualModal((prev) => ({ ...prev, isOpen: true, error: undefined }))}
+            className="text-xs bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-1.5 cursor-pointer shrink-0 shadow-xs"
+            title="Ghi nhận đơn bán ngoài (Zalo, Facebook, trực tiếp) để tính vào doanh thu"
+          >
+            <PlusCircle className="size-3.5" />
+            <span>Tạo đơn bán ngoài</span>
+          </Button>
 
           <Button
             size="sm"
@@ -874,6 +1012,277 @@ export function OrderManagerClient({ orders }: { orders: OrderItem[] }) {
                 Đóng
               </Button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: TẠO ĐƠN BÁN NGOÀI (THỦ CÔNG) */}
+      {createManualModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in-0 duration-200">
+          <div className="w-full max-w-xl rounded-2xl border border-border bg-card p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-border/60 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                  <Wallet className="size-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-foreground">Ghi Nhận Đơn Bán Ngoài</h3>
+                  <p className="text-[11px] text-muted-foreground">
+                    Tạo đơn thành công &amp; cộng trực tiếp vào Tổng Doanh Thu Admin
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCreateManualModal((prev) => ({ ...prev, isOpen: false }))}
+                className="text-muted-foreground hover:text-foreground p-1 rounded-lg hover:bg-secondary transition-colors cursor-pointer"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateManualOrder} className="space-y-4">
+              {createManualModal.error && (
+                <div className="p-3 rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-400 text-xs flex items-center gap-2">
+                  <AlertCircle className="size-4 shrink-0" />
+                  <span>{createManualModal.error}</span>
+                </div>
+              )}
+
+              {/* Thông tin khách hàng */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-foreground">Tên khách / Người mua</label>
+                  <Input
+                    placeholder="VD: Anh Nam Zalo..."
+                    value={createManualModal.customerName}
+                    onChange={(e) => setCreateManualModal((p) => ({ ...p, customerName: e.target.value }))}
+                    className="text-xs"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-foreground">SĐT / Zalo / Email liên hệ</label>
+                  <Input
+                    placeholder="VD: 0987654321 hoặc zalo"
+                    value={createManualModal.customerContact}
+                    onChange={(e) => setCreateManualModal((p) => ({ ...p, customerContact: e.target.value }))}
+                    className="text-xs"
+                  />
+                </div>
+              </div>
+
+              {/* Chọn gói sản phẩm có sẵn hoặc tự nhập */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-foreground flex items-center justify-between">
+                  <span>Chọn sản phẩm trong kho (Tùy chọn)</span>
+                  <span className="text-[10px] text-muted-foreground font-normal">Tự điền giá bán khi chọn</span>
+                </label>
+                <select
+                  value={createManualModal.selectedVariantId}
+                  onChange={(e) => {
+                    const vId = e.target.value
+                    if (!vId) {
+                      setCreateManualModal((p) => ({
+                        ...p,
+                        selectedVariantId: "",
+                        deductSerial: false,
+                      }))
+                      return
+                    }
+                    let foundName = ""
+                    let foundPrice = 0
+                    for (const p of products) {
+                      const v = p.variants.find((x) => x.id === vId)
+                      if (v) {
+                        foundName = `${p.name} (${v.name})`
+                        foundPrice = v.priceCents
+                        break
+                      }
+                    }
+                    setCreateManualModal((p) => ({
+                      ...p,
+                      selectedVariantId: vId,
+                      customItemName: foundName,
+                      amountVnd: foundPrice > 0 ? (foundPrice * p.quantity).toLocaleString("vi-VN") : p.amountVnd,
+                    }))
+                  }}
+                  className="w-full p-2.5 rounded-xl border border-border bg-background text-foreground text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+                >
+                  <option value="">-- Tự nhập tên &amp; giá tự do bên dưới --</option>
+                  {products.map((p) => (
+                    <optgroup key={p.id} label={p.name}>
+                      {p.variants.map((v) => (
+                        <option key={v.id} value={v.id}>
+                          {v.name} — {v.priceCents.toLocaleString("vi-VN")}đ {v.availableSerials > 0 ? `(Kho sẵn: ${v.availableSerials})` : ""}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+              </div>
+
+              {/* Tên dịch vụ hiển thị */}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-foreground">
+                  Tên gói / Dịch vụ bán ngoài <span className="text-rose-400">*</span>
+                </label>
+                <Input
+                  placeholder="VD: Canva Pro 1 Năm hoặc Buff 10B Token..."
+                  value={createManualModal.customItemName}
+                  onChange={(e) => setCreateManualModal((p) => ({ ...p, customItemName: e.target.value }))}
+                  required
+                  className="text-xs"
+                />
+              </div>
+
+              {/* Số lượng & Số tiền thực thu */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-foreground">Số lượng</label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={100}
+                    value={createManualModal.quantity}
+                    onChange={(e) => {
+                      const q = Math.max(1, parseInt(e.target.value, 10) || 1)
+                      setCreateManualModal((p) => ({ ...p, quantity: q }))
+                    }}
+                    className="text-xs"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-foreground">
+                    Số tiền thực thu (VND) <span className="text-rose-400">*</span>
+                  </label>
+                  <div className="relative">
+                    <Input
+                      placeholder="VD: 50.000"
+                      value={createManualModal.amountVnd}
+                      onChange={(e) => {
+                        const num = e.target.value.replace(/\D/g, "")
+                        setCreateManualModal((p) => ({
+                          ...p,
+                          amountVnd: num ? parseInt(num, 10).toLocaleString("vi-VN") : "",
+                        }))
+                      }}
+                      required
+                      className="text-xs font-bold text-emerald-400 pr-8"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground">
+                      đ
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Hình thức thanh toán */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-foreground">Hình thức thanh toán thực tế</label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {[
+                    { id: "bank", label: "Chuyển khoản" },
+                    { id: "cash", label: "Tiền mặt" },
+                    { id: "momo", label: "Momo / Ví" },
+                    { id: "zalo", label: "ZaloPay" },
+                  ].map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => setCreateManualModal((p) => ({ ...p, paymentMethod: m.id as any }))}
+                      className={`p-2 rounded-xl border text-xs font-medium transition-all cursor-pointer ${
+                        createManualModal.paymentMethod === m.id
+                          ? "bg-primary/10 border-primary text-primary font-bold shadow-xs"
+                          : "border-border bg-background hover:bg-secondary text-muted-foreground"
+                      }`}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Tùy chọn trừ kho serials */}
+              {createManualModal.selectedVariantId && (
+                <div className="p-3 rounded-xl border border-border/80 bg-secondary/20 space-y-2">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-foreground">
+                    <input
+                      type="checkbox"
+                      checked={createManualModal.deductSerial}
+                      onChange={(e) =>
+                        setCreateManualModal((p) => ({ ...p, deductSerial: e.target.checked }))
+                      }
+                      className="size-4 rounded text-primary focus:ring-primary cursor-pointer"
+                    />
+                    <span>Tự động xuất &amp; trừ 1 serial có sẵn trong kho của gói này</span>
+                  </label>
+                  <p className="text-[11px] text-muted-foreground">
+                    Nếu bạn đã gửi tài khoản cho khách ngoài chat và không muốn trừ kho trên web, hãy bỏ tick ô này.
+                  </p>
+                </div>
+              )}
+
+              {/* Tùy chọn lưu tài khoản đã cấp cho khách để lưu vết */}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-foreground flex items-center justify-between">
+                  <span>Thông tin tài khoản / Serial đã gửi cho khách (Tùy chọn)</span>
+                  <span className="text-[10px] text-muted-foreground font-normal">Lưu vết để bảo hành</span>
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="VD: user@email.com|pass123 hoặc Mã mời Muse: 0FBALX..."
+                  value={createManualModal.serialContent}
+                  onChange={(e) => setCreateManualModal((p) => ({ ...p, serialContent: e.target.value }))}
+                  className="w-full p-2.5 rounded-xl border border-border bg-background text-foreground text-xs font-mono placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+                />
+              </div>
+
+              {/* Ghi chú thêm */}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-foreground">Ghi chú đối soát</label>
+                <Input
+                  placeholder="VD: Bán qua Zalo cá nhân, đã nhận tiền vào Techcombank..."
+                  value={createManualModal.note}
+                  onChange={(e) => setCreateManualModal((p) => ({ ...p, note: e.target.value }))}
+                  className="text-xs"
+                />
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-border/60">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={createManualModal.isSubmitting}
+                  onClick={() => setCreateManualModal((prev) => ({ ...prev, isOpen: false }))}
+                  className="text-xs cursor-pointer"
+                >
+                  Hủy bỏ
+                </Button>
+
+                <Button
+                  type="submit"
+                  size="sm"
+                  disabled={createManualModal.isSubmitting}
+                  className="text-xs bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-1.5 cursor-pointer"
+                >
+                  {createManualModal.isSubmitting ? (
+                    <>
+                      <RefreshCw className="size-3.5 animate-spin" />
+                      <span>Đang lưu...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="size-3.5" />
+                      <span>Xác nhận &amp; Cộng doanh thu</span>
+                    </>
+                  )}
+                </Button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -5,21 +5,41 @@ export const dynamic = "force-dynamic"
 export const revalidate = 0
 
 export default async function AdminOrdersPage() {
-  const orders = await prisma.order.findMany({
-    orderBy: { createdAt: "desc" },
-    include: {
-      items: {
-        include: {
-          product: { select: { name: true } },
-          variant: { select: { name: true } },
-          serials: { select: { content: true } },
+  const [orders, products] = await Promise.all([
+    prisma.order.findMany({
+      orderBy: { createdAt: "desc" },
+      include: {
+        items: {
+          include: {
+            product: { select: { name: true } },
+            variant: { select: { name: true } },
+            serials: { select: { content: true } },
+          },
+        },
+        payments: {
+          orderBy: { createdAt: "desc" },
         },
       },
-      payments: {
-        orderBy: { createdAt: "desc" },
+    }),
+    prisma.product.findMany({
+      where: { visibility: "public" },
+      orderBy: { name: "asc" },
+      select: {
+        id: true,
+        name: true,
+        variants: {
+          where: { isActive: true },
+          orderBy: { sortOrder: "asc" },
+          select: {
+            id: true,
+            name: true,
+            priceCents: true,
+            _count: { select: { serials: { where: { status: "available" } } } },
+          },
+        },
       },
-    },
-  })
+    }),
+  ])
 
   return (
     <div className="space-y-6">
@@ -29,6 +49,16 @@ export default async function AdminOrdersPage() {
       </div>
 
       <OrderManagerClient
+        products={products.map((p) => ({
+          id: p.id,
+          name: p.name,
+          variants: p.variants.map((v) => ({
+            id: v.id,
+            name: v.name,
+            priceCents: v.priceCents,
+            availableSerials: v._count.serials,
+          })),
+        }))}
         orders={orders.map((o) => {
           const paidAmount = o.payments.reduce((sum, p) => sum + p.amount, 0)
           return {
