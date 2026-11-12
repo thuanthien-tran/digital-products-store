@@ -10,7 +10,6 @@ import {
   Plus, 
   Trash2, 
   Eye, 
-  EyeOff, 
   Sparkles, 
   FileText, 
   ChevronRight, 
@@ -18,12 +17,15 @@ import {
   Sliders, 
   Layers, 
   Loader2, 
-  Share2,
-  PackageCheck,
-  ArrowLeft,
-  ExternalLink
+  Link2,
+  Unlink,
+  RefreshCw,
+  Search,
+  X,
+  ArrowUpDown
 } from "lucide-react"
 import { toPng, toBlob } from "html-to-image"
+import { StoreCatalogOption } from "@/app/api/admin/price-list/route"
 
 export interface PriceMenuItem {
   id: string
@@ -32,6 +34,10 @@ export interface PriceMenuItem {
   price: number
   stock: number
   isEnabled: boolean
+  linkedProductId?: string
+  linkedVariantId?: string
+  linkedName?: string
+  autoSync?: boolean
 }
 
 export interface PriceMenuGroup {
@@ -105,10 +111,11 @@ const THEMES: ThemeConfig[] = [
   },
 ]
 
-const LOCAL_STORAGE_KEY = "capygo_price_list_v1"
+const LOCAL_STORAGE_KEY = "capygo_price_list_v2"
 
 export function PriceListClient() {
   const [groups, setGroups] = useState<PriceMenuGroup[]>([])
+  const [catalog, setCatalog] = useState<StoreCatalogOption[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<"items" | "settings">("items")
 
@@ -129,22 +136,49 @@ export function PriceListClient() {
   // Search filter inside editor
   const [editorSearch, setEditorSearch] = useState("")
 
+  // Linking Modal State
+  const [linkingTarget, setLinkingTarget] = useState<{ groupId: string; itemId: string; currentName: string } | null>(null)
+  const [pickerSearch, setPickerSearch] = useState("")
+
   // Action status states
   const [isDownloading, setIsDownloading] = useState(false)
+  const [isSyncingPrices, setIsSyncingPrices] = useState(false)
   const [copiedImage, setCopiedImage] = useState(false)
   const [copiedText, setCopiedText] = useState(false)
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null)
 
   const previewCardRef = useRef<HTMLDivElement>(null)
+  const pickerInputRef = useRef<HTMLInputElement>(null)
 
   const activeTheme = THEMES.find((t) => t.id === selectedThemeId) || THEMES[0]
+
+  // Focus picker search input when modal opens
+  useEffect(() => {
+    if (linkingTarget) {
+      setTimeout(() => pickerInputRef.current?.focus(), 80)
+    }
+  }, [linkingTarget])
 
   // Load initial data
   const loadData = async (forceFresh = false) => {
     setLoading(true)
     setMessage(null)
     try {
-      // Check localStorage first if not forced
+      // Fetch latest catalog from API
+      const res = await fetch("/api/admin/price-list")
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Không thể tải dữ liệu bảng giá")
+      }
+
+      const freshCatalog: StoreCatalogOption[] = data.catalog || []
+      setCatalog(freshCatalog)
+
+      if (data.meta?.domain) setFooterDomain(data.meta.domain)
+      if (data.meta?.hotline) setHotline(data.meta.hotline)
+      if (data.meta?.warrantyNote) setFooterNote(data.meta.warrantyNote)
+
+      // Check localStorage first if not forced fresh
       if (!forceFresh && typeof window !== "undefined") {
         const saved = localStorage.getItem(LOCAL_STORAGE_KEY)
         if (saved) {
@@ -169,19 +203,10 @@ export function PriceListClient() {
         }
       }
 
-      // Fetch from API
-      const res = await fetch("/api/admin/price-list")
-      const data = await res.json()
-      if (res.ok && data.success) {
-        setGroups(data.groups || [])
-        if (data.meta?.domain) setFooterDomain(data.meta.domain)
-        if (data.meta?.hotline) setHotline(data.meta.hotline)
-        if (data.meta?.warrantyNote) setFooterNote(data.meta.warrantyNote)
-      } else {
-        setMessage({ text: data.error || "Không thể tải dữ liệu bảng giá", type: "error" })
-      }
-    } catch {
-      setMessage({ text: "Lỗi kết nối khi tải bảng giá", type: "error" })
+      // Default: use server-generated groups
+      setGroups(data.groups || [])
+    } catch (err: any) {
+      setMessage({ text: err.message || "Lỗi kết nối khi tải bảng giá", type: "error" })
     } finally {
       setLoading(false)
     }
@@ -231,6 +256,57 @@ export function PriceListClient() {
       return `${Math.round(cents / 1000)}k`
     }
     return `${cents.toLocaleString("vi-VN")}${currencyUnit}`
+  }
+
+  // Synchronize prices & stock from website for all linked items, KEEPING custom names!
+  const handleSyncLinkedPrices = async () => {
+    setIsSyncingPrices(true)
+    setMessage(null)
+    try {
+      const res = await fetch("/api/admin/price-list")
+      const data = await res.json()
+      if (!res.ok || !data.success) throw new Error(data.error || "Lỗi nạp dữ liệu từ web")
+
+      const freshCatalog: StoreCatalogOption[] = data.catalog || []
+      setCatalog(freshCatalog)
+
+      let updatedCount = 0
+      setGroups((prevGroups) =>
+        prevGroups.map((group) => ({
+          ...group,
+          items: group.items.map((item) => {
+            if (!item.linkedProductId) return item
+
+            // Find matching product in fresh catalog
+            const target = freshCatalog.find((c) =>
+              item.linkedVariantId
+                ? c.productId === item.linkedProductId && c.variantId === item.linkedVariantId
+                : c.productId === item.linkedProductId
+            )
+
+            if (target) {
+              updatedCount++
+              return {
+                ...item,
+                price: target.price,
+                stock: target.stock,
+                linkedName: target.fullName,
+              }
+            }
+            return item
+          }),
+        }))
+      )
+
+      setMessage({
+        type: "success",
+        text: `Đã tự động đồng bộ giá và tồn kho cho ${updatedCount} sản phẩm được ghim (giữ nguyên 100% tên bạn đã tự đặt)!`,
+      })
+    } catch (err: any) {
+      setMessage({ type: "error", text: err.message || "Lỗi đồng bộ giá" })
+    } finally {
+      setIsSyncingPrices(false)
+    }
   }
 
   // Toggle group visibility
@@ -333,6 +409,95 @@ export function PriceListClient() {
     setGroups((prev) => prev.filter((g) => g.id !== groupId))
   }
 
+  // Link an item to a catalog product
+  const handleBindCatalogProduct = (catItem: StoreCatalogOption) => {
+    if (!linkingTarget) return
+
+    setGroups((prevGroups) =>
+      prevGroups.map((g) => {
+        if (g.id !== linkingTarget.groupId) return g
+        return {
+          ...g,
+          items: g.items.map((i) => {
+            if (i.id !== linkingTarget.itemId) return i
+
+            // If the item has default name or user wants, keep custom name or update if empty
+            const shouldUpdateName = !i.name || i.name === "Sản phẩm mới" || i.name.trim() === ""
+
+            return {
+              ...i,
+              name: shouldUpdateName ? catItem.fullName : i.name,
+              price: catItem.price,
+              stock: catItem.stock,
+              linkedProductId: catItem.productId,
+              linkedVariantId: catItem.variantId,
+              linkedName: catItem.fullName,
+              autoSync: true,
+            }
+          }),
+        }
+      })
+    )
+
+    setMessage({
+      type: "success",
+      text: `Đã ghim dòng "${linkingTarget.currentName}" với sản phẩm "${catItem.fullName}"! Giá và tồn kho đã được cập nhật tự động.`,
+    })
+    setLinkingTarget(null)
+    setPickerSearch("")
+  }
+
+  // Unlink an item
+  const handleUnlinkItem = (groupId: string, itemId: string) => {
+    setGroups((prev) =>
+      prev.map((g) => {
+        if (g.id !== groupId) return g
+        return {
+          ...g,
+          items: g.items.map((i) =>
+            i.id === itemId
+              ? {
+                  ...i,
+                  linkedProductId: undefined,
+                  linkedVariantId: undefined,
+                  linkedName: undefined,
+                  autoSync: false,
+                }
+              : i
+          ),
+        }
+      })
+    )
+  }
+
+  // Sync a single linked item right now
+  const handleSyncSingleItem = (groupId: string, itemId: string) => {
+    setGroups((prev) =>
+      prev.map((g) => {
+        if (g.id !== groupId) return g
+        return {
+          ...g,
+          items: g.items.map((i) => {
+            if (i.id !== itemId || !i.linkedProductId) return i
+            const target = catalog.find((c) =>
+              i.linkedVariantId
+                ? c.productId === i.linkedProductId && c.variantId === i.linkedVariantId
+                : c.productId === i.linkedProductId
+            )
+            if (target) {
+              setMessage({
+                type: "success",
+                text: `Đã đồng bộ giá (${formatPrice(target.price)}) và kho (${target.stock}) cho dòng "${i.name}".`,
+              })
+              return { ...i, price: target.price, stock: target.stock, linkedName: target.fullName }
+            }
+            return i
+          }),
+        }
+      })
+    )
+  }
+
   // 1. Export Image PNG
   const handleDownloadPng = async () => {
     if (!previewCardRef.current) return
@@ -374,15 +539,14 @@ export function PriceListClient() {
         setTimeout(() => setCopiedImage(false), 3000)
         setMessage({ text: "Đã sao chép ảnh vào Clipboard! Bạn có thể nhấn Ctrl + V để dán ngay vào Zalo hoặc Telegram.", type: "success" })
       } else {
-        // Fallback: download
         await handleDownloadPng()
       }
     } catch (err: any) {
-      setMessage({ text: "Không thể sao chép ảnh (trình duyệt có thể chặn quyền clipboard): " + err.message, type: "error" })
+      setMessage({ text: "Không thể sao chép ảnh: " + err.message, type: "error" })
     }
   }
 
-  // 3. Copy Text for Chat (Zalo / Telegram / Messenger)
+  // 3. Copy Text for Chat
   const handleCopyChatText = async () => {
     try {
       let text = `🔥 ${menuTitle} — ${footerDomain.toUpperCase()} 🔥\n`
@@ -425,6 +589,14 @@ export function PriceListClient() {
     0
   )
 
+  // Filtered catalog for picker modal
+  const filteredCatalog = catalog.filter((c) =>
+    pickerSearch
+      ? c.fullName.toLowerCase().includes(pickerSearch.toLowerCase()) ||
+        c.groupName.toLowerCase().includes(pickerSearch.toLowerCase())
+      : true
+  )
+
   return (
     <div className="space-y-6">
       {/* Top Header & Breadcrumb */}
@@ -450,14 +622,30 @@ export function PriceListClient() {
 
         {/* Global Action Buttons */}
         <div className="flex flex-wrap items-center gap-2">
+          {/* Sync Prices from Web while preserving custom names */}
           <button
             type="button"
-            onClick={() => loadData(true)}
-            className="px-3 py-1.5 rounded-lg border border-border bg-card hover:bg-secondary text-xs font-semibold text-foreground flex items-center gap-1.5 transition-all shadow-sm"
-            title="Đồng bộ lại toàn bộ sản phẩm và giá mới nhất từ website"
+            onClick={handleSyncLinkedPrices}
+            disabled={isSyncingPrices}
+            className="px-3 py-1.5 rounded-lg border border-primary/40 bg-primary/10 hover:bg-primary/20 text-xs font-semibold text-primary flex items-center gap-1.5 transition-all shadow-sm disabled:opacity-50"
+            title="Đồng bộ ngay giá bán và tồn kho từ website cho các sản phẩm đã ghim (vẫn giữ nguyên 100% tên bạn tự đặt)"
+          >
+            <RefreshCw className={`size-3.5 ${isSyncingPrices ? "animate-spin" : ""}`} />
+            <span>{isSyncingPrices ? "Đang đồng bộ..." : "Đồng bộ giá & kho"}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              if (confirm("Bạn có chắc chắn muốn nạp lại dữ liệu gốc từ website? Toàn bộ tùy chỉnh tên sẽ được khôi phục theo mặc định.")) {
+                void loadData(true)
+              }
+            }}
+            className="px-3 py-1.5 rounded-lg border border-border bg-card hover:bg-secondary text-xs font-semibold text-muted-foreground hover:text-foreground flex items-center gap-1.5 transition-all shadow-sm"
+            title="Khôi phục lại toàn bộ sản phẩm và tên mặc định từ website"
           >
             <RotateCcw className="size-3.5" />
-            <span>Nạp lại từ web</span>
+            <span>Khôi phục gốc</span>
           </button>
 
           <button
@@ -544,13 +732,16 @@ export function PriceListClient() {
             <div className="space-y-4">
               {/* Header bar of items tab */}
               <div className="flex items-center justify-between gap-3 p-3 rounded-xl border border-border bg-card">
-                <input
-                  type="text"
-                  placeholder="Lọc tên sản phẩm trong menu..."
-                  value={editorSearch}
-                  onChange={(e) => setEditorSearch(e.target.value)}
-                  className="px-3 py-1.5 rounded-lg border border-border bg-background text-xs w-full max-w-xs focus:outline-none focus:ring-1 focus:ring-primary"
-                />
+                <div className="relative flex-1 max-w-xs">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+                  <input
+                    type="text"
+                    placeholder="Lọc tên sản phẩm trong menu..."
+                    value={editorSearch}
+                    onChange={(e) => setEditorSearch(e.target.value)}
+                    className="pl-8 pr-3 py-1.5 rounded-lg border border-border bg-background text-xs w-full focus:outline-none focus:ring-1 focus:ring-primary"
+                  />
+                </div>
                 <button
                   type="button"
                   onClick={handleAddGroup}
@@ -575,7 +766,8 @@ export function PriceListClient() {
                     const filteredItems = group.items.filter((item) =>
                       editorSearch
                         ? item.name.toLowerCase().includes(editorSearch.toLowerCase()) ||
-                          group.name.toLowerCase().includes(editorSearch.toLowerCase())
+                          group.name.toLowerCase().includes(editorSearch.toLowerCase()) ||
+                          (item.linkedName && item.linkedName.toLowerCase().includes(editorSearch.toLowerCase()))
                         : true
                     )
 
@@ -638,91 +830,181 @@ export function PriceListClient() {
                         </div>
 
                         {/* Items inside Group */}
-                        <div className="p-2 space-y-1.5">
+                        <div className="p-2 space-y-2">
                           {filteredItems.map((item) => (
                             <div
                               key={item.id}
-                              className={`flex items-center gap-2 p-2 rounded-lg text-xs transition-colors ${
-                                item.isEnabled ? "bg-background/80 hover:bg-secondary/40 border border-border/40" : "bg-muted/10 opacity-50"
+                              className={`p-2.5 rounded-lg text-xs transition-colors space-y-1.5 ${
+                                item.isEnabled ? "bg-background/80 hover:bg-secondary/30 border border-border/50" : "bg-muted/10 opacity-50"
                               }`}
                             >
-                              {/* Checkbox show/hide */}
-                              <input
-                                type="checkbox"
-                                checked={item.isEnabled}
-                                onChange={() => handleToggleItem(group.id, item.id)}
-                                className="size-3.5 rounded border-border bg-card text-caramel focus:ring-1 focus:ring-caramel cursor-pointer accent-caramel shrink-0"
-                                title="Bật/Tắt dòng này trên bảng giá"
-                              />
-
-                              {/* Item Name */}
-                              <input
-                                type="text"
-                                value={item.name}
-                                onChange={(e) =>
-                                  handleUpdateItem(group.id, item.id, "name", e.target.value)
-                                }
-                                placeholder="Tên sản phẩm..."
-                                className="flex-1 min-w-[140px] px-2 py-1 rounded bg-card border border-border/60 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary font-medium"
-                              />
-
-                              {/* Item Note (e.g. 1 tháng / KBH) */}
-                              <input
-                                type="text"
-                                value={item.note || ""}
-                                onChange={(e) =>
-                                  handleUpdateItem(group.id, item.id, "note", e.target.value)
-                                }
-                                placeholder="Ghi chú (KBH, 1T...)"
-                                className="w-24 px-1.5 py-1 rounded bg-card border border-border/60 text-[11px] text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary hidden sm:block"
-                              />
-
-                              {/* Price */}
-                              <div className="flex items-center gap-1 shrink-0">
+                              {/* Row 1: Checkbox, Name, Note, Price, Stock, Delete */}
+                              <div className="flex items-center gap-2">
                                 <input
-                                  type="number"
-                                  value={item.price}
-                                  onChange={(e) =>
-                                    handleUpdateItem(
-                                      group.id,
-                                      item.id,
-                                      "price",
-                                      Math.max(0, parseInt(e.target.value) || 0)
-                                    )
-                                  }
-                                  step={1000}
-                                  className="w-20 px-2 py-1 rounded bg-card border border-border/60 text-xs text-right font-bold text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                                  type="checkbox"
+                                  checked={item.isEnabled}
+                                  onChange={() => handleToggleItem(group.id, item.id)}
+                                  className="size-3.5 rounded border-border bg-card text-caramel focus:ring-1 focus:ring-caramel cursor-pointer accent-caramel shrink-0"
+                                  title="Bật/Tắt dòng này trên bảng giá"
                                 />
-                                <span className="text-[11px] text-muted-foreground font-semibold">đ</span>
+
+                                {/* Custom Display Name Input */}
+                                <div className="flex-1 min-w-[130px]">
+                                  <input
+                                    type="text"
+                                    value={item.name}
+                                    onChange={(e) =>
+                                      handleUpdateItem(group.id, item.id, "name", e.target.value)
+                                    }
+                                    placeholder="Tên hiển thị trên menu..."
+                                    className="w-full px-2 py-1 rounded bg-card border border-border/70 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary font-medium"
+                                  />
+                                </div>
+
+                                {/* Item Note (e.g. 1 tháng / KBH) */}
+                                <input
+                                  type="text"
+                                  value={item.note || ""}
+                                  onChange={(e) =>
+                                    handleUpdateItem(group.id, item.id, "note", e.target.value)
+                                  }
+                                  placeholder="Ghi chú (KBH, 1T...)"
+                                  className="w-24 px-1.5 py-1 rounded bg-card border border-border/70 text-[11px] text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary hidden sm:block shrink-0"
+                                />
+
+                                {/* Price */}
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <input
+                                    type="number"
+                                    value={item.price}
+                                    onChange={(e) =>
+                                      handleUpdateItem(
+                                        group.id,
+                                        item.id,
+                                        "price",
+                                        Math.max(0, parseInt(e.target.value) || 0)
+                                      )
+                                    }
+                                    step={1000}
+                                    className="w-20 px-2 py-1 rounded bg-card border border-border/70 text-xs text-right font-bold text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                                  />
+                                  <span className="text-[11px] text-muted-foreground font-semibold">đ</span>
+                                </div>
+
+                                {/* Stock (if column enabled) */}
+                                {showStock && (
+                                  <input
+                                    type="number"
+                                    value={item.stock}
+                                    onChange={(e) =>
+                                      handleUpdateItem(
+                                        group.id,
+                                        item.id,
+                                        "stock",
+                                        Math.max(0, parseInt(e.target.value) || 0)
+                                      )
+                                    }
+                                    title="Tồn kho"
+                                    className="w-14 px-1.5 py-1 rounded bg-card border border-border/70 text-xs text-center text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary shrink-0 font-mono"
+                                  />
+                                )}
+
+                                {/* Delete Item */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteItem(group.id, item.id)}
+                                  className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors shrink-0"
+                                  title="Xóa sản phẩm này"
+                                >
+                                  <Trash2 className="size-3" />
+                                </button>
                               </div>
 
-                              {/* Stock (if column enabled) */}
-                              {showStock && (
-                                <input
-                                  type="number"
-                                  value={item.stock}
-                                  onChange={(e) =>
-                                    handleUpdateItem(
-                                      group.id,
-                                      item.id,
-                                      "stock",
-                                      Math.max(0, parseInt(e.target.value) || 0)
-                                    )
-                                  }
-                                  title="Tồn kho"
-                                  className="w-14 px-1.5 py-1 rounded bg-card border border-border/60 text-xs text-center text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary shrink-0"
-                                />
-                              )}
+                              {/* Row 2: Product Binding / Ghim sản phẩm kho */}
+                              <div className="pl-5.5 flex flex-wrap items-center justify-between gap-2 text-[11px] pt-0.5 border-t border-border/20">
+                                {item.linkedProductId ? (
+                                  <div className="flex items-center gap-1.5 text-muted-foreground min-w-0 flex-1">
+                                    <span className="inline-flex items-center gap-1 text-caramel font-semibold shrink-0">
+                                      <Link2 className="size-3" />
+                                      Đang ghim:
+                                    </span>
+                                    <span
+                                      className="font-medium text-foreground truncate max-w-[260px] bg-secondary/40 px-1.5 py-0.5 rounded border border-border/40"
+                                      title={item.linkedName}
+                                    >
+                                      {item.linkedName || "Sản phẩm trong kho"}
+                                    </span>
+                                    <span
+                                      className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-semibold ${
+                                        item.stock > 0
+                                          ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                                          : "bg-destructive/10 text-destructive border border-destructive/20"
+                                      }`}
+                                    >
+                                      Kho: {item.stock}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-1 text-muted-foreground/80">
+                                    <span className="italic text-[10.5px]">Chưa ghim với kho (nhập tay)</span>
+                                  </div>
+                                )}
 
-                              {/* Delete Item */}
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteItem(group.id, item.id)}
-                                className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors shrink-0"
-                                title="Xóa sản phẩm này"
-                              >
-                                <Trash2 className="size-3" />
-                              </button>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  {item.linkedProductId ? (
+                                    <>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleSyncSingleItem(group.id, item.id)}
+                                        className="text-[10.5px] text-primary hover:underline flex items-center gap-1 font-medium"
+                                        title="Lấy lại giá bán và tồn kho mới nhất từ sản phẩm kho"
+                                      >
+                                        <RefreshCw className="size-2.5" />
+                                        <span>Đồng bộ</span>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          setLinkingTarget({
+                                            groupId: group.id,
+                                            itemId: item.id,
+                                            currentName: item.name,
+                                          })
+                                        }
+                                        className="text-[10.5px] text-caramel hover:underline font-medium"
+                                        title="Đổi sang ghim sản phẩm/gói khác trong kho"
+                                      >
+                                        Đổi ghim
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleUnlinkItem(group.id, item.id)}
+                                        className="text-[10.5px] text-muted-foreground hover:text-destructive transition-colors flex items-center gap-0.5"
+                                        title="Gỡ ghim (chuyển sang quản lý giá thủ công)"
+                                      >
+                                        <Unlink className="size-2.5" />
+                                        <span>Gỡ</span>
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setLinkingTarget({
+                                          groupId: group.id,
+                                          itemId: item.id,
+                                          currentName: item.name,
+                                        })
+                                      }
+                                      className="text-[10.5px] text-caramel hover:text-caramel/80 flex items-center gap-1 font-semibold hover:underline"
+                                      title="Chọn một sản phẩm/gói trong kho để tự động cập nhật giá và số lượng"
+                                    >
+                                      <Link2 className="size-3" />
+                                      <span>+ Ghim với sản phẩm kho</span>
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
                             </div>
                           ))}
                         </div>
@@ -1058,6 +1340,106 @@ export function PriceListClient() {
           </div>
         </div>
       </div>
+
+      {/* ===================== MODAL: LINK PRODUCT PICKER ===================== */}
+      {linkingTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-lg rounded-2xl border border-border bg-card p-5 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-border">
+              <div className="flex items-center gap-2">
+                <div className="size-8 rounded-lg bg-caramel/10 border border-caramel/30 flex items-center justify-center">
+                  <Link2 className="size-4 text-caramel" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-foreground">Ghim với sản phẩm trong kho</h3>
+                  <p className="text-[11px] text-muted-foreground">
+                    Chọn sản phẩm tương ứng để tự động lấy giá và tồn kho cho:{" "}
+                    <strong className="text-caramel font-semibold">
+                      &quot;{linkingTarget.currentName}&quot;
+                    </strong>
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setLinkingTarget(null)}
+                className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            {/* Search Box */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+              <input
+                ref={pickerInputRef}
+                type="text"
+                placeholder="Tìm theo tên sản phẩm, danh mục, hoặc gói..."
+                value={pickerSearch}
+                onChange={(e) => setPickerSearch(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 rounded-xl border border-border bg-background text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary font-medium"
+              />
+            </div>
+
+            {/* Catalog Items List */}
+            <div className="max-h-72 overflow-y-auto space-y-1.5 pr-1 divide-y divide-border/20">
+              {filteredCatalog.length === 0 ? (
+                <div className="py-8 text-center text-xs text-muted-foreground">
+                  Không tìm thấy sản phẩm nào phù hợp với từ khóa &quot;{pickerSearch}&quot;.
+                </div>
+              ) : (
+                filteredCatalog.map((cat) => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => handleBindCatalogProduct(cat)}
+                    className="w-full pt-2 pb-1.5 px-2.5 rounded-xl hover:bg-secondary/60 text-left transition-all flex items-center justify-between gap-3 group border border-transparent hover:border-border"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 mb-0.5">
+                        <span className="text-[9.5px] uppercase font-bold tracking-wider px-1.5 py-0.2 rounded bg-secondary text-muted-foreground">
+                          {cat.groupName}
+                        </span>
+                        <span className="text-xs font-semibold text-foreground group-hover:text-caramel transition-colors truncate">
+                          {cat.fullName}
+                        </span>
+                      </div>
+                      <p className="text-[10.5px] text-muted-foreground">
+                        Sản phẩm: {cat.productName}
+                      </p>
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      <div className="text-xs font-extrabold text-foreground tabular-nums">
+                        {formatPrice(cat.price)}
+                      </div>
+                      <div
+                        className={`text-[10px] font-mono font-medium ${
+                          cat.stock > 0 ? "text-emerald-400" : "text-destructive"
+                        }`}
+                      >
+                        {cat.stock > 0 ? `Còn ${cat.stock}` : "Hết hàng"}
+                      </div>
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+
+            <div className="pt-2 border-t border-border flex items-center justify-between text-[11px] text-muted-foreground">
+              <span>Đang có {catalog.length} sản phẩm/gói trong kho web</span>
+              <button
+                type="button"
+                onClick={() => setLinkingTarget(null)}
+                className="px-3 py-1 rounded-lg border border-border hover:bg-secondary text-foreground text-xs font-semibold"
+              >
+                Hủy bỏ
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
