@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Plus_Jakarta_Sans, Be_Vietnam_Pro } from 'next/font/google'
 import './globals.css'
 import { Toaster } from '@/components/ui/toaster'
+import { VisitorTracker } from '@/components/storefront/VisitorTracker'
 import { getSiteSettings } from '@/lib/settings'
 
 const beVietnamPro = Be_Vietnam_Pro({
@@ -52,6 +53,7 @@ export default async function RootLayout({
       <body
         className={`${beVietnamPro.variable} ${plusJakartaSans.variable} font-sans antialiased bg-background text-foreground min-h-screen`}
       >
+        <VisitorTracker />
         {children}
         <Toaster />
       </body>

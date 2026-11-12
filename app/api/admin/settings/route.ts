@@ -29,7 +29,18 @@ export async function PUT(req: NextRequest) {
 
   try {
     const body = await req.json()
-    const { siteName, siteTitle, logoUrl, heroTitle, heroSubtitle, heroTitleColor, heroHighlightColor, heroCtaText, version } = body
+    const {
+      siteName,
+      siteTitle,
+      logoUrl,
+      heroTitle,
+      heroSubtitle,
+      heroTitleColor,
+      heroHighlightColor,
+      heroCtaText,
+      showVisitorStats,
+      version,
+    } = body
 
     if (typeof siteName !== "string") {
       return NextResponse.json({ error: "Tên website không hợp lệ." }, { status: 400 })
@@ -94,6 +105,7 @@ export async function PUT(req: NextRequest) {
       heroTitleColor: typeof heroTitleColor === "string" ? heroTitleColor.trim() || null : undefined,
       heroHighlightColor: typeof heroHighlightColor === "string" ? heroHighlightColor.trim() || null : undefined,
       heroCtaText: typeof heroCtaText === "string" ? heroCtaText.trim() || null : (heroCtaText === null ? null : undefined),
+      showVisitorStats: typeof showVisitorStats === "boolean" ? showVisitorStats : undefined,
       expectedVersion: typeof version === "number" ? version : undefined,
     })
 

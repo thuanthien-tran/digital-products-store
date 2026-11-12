@@ -29,6 +29,7 @@ interface InitialSettings {
   heroTitleColor?: string | null
   heroHighlightColor?: string | null
   heroCtaText?: string | null
+  showVisitorStats?: boolean
   version: number
   updatedAt: string | null
 }
@@ -98,6 +99,9 @@ export function SettingsClient({ initialData }: { initialData: InitialSettings }
   const [heroTitleColor, setHeroTitleColor] = useState(initialData.heroTitleColor || "#FAF4ED")
   const [heroHighlightColor, setHeroHighlightColor] = useState(initialData.heroHighlightColor || "#E6A66F")
   const [heroCtaText, setHeroCtaText] = useState(initialData.heroCtaText || "Khám phá các gói")
+  const [showVisitorStats, setShowVisitorStats] = useState<boolean>(
+    typeof initialData.showVisitorStats === "boolean" ? initialData.showVisitorStats : true
+  )
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [localPreviewUrl, setLocalPreviewUrl] = useState<string | null>(null)
   const [isRemovingLogo, setIsRemovingLogo] = useState(false)
@@ -144,7 +148,8 @@ export function SettingsClient({ initialData }: { initialData: InitialSettings }
         "Khám phá các gói Canva, YouTube Premium, Duolingo và những dịch vụ đang có tại cửa hàng. Chọn sản phẩm để xem giá và thông tin chi tiết.").trim() ||
     heroTitleColor.trim().toLowerCase() !== (savedData.heroTitleColor || "#FAF4ED").trim().toLowerCase() ||
     heroHighlightColor.trim().toLowerCase() !== (savedData.heroHighlightColor || "#E6A66F").trim().toLowerCase() ||
-    heroCtaText.trim() !== (savedData.heroCtaText || "Khám phá các gói").trim()
+    heroCtaText.trim() !== (savedData.heroCtaText || "Khám phá các gói").trim() ||
+    showVisitorStats !== (typeof savedData.showVisitorStats === "boolean" ? savedData.showVisitorStats : true)
 
   const canSave = isDirty && !nameError && !isSaving
 
@@ -210,6 +215,7 @@ export function SettingsClient({ initialData }: { initialData: InitialSettings }
     setHeroTitleColor(savedData.heroTitleColor || "#FAF4ED")
     setHeroHighlightColor(savedData.heroHighlightColor || "#E6A66F")
     setHeroCtaText(savedData.heroCtaText || "Khám phá các gói")
+    setShowVisitorStats(typeof savedData.showVisitorStats === "boolean" ? savedData.showVisitorStats : true)
     setIsRemovingLogo(false)
     setFeedback(null)
   }
@@ -254,6 +260,7 @@ export function SettingsClient({ initialData }: { initialData: InitialSettings }
           heroTitleColor: heroTitleColor.trim() || "#FAF4ED",
           heroHighlightColor: heroHighlightColor.trim() || "#E6A66F",
           heroCtaText: heroCtaText.trim() || "Khám phá các gói",
+          showVisitorStats,
           version: savedData.version,
         }),
       })
@@ -273,6 +280,7 @@ export function SettingsClient({ initialData }: { initialData: InitialSettings }
         heroTitleColor: updated.heroTitleColor || "#FAF4ED",
         heroHighlightColor: updated.heroHighlightColor || "#E6A66F",
         heroCtaText: updated.heroCtaText || "Khám phá các gói",
+        showVisitorStats: typeof updated.showVisitorStats === "boolean" ? updated.showVisitorStats : true,
         version: updated.version,
         updatedAt: updated.updatedAt || new Date().toISOString(),
       }
@@ -711,6 +719,38 @@ export function SettingsClient({ initialData }: { initialData: InitialSettings }
                     </span>
                   </div>
                 </div>
+              </div>
+            </div>
+
+            {/* Footer Visitor Counter Toggle */}
+            <div className="pt-4 border-t border-border/60">
+              <div className="flex items-start justify-between gap-4 p-3.5 rounded-xl border border-border/70 bg-secondary/20">
+                <div className="space-y-1">
+                  <div className="text-xs font-semibold text-foreground">
+                    Hiển thị thống kê lượt truy cập ở Footer
+                  </div>
+                  <p className="text-[11px] text-muted-foreground/85 leading-relaxed">
+                    Khi bật, khách hàng sẽ thấy số người đang truy cập và tổng lượt truy cập dưới chân trang web.
+                    Hệ thống vẫn luôn ghi nhận số liệu thực tế trong Bảng Điều Khiển Admin ngay cả khi tắt hiển thị công khai.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={showVisitorStats}
+                  onClick={() => setShowVisitorStats((v) => !v)}
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border transition-colors ${
+                    showVisitorStats
+                      ? "bg-caramel border-caramel"
+                      : "bg-secondary border-border"
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block size-4 transform rounded-full bg-white shadow-sm transition-transform ${
+                      showVisitorStats ? "translate-x-5.5" : "translate-x-1"
+                    }`}
+                  />
+                </button>
               </div>
             </div>
 

@@ -11,6 +11,7 @@ export interface SiteSettingsData {
   heroTitleColor?: string | null
   heroHighlightColor?: string | null
   heroCtaText?: string | null
+  showVisitorStats?: boolean
   updatedAt?: Date | string
   version?: number
 }
@@ -63,6 +64,7 @@ async function fetchSettingsFromDb(): Promise<SiteSettingsData> {
     const heroTitleColor = (row as any)?.heroTitleColor?.trim() || "#FAF4ED"
     const heroHighlightColor = (row as any)?.heroHighlightColor?.trim() || "#E6A66F"
     const heroCtaText = (row as any)?.heroCtaText?.trim() || "Khám phá các gói"
+    const showVisitorStats = typeof (row as any)?.showVisitorStats === "boolean" ? (row as any).showVisitorStats : true
 
     return {
       siteName,
@@ -74,6 +76,7 @@ async function fetchSettingsFromDb(): Promise<SiteSettingsData> {
       heroTitleColor,
       heroHighlightColor,
       heroCtaText,
+      showVisitorStats,
       updatedAt: row?.updatedAt ? row.updatedAt.toISOString() : undefined,
       version: row?.version || 1,
     }
@@ -90,6 +93,7 @@ async function fetchSettingsFromDb(): Promise<SiteSettingsData> {
       heroTitleColor: "#FAF4ED",
       heroHighlightColor: "#E6A66F",
       heroCtaText: "Khám phá các gói",
+      showVisitorStats: true,
       version: 1,
     }
   }
@@ -119,6 +123,7 @@ export async function updateSiteSettings(data: {
   heroTitleColor?: string | null
   heroHighlightColor?: string | null
   heroCtaText?: string | null
+  showVisitorStats?: boolean
   expectedVersion?: number
 }): Promise<SiteSettingsData> {
   const cleanName = data.siteName.trim()
@@ -152,6 +157,7 @@ export async function updateSiteSettings(data: {
         ...(cleanHeroTitleColor !== undefined ? { heroTitleColor: cleanHeroTitleColor } : {}),
         ...(cleanHeroHighlightColor !== undefined ? { heroHighlightColor: cleanHeroHighlightColor } : {}),
         ...(cleanHeroCtaText !== undefined ? { heroCtaText: cleanHeroCtaText } : {}),
+        ...(typeof data.showVisitorStats === "boolean" ? { showVisitorStats: data.showVisitorStats } : {}),
         version: { increment: 1 },
       },
     })
@@ -167,6 +173,7 @@ export async function updateSiteSettings(data: {
         heroTitleColor: cleanHeroTitleColor ?? "#FAF4ED",
         heroHighlightColor: cleanHeroHighlightColor ?? "#E6A66F",
         heroCtaText: cleanHeroCtaText ?? "Khám phá các gói",
+        showVisitorStats: typeof data.showVisitorStats === "boolean" ? data.showVisitorStats : true,
         version: 1,
       },
     })
@@ -193,6 +200,7 @@ export async function updateSiteSettings(data: {
     heroTitleColor: updated.heroTitleColor || "#FAF4ED",
     heroHighlightColor: updated.heroHighlightColor || "#E6A66F",
     heroCtaText: updated.heroCtaText || "Khám phá các gói",
+    showVisitorStats: typeof updated.showVisitorStats === "boolean" ? updated.showVisitorStats : true,
     updatedAt: updated.updatedAt.toISOString(),
     version: updated.version,
   }

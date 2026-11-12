@@ -3,8 +3,9 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { MessageCircle } from "lucide-react"
+import { MessageCircle, Eye } from "lucide-react"
 import { OfficeCapybara } from "@/components/storefront/OfficeCapybara"
+import type { VisitorStatsPayload } from "@/components/storefront/VisitorTracker"
 
 const ZALO_PHONE = process.env.NEXT_PUBLIC_ZALO_PHONE_1 || "0356970964"
 
@@ -26,6 +27,7 @@ export function Footer({ initialSettings }: FooterProps) {
     logoUrl: null,
     initials: "AG",
   })
+  const [visitorStats, setVisitorStats] = useState<VisitorStatsPayload | null>(null)
 
   useEffect(() => {
     if (!initialSettings) {
@@ -43,6 +45,31 @@ export function Footer({ initialSettings }: FooterProps) {
         .catch(() => {})
     }
   }, [initialSettings])
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.__capygoVisitorStats) {
+      setVisitorStats(window.__capygoVisitorStats)
+    } else {
+      fetch("/api/analytics/stats")
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data: VisitorStatsPayload | null) => {
+          if (data) setVisitorStats(data)
+        })
+        .catch(() => {})
+    }
+
+    const handleStatsUpdate = (event: Event) => {
+      const customEvent = event as CustomEvent<VisitorStatsPayload>
+      if (customEvent.detail) {
+        setVisitorStats(customEvent.detail)
+      }
+    }
+
+    window.addEventListener("capygo:visitor-stats", handleStatsUpdate)
+    return () => {
+      window.removeEventListener("capygo:visitor-stats", handleStatsUpdate)
+    }
+  }, [])
 
   const handleNavScroll = (e: React.MouseEvent<HTMLAnchorElement>, targetId: string) => {
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
@@ -138,9 +165,41 @@ export function Footer({ initialSettings }: FooterProps) {
           <strong>* Tuyên bố miễn trừ trách nhiệm sở hữu trí tuệ:</strong> {settings.siteName} là nền tảng bán lẻ và cung cấp dịch vụ số độc lập. Tất cả hình ảnh, tên gọi và logo của các thương hiệu bên thứ ba (như Canva, YouTube, Netflix, ChatGPT, Spotify, Duolingo, v.v.) thuộc bản quyền sở hữu của các tổ chức chủ quản tương ứng và chỉ được sử dụng cho mục đích mô tả sản phẩm theo nguyên tắc sử dụng hợp lý.
         </div>
 
-        {/* HÀNG CUỐI: Bản quyền & Liên kết chính sách chuẩn mực */}
-        <div className="border-t border-border/50 pt-5 sm:pt-6 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4 text-xs text-muted-foreground">
-          <p>© {currentYear} {settings.siteName}. All rights reserved.</p>
+        {/* HÀNG CUỐI: Bản quyền, Thống kê truy cập & Liên kết chính sách chuẩn mực */}
+        <div className="border-t border-border/50 pt-5 sm:pt-6 flex flex-col md:flex-row items-center justify-between gap-3 sm:gap-4 text-xs text-muted-foreground">
+          <div className="flex flex-wrap items-center justify-center md:justify-start gap-3">
+            <p>© {currentYear} {settings.siteName}. All rights reserved.</p>
+
+            {visitorStats?.showVisitorStats && (
+              <div
+                className="inline-flex items-center gap-2.5 px-3 py-1 rounded-full bg-secondary/50 border border-border/60 text-[11px] text-muted-foreground/90"
+                title="Thống kê lượt truy cập thực tế"
+              >
+                <span className="inline-flex items-center gap-1.5 font-medium text-foreground/90">
+                  <span className="relative flex size-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full size-2 bg-emerald-500" />
+                  </span>
+                  <span>
+                    Đang truy cập:{" "}
+                    <strong className="font-semibold text-emerald-400 tabular-nums">
+                      {visitorStats.onlineCount.toLocaleString("vi-VN")}
+                    </strong>
+                  </span>
+                </span>
+                <span className="text-border">•</span>
+                <span className="inline-flex items-center gap-1">
+                  <Eye className="size-3 text-caramel shrink-0" />
+                  <span>
+                    Tổng truy cập:{" "}
+                    <strong className="font-semibold text-foreground/90 tabular-nums">
+                      {visitorStats.totalVisits.toLocaleString("vi-VN")}
+                    </strong>
+                  </span>
+                </span>
+              </div>
+            )}
+          </div>
 
           <div className="flex flex-wrap items-center gap-x-4 sm:gap-x-6 gap-y-2 text-xs">
             <Link

@@ -19,6 +19,7 @@ export default async function AdminSettingsPage() {
     heroTitleColor: (settings as any)?.heroTitleColor || "#FAF4ED",
     heroHighlightColor: (settings as any)?.heroHighlightColor || "#E6A66F",
     heroCtaText: (settings as any)?.heroCtaText || "Khám phá các gói",
+    showVisitorStats: typeof (settings as any)?.showVisitorStats === "boolean" ? (settings as any).showVisitorStats : true,
     version: settings?.version || 1,
     updatedAt: settings?.updatedAt ? settings.updatedAt.toISOString() : null,
   }

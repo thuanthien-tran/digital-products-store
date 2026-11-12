@@ -287,9 +287,32 @@ model SiteSettings {
   heroTitleColor     String?  @default("#FAF4ED")
   heroHighlightColor String?  @default("#E6A66F")
   heroCtaText        String?  @default("Khám phá các gói")
+  showVisitorStats   Boolean  @default(true)
   version            Int      @default(1)
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
+}
+
+model VisitorSession {
+  id            String   @id
+  lastSeenAt    DateTime
+  lastVisitDate String   // YYYY-MM-DD in Asia/Ho_Chi_Minh
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([lastSeenAt])
+}
+
+model DailyTraffic {
+  date      String   @id // YYYY-MM-DD in Asia/Ho_Chi_Minh
+  visits    Int      @default(0)
+  updatedAt DateTime @updatedAt
+}
+
+model SiteMetric {
+  key       String   @id
+  value     Int      @default(0)
+  updatedAt DateTime @updatedAt
 }
 
 model Coupon {
