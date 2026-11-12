@@ -1222,6 +1222,98 @@ export const haivanAdapter: ProviderAdapter = {
   },
 }
 
+/**
+ * 6. ShopXoaiNon (Shop Xoài Non API v1) Adapter
+ * Chuẩn API https://shopxoainon.online/api/v1
+ */
+const shopXoaiNonAdapter: ProviderAdapter = {
+  id: 'shopxoainon',
+  name: 'Shop Xoài Non (API v1)',
+
+  validateHost(url: string): { valid: boolean; error?: string } {
+    return validateGeneralHttpsHost(url)
+  },
+
+  async testConnection(config: ProviderConnectionConfig): Promise<TestConnectionResult> {
+    const hostCheck = this.validateHost(config.baseUrl)
+    if (!hostCheck.valid) return { ok: false, error: hostCheck.error }
+    if (!config.apiKey) return { ok: false, error: 'Chưa cấu hình API Key' }
+
+    try {
+      const { getShopXoaiNonBalance } = await import('../shopxoainon')
+      const res = await getShopXoaiNonBalance({
+        baseUrl: config.baseUrl,
+        apiKey: config.apiKey,
+        timeoutMs: config.timeoutMs || 8000,
+      })
+
+      if (!res.success) {
+        return { ok: false, error: res.error || 'Kiểm tra kết nối Shop Xoài Non thất bại' }
+      }
+
+      return {
+        ok: true,
+        balanceVnd: res.balanceVnd ?? 0,
+        balanceUsdt: 0,
+        balanceStatus: 'supported',
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Lỗi kết nối Shop Xoài Non'
+      return { ok: false, error: msg }
+    }
+  },
+
+  async fetchCatalog(config: ProviderConnectionConfig): Promise<FetchCatalogResult> {
+    const hostCheck = this.validateHost(config.baseUrl)
+    if (!hostCheck.valid) return { ok: false, error: hostCheck.error }
+    if (!config.apiKey) return { ok: false, error: 'Chưa cấu hình API Key' }
+
+    try {
+      const { getShopXoaiNonProducts } = await import('../shopxoainon')
+      const res = await getShopXoaiNonProducts({
+        baseUrl: config.baseUrl,
+        apiKey: config.apiKey,
+        timeoutMs: config.timeoutMs || 10000,
+      })
+
+      if (!res.success || !res.products) {
+        return { ok: false, error: res.error || 'Lỗi lấy danh mục sản phẩm từ Shop Xoài Non' }
+      }
+
+      const products: SourceProductDTO[] = []
+      for (const prod of res.products) {
+        if (!prod || !Array.isArray(prod.variants) || prod.variants.length === 0) continue
+
+        // Duyệt từng phân loại variant (mỗi variant tương ứng 1 mã đặt hàng riêng biệt)
+        for (const v of prod.variants) {
+          const extId = String(v.id || prod.id).trim()
+          const name = v.title?.trim() || prod.title?.trim() || extId
+          const desc = v.description?.trim() || ''
+          const priceVnd = typeof v.prices?.vnd === 'number' ? Math.max(0, Math.round(v.prices.vnd)) : 0
+          const stock = typeof v.available_quantity === 'number' ? Math.max(0, Math.floor(v.available_quantity)) : (v.in_stock ? 1 : 0)
+
+          products.push({
+            externalId: extId,
+            sourceName: name,
+            sourceDescription: desc,
+            sourcePrice: priceVnd,
+            sourceRegularPrice: null,
+            saleQty: null,
+            sourceStock: stock,
+            maxQuantity: 100,
+            rawJson: JSON.stringify({ ...prod, variant: v }),
+          })
+        }
+      }
+
+      return { ok: true, products }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Lỗi đồng bộ danh mục Shop Xoài Non'
+      return { ok: false, error: msg }
+    }
+  },
+}
+
 const adapters: Record<string, ProviderAdapter> = {
   fatcat: fatcatAdapter,
   dino: dinoAdapter,
@@ -1229,6 +1321,8 @@ const adapters: Record<string, ProviderAdapter> = {
   shoptoolgiare: shoptoolAdapter,
   haivan: haivanAdapter,
   shopbot: haivanAdapter,
+  shopxoainon: shopXoaiNonAdapter,
+  xoainon: shopXoaiNonAdapter,
   custom: customAdapter,
 }
 
@@ -1244,6 +1338,7 @@ export function normalizeProviderBaseUrl(urlStr: string): string {
 
 export function resolveEffectiveProvider(providerType: string, baseUrl?: string): string {
   const lowerUrl = (baseUrl || '').toLowerCase()
+  if (lowerUrl.includes('shopxoainon')) return 'shopxoainon'
   if (lowerUrl.includes('haivankhosi')) return 'haivan'
   if (lowerUrl.includes('shoptoolgiare')) return 'shoptool'
   if (lowerUrl.includes('fatcatstore')) return 'fatcat'

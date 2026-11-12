@@ -102,9 +102,18 @@ export async function fulfillOrder(
       item.variant?.sourceProduct?.provider === 'haivan' ||
       item.variant?.sourceProduct?.provider === 'shopbot' ||
       Boolean(item.variant?.connection?.baseUrl?.toLowerCase().includes('haivankhosi'))
+    const isShopXoaiNon =
+      item.variant?.provider === 'shopxoainon' ||
+      item.variant?.provider === 'xoainon' ||
+      item.variant?.connection?.provider === 'shopxoainon' ||
+      item.variant?.connection?.provider === 'xoainon' ||
+      item.variant?.sourceProduct?.provider === 'shopxoainon' ||
+      item.variant?.sourceProduct?.provider === 'xoainon' ||
+      Boolean(item.variant?.connection?.baseUrl?.toLowerCase().includes('shopxoainon'))
     const isFatcat = item.variant?.provider === 'fatcat' || item.product.deliveryType === 'fatcat'
     const isDino =
       !isHaiVan &&
+      !isShopXoaiNon &&
       (item.variant?.provider === 'dino' ||
         item.variant?.connection?.provider === 'dino' ||
         item.variant?.sourceProduct?.provider === 'dino')
@@ -259,7 +268,7 @@ export async function fulfillOrder(
       continue
     }
 
-    const isSerialDelivery = item.product.deliveryType === 'serials' || isFatcat || isDino || isShopTool || isHaiVan
+    const isSerialDelivery = item.product.deliveryType === 'serials' || isFatcat || isDino || isShopTool || isHaiVan || isShopXoaiNon
     const alreadyDelivered = item.serials.length
     const needed = isSerialDelivery ? Math.max(0, item.quantity - alreadyDelivered) : 0
 
@@ -654,6 +663,107 @@ export async function fulfillOrder(
           } catch (haivanErr) {
             const msg = haivanErr instanceof Error ? haivanErr.message : 'HaiVan API Exception'
             console.error('[Fulfillment HaiVan Exception]', msg)
+            totalDelivered += alreadyDelivered + localDelivered
+          }
+        } else {
+          totalDelivered += alreadyDelivered + localDelivered
+        }
+      } else if (isShopXoaiNon && remainingNeeded > 0) {
+        // 6. Shop Xoài Non (ShopXoaiNon API v1) live purchase
+        const xoainonVariantId =
+          item.variant?.sourceProduct?.externalId ||
+          (item.variant?.providerProductId ? String(item.variant.providerProductId) : '')
+
+        if (xoainonVariantId) {
+          try {
+            const { buyShopXoaiNonProduct, getShopXoaiNonActiveConnection } = await import('./shopxoainon')
+            const { decryptSecret } = await import('./crypto')
+
+            let xoainonConfig = null
+            if (item.variant?.connection?.isEnabled && item.variant.connection.apiKeyEncrypted) {
+              try {
+                xoainonConfig = {
+                  baseUrl: item.variant.connection.baseUrl.trim().replace(/\/+$/, ''),
+                  apiKey: decryptSecret(item.variant.connection.apiKeyEncrypted),
+                }
+              } catch {
+                // fallback to active connection
+              }
+            }
+
+            if (!xoainonConfig) {
+              const activeConn = await getShopXoaiNonActiveConnection()
+              xoainonConfig = activeConn.config
+            }
+
+            if (!xoainonConfig) {
+              await db.order.update({
+                where: { id: orderId },
+                data: {
+                  note: '[Kênh giao hàng Shop Xoài Non chưa kết nối]: Chưa tìm thấy cấu hình đại lý Shop Xoài Non hợp lệ.',
+                },
+              })
+              totalDelivered += alreadyDelivered + localDelivered
+              continue
+            }
+
+            const buyRes = await buyShopXoaiNonProduct(xoainonConfig, {
+              variantId: xoainonVariantId,
+              quantity: remainingNeeded,
+              idempotencyKey: `${order.code}-${item.id}-${Date.now()}`,
+            })
+
+            if (buyRes.success && buyRes.items && buyRes.items.length > 0) {
+              for (const cred of buyRes.items) {
+                await db.serial.create({
+                  data: {
+                    variantId: item.variantId,
+                    orderItemId: item.id,
+                    content: cred,
+                    status: 'sold',
+                  },
+                })
+              }
+              totalDelivered += alreadyDelivered + localDelivered + buyRes.items.length
+
+              const orderIdStr = buyRes.order?.id || buyRes.order?.order_id || 'N/A'
+              await db.order.update({
+                where: { id: orderId },
+                data: {
+                  note: `[Đã mua từ Shop Xoài Non thành công]: Mã đơn: #${orderIdStr}`,
+                },
+              })
+            } else {
+              if (buyRes.isOutOfStock) {
+                try {
+                  const { recordSourceStockUpdate } = await import('./inventory-pipeline')
+                  const connId = item.connectionId || item.variant?.connectionId
+                  if (connId) {
+                    await recordSourceStockUpdate({
+                      connectionId: connId,
+                      externalId: xoainonVariantId,
+                      sourceStock: 0,
+                      reason: 'fulfillment_out_of_stock',
+                    })
+                  }
+                } catch (reverseErr) {
+                  console.error('[Fulfillment ShopXoaiNon Reverse Sync Error]', reverseErr)
+                }
+              }
+
+              const noteMsg = buyRes.isInsufficientBalance
+                ? `[NGOẠI LỆ NGUỒN HÀNG SHOP XOÀI NON]: Số dư ví Shop Xoài Non không đủ (${buyRes.error}). Vui lòng nạp thêm tiền vào Shop Xoài Non và bấm Giao Lại đơn hàng.`
+                : `[NGOẠI LỆ NGUỒN HÀNG SHOP XOÀI NON]: Đại lý báo lỗi "${buyRes.error || 'Mua thất bại'}".`
+
+              await db.order.update({
+                where: { id: orderId },
+                data: { note: noteMsg },
+              })
+              totalDelivered += alreadyDelivered + localDelivered
+            }
+          } catch (xoainonErr) {
+            const msg = xoainonErr instanceof Error ? xoainonErr.message : 'Shop Xoài Non API Exception'
+            console.error('[Fulfillment ShopXoaiNon Exception]', msg)
             totalDelivered += alreadyDelivered + localDelivered
           }
         } else {
