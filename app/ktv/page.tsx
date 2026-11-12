@@ -7,7 +7,7 @@ import { KtvPriceListClient } from "./KtvPriceListClient"
 export const dynamic = "force-dynamic"
 
 export const metadata: Metadata = {
-  title: "Bảng Giá Trực Tiếp — KTV",
+  title: "KTV Premium",
   description: "Bảng giá và tình trạng tồn kho sản phẩm trực tiếp theo thời gian thực dành cho KTV & Đại lý",
 }
 
