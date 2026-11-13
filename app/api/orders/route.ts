@@ -115,10 +115,9 @@ export async function POST(req: Request) {
         )
       }
       const singleItem = items[0]
-      const isFixed = variants[0]?.product.quantityMode === "fixed_package"
-      if (isFixed && singleItem.quantity !== 1) {
+      if (singleItem.quantity < 1 || singleItem.quantity > 5) {
         return NextResponse.json(
-          { error: "Dịch vụ này được cấu hình gói cố định 1 lượt nạp / đơn." },
+          { error: "Dịch vụ Buff Token Muse AI hỗ trợ đặt từ 1 đến tối đa 5 lượt nạp / đơn." },
           { status: 400 }
         )
       }
@@ -130,8 +129,17 @@ export async function POST(req: Request) {
           { status: 400 }
         )
       }
-    } else if (body.inviteCode) {
-      validatedInviteCode = normalizeInviteCode(body.inviteCode)
+    } else {
+      const isFixed = variants[0]?.product.quantityMode === "fixed_package"
+      if (isFixed && items[0]?.quantity !== 1) {
+        return NextResponse.json(
+          { error: "Dịch vụ này được cấu hình gói cố định 1 lượt nạp / đơn." },
+          { status: 400 }
+        )
+      }
+      if (body.inviteCode) {
+        validatedInviteCode = normalizeInviteCode(body.inviteCode)
+      }
     }
 
     // Consolidate quantities if the same variantId is submitted multiple times
@@ -158,9 +166,15 @@ export async function POST(req: Request) {
           { status: 400 }
         )
       }
-      if (variant.maxQuantity && totalQty > variant.maxQuantity) {
+      const isBuffVariant =
+        variant.product.fulfillmentType === "buff" ||
+        variant.tokenAmountB != null ||
+        /buff/i.test(`${variant.product.name} ${variant.name}`)
+
+      const effectiveMaxQty = isBuffVariant ? Math.max(variant.maxQuantity || 5, 5) : variant.maxQuantity
+      if (effectiveMaxQty && totalQty > effectiveMaxQty) {
         return NextResponse.json(
-          { error: `Số lượng đặt mua tối đa cho mỗi đơn hàng của "${variant.name}" là ${variant.maxQuantity}` },
+          { error: `Số lượng đặt mua tối đa cho mỗi đơn hàng của "${variant.name}" là ${effectiveMaxQty}` },
           { status: 400 }
         )
       }

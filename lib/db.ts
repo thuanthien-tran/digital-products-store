@@ -171,6 +171,17 @@ export async function ensureDatabaseSchema(): Promise<void> {
         await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "BuffFulfillment_status_idx" ON "BuffFulfillment"("status");`)
         await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "BuffFulfillment_orderId_idx" ON "BuffFulfillment"("orderId");`)
         await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "BuffFulfillment_providerOrderCode_idx" ON "BuffFulfillment"("providerOrderCode");`)
+
+        // Update Muse AI Buff products & variants quantity limit to max 5
+        try {
+          await prisma.$executeRawUnsafe(`
+            UPDATE "Product" SET "quantityMode" = 'flexible' WHERE "fulfillmentType" = 'buff' OR "name" LIKE '%Buff Token%';
+          `)
+          await prisma.$executeRawUnsafe(`
+            UPDATE "Variant" SET "maxQuantity" = 5 WHERE "tokenAmountB" IS NOT NULL OR "name" LIKE '%Buff Token%';
+          `)
+        } catch {}
+
         globalForPrisma.schemaEnsured = true
       } catch (err) {
         console.error('[AutoMigration] Failed to verify/migrate schema:', err)

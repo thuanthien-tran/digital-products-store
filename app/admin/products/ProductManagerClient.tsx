@@ -1717,7 +1717,7 @@ export function ProductManagerClient({ groups }: Props) {
                             ...editForm,
                             fulfillmentType: fType,
                             deliveryType: fType === "buff" ? "service" : editForm.deliveryType,
-                            quantityMode: fType === "buff" ? "fixed_package" : editForm.quantityMode,
+                            quantityMode: fType === "buff" ? "flexible" : editForm.quantityMode,
                             requiresInviteCode: fType === "buff" ? true : editForm.requiresInviteCode,
                           })
                         }}

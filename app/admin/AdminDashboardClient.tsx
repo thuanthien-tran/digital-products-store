@@ -96,46 +96,58 @@ export function AdminDashboardClient({
   const [isPending, startTransition] = useTransition()
   const [selectedRange, setSelectedRange] = useState<TimeRange>("all")
   const [providers, setProviders] = useState<DashboardProvider[]>(initialProviders)
-  const [refreshingProviderId, setRefreshingProviderId] = useState<string | null>(null)
+  const [isRefreshingAllProviders, setIsRefreshingAllProviders] = useState(false)
   const [hoveredBucketIndex, setHoveredBucketIndex] = useState<number | null>(null)
   const [lastRefreshedAt, setLastRefreshedAt] = useState<string>(() =>
     new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", second: "2-digit" })
   )
 
-  // Quick refresh data
+  // Refresh all providers balances simultaneously
+  const handleRefreshAllProviders = async () => {
+    if (isRefreshingAllProviders || providers.length === 0) return
+    setIsRefreshingAllProviders(true)
+    try {
+      const results = await Promise.allSettled(
+        providers.map(async (p) => {
+          const res = await fetch(`/api/admin/providers/${p.id}/test`, { method: "POST" })
+          if (!res.ok) throw new Error("Failed")
+          const data = await res.json()
+          return { id: p.id, balanceVnd: data.balanceVnd, balanceUsdt: data.balanceUsdt }
+        })
+      )
+
+      setProviders((prev) =>
+        prev.map((p) => {
+          const found = results.find(
+            (r): r is PromiseFulfilledResult<{ id: string; balanceVnd: number; balanceUsdt: number }> =>
+              r.status === "fulfilled" && r.value.id === p.id
+          )
+          if (found) {
+            return {
+              ...p,
+              balanceVnd: found.value.balanceVnd ?? p.balanceVnd,
+              balanceUsdt: found.value.balanceUsdt ?? p.balanceUsdt,
+              lastSyncedAt: new Date().toISOString(),
+              lastSyncStatus: "success",
+            }
+          }
+          return p
+        })
+      )
+    } catch (err) {
+      console.error("Failed to refresh all providers", err)
+    } finally {
+      setIsRefreshingAllProviders(false)
+    }
+  }
+
+  // Quick refresh data (refreshes page stats + all provider wallets)
   const handleRefreshAll = () => {
     startTransition(() => {
       router.refresh()
       setLastRefreshedAt(new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }))
     })
-  }
-
-  // Refresh single provider balance
-  const handleRefreshProviderBalance = async (providerId: string) => {
-    try {
-      setRefreshingProviderId(providerId)
-      const res = await fetch(`/api/admin/providers/${providerId}/test`, { method: "POST" })
-      const data = await res.json()
-      if (res.ok && data.success) {
-        setProviders((prev) =>
-          prev.map((p) =>
-            p.id === providerId
-              ? {
-                  ...p,
-                  balanceVnd: data.balanceVnd ?? p.balanceVnd,
-                  balanceUsdt: data.balanceUsdt ?? p.balanceUsdt,
-                  lastSyncedAt: new Date().toISOString(),
-                  lastSyncStatus: "success",
-                }
-              : p
-          )
-        )
-      }
-    } catch (err) {
-      console.error("Failed to refresh balance", err)
-    } finally {
-      setRefreshingProviderId(null)
-    }
+    void handleRefreshAllProviders()
   }
 
   // Date range calculation helpers
@@ -625,19 +637,31 @@ export function AdminDashboardClient({
             </div>
           </div>
 
-          <Link
-            href="/admin/providers"
-            className="text-xs text-primary hover:underline font-semibold flex items-center gap-1 group"
-          >
-            <span>Quản lý đại lý &amp; nạp ví</span>
-            <ArrowRight className="size-3 group-hover:translate-x-0.5 transition-transform" />
-          </Link>
+          <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={handleRefreshAllProviders}
+              disabled={isRefreshingAllProviders}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border/80 bg-background/60 hover:bg-background hover:border-primary/40 text-xs font-semibold text-foreground transition-all active:scale-95 disabled:opacity-60 shadow-sm cursor-pointer"
+              title="Kiểm tra và cập nhật số dư cho tất cả các đại lý cùng lúc"
+            >
+              <RefreshCw className={`size-3.5 text-primary ${isRefreshingAllProviders ? "animate-spin" : ""}`} />
+              <span>{isRefreshingAllProviders ? "Đang làm mới tất cả ví..." : "Làm mới tất cả ví"}</span>
+            </button>
+
+            <Link
+              href="/admin/providers"
+              className="text-xs text-primary hover:underline font-semibold flex items-center gap-1 group"
+            >
+              <span>Quản lý đại lý &amp; nạp ví</span>
+              <ArrowRight className="size-3 group-hover:translate-x-0.5 transition-transform" />
+            </Link>
+          </div>
         </div>
 
         {/* Provider Cards Grid */}
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           {providers.map((p) => {
-            const isRefreshing = refreshingProviderId === p.id
             const isLow = p.balanceVnd > 0 && p.balanceVnd < 50000 && p.balanceUsdt < 2
             const isCritical = p.balanceVnd <= 0 && p.balanceUsdt <= 0
             const isHealthy = !isLow && !isCritical
@@ -658,15 +682,9 @@ export function AdminDashboardClient({
                     <span className="font-bold text-xs text-foreground truncate" title={p.name}>
                       {p.name}
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => handleRefreshProviderBalance(p.id)}
-                      disabled={isRefreshing}
-                      title="Kiểm tra & đồng bộ số dư tức thì"
-                      className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer shrink-0"
-                    >
-                      <RefreshCw className={`size-3 ${isRefreshing ? "animate-spin text-primary" : ""}`} />
-                    </button>
+                    {isRefreshingAllProviders && (
+                      <RefreshCw className="size-3 animate-spin text-primary shrink-0" />
+                    )}
                   </div>
 
                   {/* Balance Display */}

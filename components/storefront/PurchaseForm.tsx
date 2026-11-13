@@ -177,17 +177,20 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
     variants.some((v) => Boolean(v.tokenAmountB)) ||
     /buff/i.test(`${product.name} ${selectedVariant?.name || ""}`)
 
-  const isFixedPackage = product.quantityMode === "fixed_package"
+  // Buff Token Muse AI allows flexible quantity up to 5
+  const isFixedPackage = isBuffProduct ? false : product.quantityMode === "fixed_package"
   const rawStock = selectedVariant ? getEffectiveStock(selectedVariant) : 0
   const effectiveStock = selectedVariant
     ? (isBuffProduct ? Math.max(rawStock, 999) : rawStock)
     : 0
   const isOutOfStock = !selectedVariant || (isBuffProduct ? (selectedVariant.isActive === false) : effectiveStock <= 0)
 
-  // Quantity limits
-  const maxAllowedQuantity = isFixedPackage
+  // Quantity limits: Buff Token Muse AI supports up to 5 per order
+  const maxAllowedQuantity = isBuffProduct
+    ? 5
+    : isFixedPackage
     ? 1
-    : Math.min(selectedVariant?.maxQuantity || 50, isBuffProduct ? 50 : Math.max(1, effectiveStock))
+    : Math.min(selectedVariant?.maxQuantity || 50, Math.max(1, effectiveStock))
 
   // Price calculations
   const unitPrice = selectedVariant?.priceCents || 0
@@ -716,7 +719,7 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
             <span className="text-[11px] text-muted-foreground">
               {isFixedPackage
                 ? "Gói cố định 1 lượt nạp / đơn"
-                : `Tối đa ${maxAllowedQuantity} ${isBuffProduct ? "gói" : "tài khoản"} / đơn`}
+                : `Tối đa ${maxAllowedQuantity} ${isBuffProduct ? "lượt nạp" : "tài khoản"} / đơn`}
             </span>
           </div>
 
