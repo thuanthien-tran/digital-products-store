@@ -7,19 +7,23 @@ export async function mergeMuse5B() {
 
   // 1. Find Hải Vân connection
   const haivanConn = await prisma.providerConnection.findFirst({
-    where: { provider: 'haivan' }
+    where: {
+      OR: [
+        { provider: 'haivan' },
+        { provider: 'shopbot' },
+        { name: { contains: 'Hải Vân' } },
+        { name: { contains: 'HaiVan' } },
+        { baseUrl: { contains: 'haivankhosi' } },
+      ],
+    },
   })
-  if (!haivanConn) {
-    console.error('[MergeMuse5B] HaiVan connection not found')
-    return
-  }
 
   // 2. Find the 5B SourceProduct from HaiVan (externalId: 'xyqzgjze')
   let s5 = await prisma.sourceProduct.findFirst({
     where: {
-      connectionId: haivanConn.id,
       OR: [
         { externalId: 'xyqzgjze' },
+        { sourceName: { contains: 'BUFF 5' } },
         { sourceName: { contains: '5 TỶ' } },
         { sourceName: { contains: '5 tỷ' } }
       ]
@@ -79,7 +83,7 @@ export async function mergeMuse5B() {
         maxQuantity: 5,
         isActive: true,
         sortOrder: 2,
-        connectionId: haivanConn.id,
+        connectionId: haivanConn?.id ?? s5?.connectionId ?? null,
         sourceProductId: s5?.id ?? null
       }
     })
@@ -99,7 +103,7 @@ export async function mergeMuse5B() {
         maxQuantity: 5,
         isActive: true,
         sortOrder: 2,
-        connectionId: haivanConn.id,
+        connectionId: haivanConn?.id ?? s5?.connectionId ?? null,
         sourceProductId: s5?.id ?? null
       }
     })

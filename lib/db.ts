@@ -195,6 +195,95 @@ export async function ensureDatabaseSchema(): Promise<void> {
           await prisma.$executeRawUnsafe(`
             DELETE FROM "Product" WHERE "slug" = 'muse---buff-5-ty' OR "name" = 'MUSE - BUFF 5 TỶ' OR "name" = 'MUSE Buff 5 tỷ';
           `)
+
+          // Ensure Buff Token 5B variant exists in Muse Buff product
+          const museProd = await prisma.product.findFirst({
+            where: {
+              OR: [
+                { slug: 'muse-ai---buff-token-chinh-chu-10b-20b-30b' },
+                { name: { contains: 'Buff Token' } },
+              ],
+            },
+            include: { variants: true },
+          })
+
+          if (museProd) {
+            const has5B = museProd.variants.some(
+              (v) => v.tokenAmountB === 5 || v.name.includes('5B') || v.name.includes('5 Tỷ') || v.name.includes('5 TỶ')
+            )
+
+            if (!has5B) {
+              const haivanConn = await prisma.providerConnection.findFirst({
+                where: {
+                  OR: [
+                    { provider: 'haivan' },
+                    { provider: 'shopbot' },
+                    { name: { contains: 'Hải Vân' } },
+                    { name: { contains: 'HaiVan' } },
+                    { baseUrl: { contains: 'haivankhosi' } },
+                  ],
+                },
+              })
+
+              const s5 = await prisma.sourceProduct.findFirst({
+                where: {
+                  OR: [
+                    { externalId: 'xyqzgjze' },
+                    { sourceName: { contains: 'BUFF 5' } },
+                    { sourceName: { contains: '5 TỶ' } },
+                    { sourceName: { contains: '5 tỷ' } },
+                  ],
+                },
+              })
+
+              const v5 = await prisma.variant.create({
+                data: {
+                  productId: museProd.id,
+                  name: 'Buff Token 5B (~5 Tỷ Tokens)',
+                  tokenAmountB: 5,
+                  provider: 'haivan',
+                  providerPrice: s5?.sourcePrice ?? 7500,
+                  priceCents: 11000,
+                  compareAtPriceCents: 16000,
+                  providerStock: s5?.sourceStock ?? 18,
+                  minQuantity: 1,
+                  maxQuantity: 5,
+                  isActive: true,
+                  sortOrder: 2,
+                  connectionId: haivanConn?.id ?? s5?.connectionId ?? null,
+                  sourceProductId: s5?.id ?? null,
+                },
+              })
+
+              if (s5) {
+                await prisma.sourceProduct.update({
+                  where: { id: s5.id },
+                  data: {
+                    isAddedToStore: true,
+                    variantId: v5.id,
+                  },
+                }).catch(() => {})
+              }
+
+              // Reorder sortOrders: 1B (1), 5B (2), 10B (3), 20B (4), 30B (5)
+              const updatedVariants = await prisma.variant.findMany({
+                where: { productId: museProd.id },
+              })
+              for (const v of updatedVariants) {
+                let sOrder = 1
+                if (v.tokenAmountB === 1 || v.name.includes('1B')) sOrder = 1
+                else if (v.tokenAmountB === 5 || v.name.includes('5B')) sOrder = 2
+                else if (v.tokenAmountB === 10 || v.name.includes('10B')) sOrder = 3
+                else if (v.tokenAmountB === 20 || v.name.includes('20B')) sOrder = 4
+                else if (v.tokenAmountB === 30 || v.name.includes('30B')) sOrder = 5
+
+                await prisma.variant.update({
+                  where: { id: v.id },
+                  data: { sortOrder: sOrder, maxQuantity: 5 },
+                }).catch(() => {})
+              }
+            }
+          }
         } catch {}
 
         globalForPrisma.schemaEnsured = true
