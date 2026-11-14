@@ -180,6 +180,21 @@ export async function ensureDatabaseSchema(): Promise<void> {
           await prisma.$executeRawUnsafe(`
             UPDATE "Variant" SET "maxQuantity" = 5 WHERE "tokenAmountB" IS NOT NULL OR "name" LIKE '%Buff Token%';
           `)
+          // Consolidate Muse AI Buff 5B into Muse Buff product
+          await prisma.$executeRawUnsafe(`
+            UPDATE "Product" 
+            SET "name" = 'MUSE AI - Buff Token Chính Chủ (1B - 5B - 10B - 20B - 30B)' 
+            WHERE "slug" = 'muse-ai---buff-token-chinh-chu-10b-20b-30b' OR "name" LIKE 'MUSE AI - Buff Token Chính Chủ%';
+          `)
+          // Delete any standalone Muse 5B product variants & product
+          await prisma.$executeRawUnsafe(`
+            DELETE FROM "Variant" WHERE "productId" IN (
+              SELECT "id" FROM "Product" WHERE "slug" = 'muse---buff-5-ty' OR "name" = 'MUSE - BUFF 5 TỶ' OR "name" = 'MUSE Buff 5 tỷ'
+            );
+          `)
+          await prisma.$executeRawUnsafe(`
+            DELETE FROM "Product" WHERE "slug" = 'muse---buff-5-ty' OR "name" = 'MUSE - BUFF 5 TỶ' OR "name" = 'MUSE Buff 5 tỷ';
+          `)
         } catch {}
 
         globalForPrisma.schemaEnsured = true

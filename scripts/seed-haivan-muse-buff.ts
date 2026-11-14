@@ -14,10 +14,14 @@ export async function seedMergedAllBuffMuse() {
     where: { provider: 'haivan' },
   })
 
+  let s5 = null
   let s10 = null
   let s20 = null
   let s30 = null
   if (haivanConn) {
+    s5 = await prisma.sourceProduct.findFirst({
+      where: { connectionId: haivanConn.id, OR: [{ externalId: 'xyqzgjze' }, { sourceName: { contains: '5 TỶ' } }] },
+    })
     s10 = await prisma.sourceProduct.findFirst({
       where: { connectionId: haivanConn.id, externalId: 'zz6yyexp' },
     })
@@ -29,7 +33,7 @@ export async function seedMergedAllBuffMuse() {
     })
   }
 
-  const productName = 'MUSE AI - Buff Token Chính Chủ (1B - 10B - 20B - 30B)'
+  const productName = 'MUSE AI - Buff Token Chính Chủ (1B - 5B - 10B - 20B - 30B)'
   const slug = 'muse-ai---buff-token-chinh-chu-10b-20b-30b'
   const group = await prisma.productGroup.findFirst({
     where: { name: 'AI' },
@@ -40,7 +44,7 @@ export async function seedMergedAllBuffMuse() {
   ])
 
   const description = [
-    '**Thông tin & Quyền lợi:**\n- Nạp token trực tiếp vào tài khoản Muse AI thông qua Mã mời (Invite Code).\n- Đầy đủ các gói dung lượng linh hoạt: 1 Tỷ (~1B), 10 Tỷ (~10B), 20 Tỷ (~20B), 30 Tỷ (~30B) Token.\n- Xử lý tự động hóa 24/7 qua kết nối đại lý chuyên biệt, an toàn 100% không yêu cầu mật khẩu.',
+    '**Thông tin & Quyền lợi:**\n- Nạp token trực tiếp vào tài khoản Muse AI thông qua Mã mời (Invite Code).\n- Đầy đủ các gói dung lượng linh hoạt: 1 Tỷ (~1B), 5 Tỷ (~5B), 10 Tỷ (~10B), 20 Tỷ (~20B), 30 Tỷ (~30B) Token.\n- Xử lý tự động hóa 24/7 qua kết nối đại lý chuyên biệt, an toàn 100% không yêu cầu mật khẩu.',
     '**Hướng dẫn nhận hàng:**\n1. Lấy Mã Mời (Invite Code dạng 6 ký tự, ví dụ: 0FBALX) trong tài khoản Muse AI của bạn.\n2. Điền chính xác Mã Mời khi thanh toán.\n3. Hệ thống sẽ tự động gửi lệnh nạp token vào tài khoản Muse AI của bạn ngay sau khi hoàn tất thanh toán.',
     '**Chính sách bảo hành:**\nBảo hành đủ số lượng token tương ứng theo đúng gói dung lượng đã chọn.',
     '**Lưu ý quan trọng:**\n- Kiểm tra chính xác mã mời trước khi xác nhận đơn hàng.\n- Một đơn hàng nạp tương ứng vào một mã mời duy nhất.',
@@ -65,13 +69,25 @@ export async function seedMergedAllBuffMuse() {
       providerStock: 999,
     },
     {
+      name: 'Buff Token 5B (~5 Tỷ Tokens)',
+      tokenAmountB: 5,
+      provider: 'haivan',
+      providerPrice: s5?.sourcePrice || 7500,
+      priceCents: 11000,
+      compareAtPriceCents: 16000,
+      sortOrder: 2,
+      connectionId: haivanConn?.id || null,
+      sourceProductId: s5?.id || null,
+      providerStock: s5?.sourceStock || 18,
+    },
+    {
       name: 'Buff Token 10B (~10 Tỷ Tokens)',
       tokenAmountB: 10,
       provider: 'haivan',
       providerPrice: 14000,
       priceCents: 21000,
       compareAtPriceCents: 28000,
-      sortOrder: 2,
+      sortOrder: 3,
       connectionId: haivanConn?.id || null,
       sourceProductId: s10?.id || null,
       providerStock: s10?.sourceStock || 59,
@@ -83,7 +99,7 @@ export async function seedMergedAllBuffMuse() {
       providerPrice: 24000,
       priceCents: 32000,
       compareAtPriceCents: 45000,
-      sortOrder: 3,
+      sortOrder: 4,
       connectionId: haivanConn?.id || null,
       sourceProductId: s20?.id || null,
       providerStock: s20?.sourceStock || 25,
@@ -95,7 +111,7 @@ export async function seedMergedAllBuffMuse() {
       providerPrice: 29000,
       priceCents: 39000,
       compareAtPriceCents: 55000,
-      sortOrder: 4,
+      sortOrder: 5,
       connectionId: haivanConn?.id || null,
       sourceProductId: s30?.id || null,
       providerStock: s30?.sourceStock || 29,
@@ -201,18 +217,25 @@ export async function seedMergedAllBuffMuse() {
     }
   }
 
-  // Hide older separate products to keep catalog clean
-  const oldProd = await prisma.product.findUnique({
-    where: { slug: 'dich-vu-bo-sung-token-muse-ai' },
+  // Hide or remove older separate products to keep catalog clean
+  const standaloneProds = await prisma.product.findMany({
+    where: {
+      OR: [
+        { slug: 'dich-vu-bo-sung-token-muse-ai' },
+        { slug: 'muse---buff-5-ty' },
+        { name: 'MUSE - BUFF 5 TỶ' },
+        { name: 'MUSE Buff 5 tỷ' },
+      ],
+    },
+    include: { variants: true },
   })
-  if (oldProd) {
-    await prisma.product.update({
-      where: { id: oldProd.id },
-      data: { visibility: 'hidden', editorialStatus: 'hidden', isFeatured: false },
-    })
+  for (const sp of standaloneProds) {
+    if (sp.id === product.id) continue
+    await prisma.variant.deleteMany({ where: { productId: sp.id } })
+    await prisma.product.delete({ where: { id: sp.id } })
   }
 
-  console.log('[Seed] Successfully ensured merged 4-tier Muse Buff product (1B, 10B, 20B, 30B).')
+  console.log('[Seed] Successfully ensured merged 5-tier Muse Buff product (1B, 5B, 10B, 20B, 30B).')
 }
 
 async function main() {
