@@ -12,7 +12,13 @@ export default async function AdminOrdersPage() {
         items: {
           include: {
             product: { select: { name: true } },
-            variant: { select: { name: true } },
+            variant: {
+              select: {
+                name: true,
+                provider: true,
+                connection: { select: { name: true, provider: true } },
+              },
+            },
             serials: { select: { content: true } },
           },
         },
@@ -71,6 +77,7 @@ export default async function AdminOrdersPage() {
             createdAt: o.createdAt.toISOString(),
             paymentGateway: o.payments[0]?.gateway || null,
             note: o.note,
+            inviteCode: o.inviteCode,
             payments: o.payments.map((p) => ({
               id: p.id,
               amount: p.amount,
@@ -87,6 +94,10 @@ export default async function AdminOrdersPage() {
                 priceCents: i.priceCents,
                 serials: serialList,
                 serial: serialList.length > 0 ? serialList.join("\n") : null,
+                connectionName: i.connectionName || (i.variant as any)?.connection?.name || (i.variant as any)?.provider,
+                provider: (i.variant as any)?.provider || (i.variant as any)?.connection?.provider,
+                inviteCode: i.inviteCode || o.inviteCode,
+                tokenAmountB: i.tokenAmountB,
               }
             }),
           }

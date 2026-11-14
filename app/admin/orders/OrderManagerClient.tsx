@@ -60,6 +60,7 @@ export interface OrderItem {
   createdAt: string
   paymentGateway: string | null
   note?: string | null
+  inviteCode?: string | null
   payments?: PaymentItem[]
   items: Array<{
     name: string
@@ -67,6 +68,10 @@ export interface OrderItem {
     priceCents: number
     serials?: string[]
     serial: string | null
+    connectionName?: string | null
+    provider?: string | null
+    inviteCode?: string | null
+    tokenAmountB?: number | null
   }>
 }
 
@@ -579,10 +584,22 @@ export function OrderManagerClient({
                       : []
 
                   return (
-                    <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                      <span className="font-bold text-foreground">
-                        {it.name} {it.quantity && it.quantity > 1 ? `x${it.quantity}` : ""}
-                      </span>
+                    <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="font-bold text-foreground">
+                          {it.name} {it.quantity && it.quantity > 1 ? `x${it.quantity}` : ""}
+                        </span>
+                        {(it.connectionName || it.provider) && (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-sky-500/10 text-sky-400 border border-sky-500/20">
+                            Đại lý: {it.connectionName || it.provider}
+                          </span>
+                        )}
+                        {(it.inviteCode || order.inviteCode) && (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                            Mã mời: {it.inviteCode || order.inviteCode}
+                          </span>
+                        )}
+                      </div>
                       {serialList.length > 0 ? (
                         <div className="flex flex-wrap gap-1 max-w-sm">
                           {serialList.map((s, sIdx) => (
@@ -600,6 +617,14 @@ export function OrderManagerClient({
                     </div>
                   )
                 })}
+
+                {/* Direct note preview on order card */}
+                {order.note && (
+                  <div className="pt-2 border-t border-border/30 text-[11px] font-mono text-muted-foreground bg-muted/20 p-2 rounded-lg flex items-start gap-1.5">
+                    <span className="text-primary font-bold shrink-0">Note:</span>
+                    <span className="break-all">{order.note}</span>
+                  </div>
+                )}
               </div>
 
               {/* Actions */}
@@ -956,8 +981,15 @@ export function OrderManagerClient({
 
                   return (
                     <div key={idx} className="p-3.5 rounded-xl border border-border/80 bg-background/50 space-y-2 text-xs">
-                      <div className="flex items-center justify-between font-bold text-foreground">
-                        <span>{it.name} {it.quantity && it.quantity > 1 ? `x${it.quantity}` : ""}</span>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 font-bold text-foreground">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span>{it.name} {it.quantity && it.quantity > 1 ? `x${it.quantity}` : ""}</span>
+                          {(it.connectionName || it.provider) && (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-sky-500/10 text-sky-400 border border-sky-500/20">
+                              Đại lý: {it.connectionName || it.provider}
+                            </span>
+                          )}
+                        </div>
                         <span className="text-primary tabular-nums font-bold">{formatPrice(it.priceCents)}</span>
                       </div>
 
@@ -982,11 +1014,38 @@ export function OrderManagerClient({
               </div>
             </div>
 
+            {/* Invite Code Highlight Box if present */}
+            {(historyOrder.inviteCode || historyOrder.items.some((it) => it.inviteCode)) && (
+              <div className="space-y-1.5 p-3 rounded-xl border border-amber-500/30 bg-amber-500/10">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold uppercase tracking-wider text-amber-400">
+                    Mã Mời (Invite Code Muse AI)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const code = historyOrder.inviteCode || historyOrder.items.find((it) => it.inviteCode)?.inviteCode || ""
+                      if (code) {
+                        navigator.clipboard.writeText(code)
+                        toast({ title: "Đã sao chép mã mời!", description: code })
+                      }
+                    }}
+                    className="px-2 py-0.5 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-[11px] font-semibold transition-colors cursor-pointer"
+                  >
+                    Sao chép mã
+                  </button>
+                </div>
+                <p className="font-mono text-base font-extrabold text-amber-300 tracking-wider">
+                  {historyOrder.inviteCode || historyOrder.items.find((it) => it.inviteCode)?.inviteCode}
+                </p>
+              </div>
+            )}
+
             {/* System Note */}
             {historyOrder.note && (
               <div className="space-y-1">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Ghi chú hệ thống</h4>
-                <div className="p-2.5 rounded-lg border border-border bg-secondary/30 text-xs text-muted-foreground font-mono">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Ghi chú hệ thống &amp; Đại lý</h4>
+                <div className="p-2.5 rounded-lg border border-border bg-secondary/30 text-xs text-muted-foreground font-mono whitespace-pre-wrap break-all">
                   {historyOrder.note}
                 </div>
               </div>

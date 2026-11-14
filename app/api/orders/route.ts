@@ -4,7 +4,7 @@ import { generateOrderCode } from "@/lib/utils"
 import { validateEmail, validateQuantity, generateAccessToken } from "@/lib/validations"
 import { verifyAdminRequest } from "@/lib/auth"
 import { verifyVariantLiveStock } from "@/lib/provider-stock-verifier"
-import { normalizeCouponCode, reserveCouponForOrder, OrderItemEvalInput } from "@/lib/coupon-service"
+import { normalizeCouponCode, validateAndReserveCoupon, reserveCouponForOrder, OrderItemEvalInput } from "@/lib/coupon-service"
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit"
 import { normalizeInviteCode, isValidInviteCode, calculateExpectedBuffCost } from "@/lib/buff-pricing"
 
@@ -351,11 +351,26 @@ export async function POST(req: Request) {
     }
 
     const accessToken = generateAccessToken()
-    const orderNote = body.note
-      ? String(body.note).trim()
-      : validatedInviteCode
-      ? `Mã mời: ${validatedInviteCode}`
-      : null
+
+    // Build informative order note including invite code and handling providers
+    const providerSummaries = itemsToCreate
+      .map((it) => {
+        const provName = it.connectionName || "Hệ thống"
+        return `${it.variantName || "Sản phẩm"} -> ${provName}`
+      })
+      .join("; ")
+
+    const noteParts: string[] = []
+    if (validatedInviteCode) {
+      noteParts.push(`Mã mời Muse: ${validatedInviteCode}`)
+    }
+    if (providerSummaries) {
+      noteParts.push(`[Đại lý: ${providerSummaries}]`)
+    }
+    if (body.note && typeof body.note === "string" && body.note.trim()) {
+      noteParts.push(`Ghi chú khách: ${body.note.trim()}`)
+    }
+    const orderNote = noteParts.join(" | ") || null
 
     const rawCouponCode = body.couponCode && typeof body.couponCode === "string" ? normalizeCouponCode(body.couponCode) : null
 
@@ -379,16 +394,13 @@ export async function POST(req: Request) {
       const itemAllocationsMap = new Map<string, number>()
 
       if (rawCouponCode) {
-        // Pre-create a deterministic order ID for redemption foreign key
-        const tempOrderId = `ord_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
-        const reservation = await reserveCouponForOrder(tx, {
+        const reservation = await validateAndReserveCoupon(tx, {
           code: rawCouponCode,
           email: emailValidation.normalized!,
           items: evalItems,
-          orderId: tempOrderId,
         })
 
-        if (!reservation.success) {
+        if (!reservation.success || !reservation.couponId) {
           throw new Error(reservation.evaluation.error || "Mã giảm giá không hợp lệ hoặc đã hết hạn.")
         }
 
@@ -396,7 +408,7 @@ export async function POST(req: Request) {
         subtotalCents = ev.subtotalCents
         discountCents = ev.discountCents
         finalPayableCents = ev.totalCents
-        couponId = ev.couponId || null
+        couponId = ev.couponId || reservation.couponId || null
         couponCodeApplied = ev.code
         couponSnapshot = JSON.stringify(ev.couponSnapshot)
 
@@ -406,7 +418,6 @@ export async function POST(req: Request) {
 
         return await tx.order.create({
           data: {
-            id: tempOrderId,
             code,
             email: emailValidation.normalized!,
             subtotalCents,
@@ -420,6 +431,14 @@ export async function POST(req: Request) {
             couponCode: couponCodeApplied,
             couponSnapshot,
             idempotencyKey,
+            redemption: {
+              create: {
+                couponId: couponId!,
+                email: emailValidation.normalized!,
+                discountAmount: discountCents,
+                status: "reserved",
+              },
+            },
             items: {
               create: itemsToCreate.map((it) => ({
                 ...it,

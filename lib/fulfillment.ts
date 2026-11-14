@@ -39,6 +39,30 @@ export function validateStatusTransition(currentStatus: string, targetStatus: st
   return { valid: true }
 }
 
+export function appendOrderNote(currentNote: string | null | undefined, newMsg: string): string {
+  if (!currentNote || !currentNote.trim()) return newMsg
+  if (currentNote.includes(newMsg)) return currentNote
+  return `${currentNote.trim()} | ${newMsg}`
+}
+
+export async function updateOrderNote(
+  db: Prisma.TransactionClient | typeof prisma,
+  orderId: string,
+  baseNote: string | null | undefined,
+  newMsg: string
+) {
+  try {
+    const cur = await db.order.findUnique({ where: { id: orderId }, select: { note: true } })
+    const updatedNote = appendOrderNote(cur?.note ?? baseNote, newMsg)
+    await db.order.update({
+      where: { id: orderId },
+      data: { note: updatedNote },
+    })
+  } catch (err) {
+    console.error(`[updateOrderNote Error for order ${orderId}]`, err)
+  }
+}
+
 /**
  * Shared transactional fulfillment logic for orders.
  * Assigns available serials to order items atomically.
@@ -161,12 +185,12 @@ export async function fulfillOrder(
       }
 
       if (!inviteCode) {
-        await db.order.update({
-          where: { id: orderId },
-          data: {
-            note: `[Chờ khách cung cấp mã mời]: Đơn hàng Buff Token Muse AI cần Mã mời (Invite Code). Vui lòng cập nhật mã mời để hệ thống tự động buff token.`,
-          },
-        })
+        await updateOrderNote(
+          db,
+          orderId,
+          order.note,
+          `[Chờ khách cung cấp mã mời]: Đơn hàng Buff Token Muse AI cần Mã mời (Invite Code). Vui lòng cập nhật mã mời để hệ thống tự động buff token.`
+        )
         continue
       }
 
@@ -190,12 +214,12 @@ export async function fulfillOrder(
         }
 
         if (!shopToolConfig) {
-          await db.order.update({
-            where: { id: orderId },
-            data: {
-              note: '[Kênh giao hàng ShopTool chưa kết nối]: Chưa tìm thấy cấu hình đại lý ShopTool Giá Rẻ hợp lệ.',
-            },
-          })
+          await updateOrderNote(
+            db,
+            orderId,
+            order.note,
+            '[Kênh giao hàng ShopTool chưa kết nối]: Chưa tìm thấy cấu hình đại lý ShopTool Giá Rẻ hợp lệ.'
+          )
           continue
         }
 
@@ -238,12 +262,12 @@ export async function fulfillOrder(
             },
           })
           totalDelivered += item.quantity
-          await db.order.update({
-            where: { id: orderId },
-            data: {
-              note: `[Đã gửi lệnh Buff sang ShopTool thành công]: Mã đơn: ${buffRes.order_code}, Gói: ${tokenAmountB}B Token, Mã mời: ${inviteCode} (${buffRes.used_method === 'credit' ? 'Credit 0đ' : 'Ví VND'}). Tiến trình đang chạy tự động.`,
-            },
-          })
+          await updateOrderNote(
+            db,
+            orderId,
+            order.note,
+            `[ShopTool - Buff ${tokenAmountB}B]: Đã gửi lệnh buff thành công (Mã đơn: ${buffRes.order_code}) · Mã mời: ${inviteCode} (${buffRes.used_method === 'credit' ? 'Credit 0đ' : 'Ví VND'}). Tiến trình đang chạy tự động.`
+          )
         } else {
           const isInsuff = buffRes.isInsufficientBalance || buffRes.isInsufficientCredits
           await db.buffFulfillment.update({
@@ -254,12 +278,12 @@ export async function fulfillOrder(
               lastCheckedAt: new Date(),
             },
           })
-          await db.order.update({
-            where: { id: orderId },
-            data: {
-              note: `[NGOẠI LỆ NGUỒN HÀNG SHOPTOOL]: ${isInsuff ? 'Ví hoặc Credit của bạn không đủ để buff' : buffRes.error || 'Lỗi gửi lệnh'}. Vui lòng nạp tiền vào ShopTool và bấm Giao lại đơn hàng.`,
-            },
-          })
+          await updateOrderNote(
+            db,
+            orderId,
+            order.note,
+            `[NGOẠI LỆ NGUỒN HÀNG SHOPTOOL - Buff ${tokenAmountB}B]: ${isInsuff ? 'Ví hoặc Credit không đủ để buff' : buffRes.error || 'Lỗi gửi lệnh'} · Mã mời: ${inviteCode}`
+          )
         }
       } catch (buffErr) {
         const msg = buffErr instanceof Error ? buffErr.message : 'Buff API Exception'
@@ -301,12 +325,12 @@ export async function fulfillOrder(
       const isLiveBuyActive = process.env.ENABLE_FATCAT_LIVE_BUY === 'true'
       if (isFatcat && item.variant?.providerProductId && remainingNeeded > 0) {
         if (!isLiveBuyActive) {
-          await db.order.update({
-            where: { id: orderId },
-            data: {
-              note: '[Kênh giao hàng FatCat chưa kích hoạt]: Cần xuất kho thủ công hoặc bật ENABLE_FATCAT_LIVE_BUY.',
-            },
-          })
+          await updateOrderNote(
+            db,
+            orderId,
+            order.note,
+            '[Kênh giao hàng FatCat chưa kích hoạt]: Cần xuất kho thủ công hoặc bật ENABLE_FATCAT_LIVE_BUY.'
+          )
           continue
         }
         try {
@@ -347,12 +371,12 @@ export async function fulfillOrder(
               }
             }
 
-            await db.order.update({
-              where: { id: orderId },
-              data: {
-                note: `[NGOẠI LỆ NGUỒN HÀNG]: Đại lý báo "${buyRes.error || 'Mua thất bại'}". Đã nhận thanh toán nhưng chưa giao được. Chờ đối soát hoặc hoàn tiền thủ công.`,
-              },
-            })
+            await updateOrderNote(
+              db,
+              orderId,
+              order.note,
+              `[NGOẠI LỆ NGUỒN HÀNG]: Đại lý báo "${buyRes.error || 'Mua thất bại'}". Đã nhận thanh toán nhưng chưa giao được. Chờ đối soát hoặc hoàn tiền thủ công.`
+            )
             totalDelivered += alreadyDelivered + localDelivered
           }
         } catch (fatcatErr) {
@@ -389,12 +413,12 @@ export async function fulfillOrder(
             }
 
             if (!dinoConfig) {
-              await db.order.update({
-                where: { id: orderId },
-                data: {
-                  note: '[Kênh giao hàng Dino chưa kết nối]: Chưa tìm thấy cấu hình đại lý Dino Store hợp lệ.',
-                },
-              })
+              await updateOrderNote(
+                db,
+                orderId,
+                order.note,
+                '[Kênh giao hàng Dino chưa kết nối]: Chưa tìm thấy cấu hình đại lý Dino Store hợp lệ.'
+              )
               totalDelivered += alreadyDelivered + localDelivered
               continue
             }
@@ -440,12 +464,12 @@ export async function fulfillOrder(
               }
 
               const balanceLeft = typeof dinoOrder?.remaining_balance === 'number' ? `${dinoOrder.remaining_balance.toLocaleString('vi-VN')} đ` : 'N/A'
-              await db.order.update({
-                where: { id: orderId },
-                data: {
-                  note: `[Đã gửi đơn sang Dino API thành công]: Mã đơn Dino: ${dinoCode}. Số dư ví Dino còn lại: ${balanceLeft}. Trạng thái đại lý: ${dinoOrder?.status || 'Chờ xử lý manual'}.`,
-                },
-              })
+              await updateOrderNote(
+                db,
+                orderId,
+                order.note,
+                `[Đã gửi đơn sang Dino API thành công]: Mã đơn Dino: ${dinoCode}. Số dư ví Dino còn lại: ${balanceLeft}. Trạng thái đại lý: ${dinoOrder?.status || 'Chờ xử lý manual'}.`
+              )
             } else {
               console.error(`[Fulfillment Dino Error] Đơn ${order.code}: ${buyRes.error}`)
 
@@ -471,10 +495,7 @@ export async function fulfillOrder(
                 ? `[NGOẠI LỆ NGUỒN HÀNG DINO]: Số dư ví Dino không đủ (${buyRes.error || 'Thiếu số dư'}). Vào Telegram Bot Dino gõ /napapi [số_tiền] để nạp tiền vào ví chung, sau đó bấm Giao Lại đơn hàng.`
                 : `[NGOẠI LỆ NGUỒN HÀNG DINO]: Đại lý báo "${buyRes.error || 'Mua thất bại'}". Đã nhận thanh toán nhưng chưa giao được. Chờ đối soát hoặc hoàn tiền thủ công.`
 
-              await db.order.update({
-                where: { id: orderId },
-                data: { note: noteMsg },
-              })
+              await updateOrderNote(db, orderId, order.note, noteMsg)
               totalDelivered += alreadyDelivered + localDelivered
             }
           } catch (dinoErr) {
@@ -513,12 +534,12 @@ export async function fulfillOrder(
           }
 
           if (!shopToolConfig) {
-            await db.order.update({
-              where: { id: orderId },
-              data: {
-                note: '[Kênh giao hàng ShopTool chưa kết nối]: Chưa tìm thấy cấu hình đại lý ShopTool Giá Rẻ hợp lệ.',
-              },
-            })
+            await updateOrderNote(
+              db,
+              orderId,
+              order.note,
+              '[Kênh giao hàng ShopTool chưa kết nối]: Chưa tìm thấy cấu hình đại lý ShopTool Giá Rẻ hợp lệ.'
+            )
             totalDelivered += alreadyDelivered + localDelivered
             continue
           }
@@ -541,21 +562,18 @@ export async function fulfillOrder(
               })
             }
             totalDelivered += alreadyDelivered + localDelivered + buyRes.credentials.length
-            await db.order.update({
-              where: { id: orderId },
-              data: {
-                note: `[Đã mua tài khoản từ ShopTool thành công]: Mã đơn: ${buyRes.order_code}`,
-              },
-            })
+            await updateOrderNote(
+              db,
+              orderId,
+              order.note,
+              `[Đã mua tài khoản từ ShopTool thành công]: Mã đơn: ${buyRes.order_code}`
+            )
           } else {
             const noteMsg = buyRes.isInsufficientBalance
               ? `[NGOẠI LỆ NGUỒN HÀNG SHOPTOOL]: Số dư ví ShopTool không đủ để mua tài khoản (${buyRes.error}). Vui lòng nạp tiền vào ShopTool và bấm Giao Lại đơn hàng.`
               : `[NGOẠI LỆ NGUỒN HÀNG SHOPTOOL]: Đại lý báo lỗi "${buyRes.error || 'Mua thất bại'}".`
 
-            await db.order.update({
-              where: { id: orderId },
-              data: { note: noteMsg },
-            })
+            await updateOrderNote(db, orderId, order.note, noteMsg)
             totalDelivered += alreadyDelivered + localDelivered
           }
         } catch (shopToolErr) {
@@ -592,12 +610,12 @@ export async function fulfillOrder(
             }
 
             if (!haivanConfig) {
-              await db.order.update({
-                where: { id: orderId },
-                data: {
-                  note: '[Kênh giao hàng Hải Vân Kho Sỉ chưa kết nối]: Chưa tìm thấy cấu hình đại lý Hải Vân hợp lệ.',
-                },
-              })
+              await updateOrderNote(
+                db,
+                orderId,
+                order.note,
+                '[Kênh giao hàng Hải Vân Kho Sỉ chưa kết nối]: Chưa tìm thấy cấu hình đại lý Hải Vân hợp lệ.'
+              )
               totalDelivered += alreadyDelivered + localDelivered
               continue
             }
@@ -607,6 +625,21 @@ export async function fulfillOrder(
               quantity: remainingNeeded,
               currency: 'vnd',
             })
+
+            const isBuffItem = Boolean(
+              item.tokenAmountB != null ||
+              item.variant?.tokenAmountB != null ||
+              item.product.fulfillmentType === 'buff' ||
+              item.inviteCode ||
+              order.inviteCode ||
+              /buff/i.test(`${item.productName || ''} ${item.variantName || ''}`)
+            )
+            const tokenAmountB = item.tokenAmountB || item.variant?.tokenAmountB || 5
+            let inviteCode = (item.inviteCode || order.inviteCode || '').trim().toUpperCase()
+            if (!inviteCode) {
+              const m = (order.note || '').match(/Mã mời(?: Muse)?:\s*([A-Z0-9]{4,20})/i) || (order.note || '').match(/\b([A-Z0-9]{4,20})\b/i)
+              if (m) inviteCode = m[1].toUpperCase()
+            }
 
             if (buyRes.success && buyRes.items && buyRes.items.length > 0) {
               for (const cred of buyRes.items) {
@@ -624,14 +657,38 @@ export async function fulfillOrder(
               const orderGroup = buyRes.order?.order_group || 'N/A'
               const balText =
                 typeof buyRes.new_balance === 'number'
-                  ? ` · Số dư còn lại: ${buyRes.new_balance.toLocaleString('vi-VN')}đ`
+                  ? ` · Số dư ví Hải Vân còn lại: ${buyRes.new_balance.toLocaleString('vi-VN')}đ`
                   : ''
-              await db.order.update({
-                where: { id: orderId },
-                data: {
-                  note: `[Đã mua từ Hải Vân Kho Sỉ thành công]: Mã đơn: ${orderGroup}${balText}`,
-                },
-              })
+
+              if (isBuffItem) {
+                await db.buffFulfillment.upsert({
+                  where: { orderItemId: item.id },
+                  create: {
+                    orderItemId: item.id,
+                    orderId: order.id,
+                    inviteCode: inviteCode || 'CHƯA_CÓ',
+                    tokenAmountB,
+                    status: 'succeeded',
+                    providerOrderCode: orderGroup,
+                    usedMethod: 'haivan_api',
+                    completedB: tokenAmountB,
+                    lastCheckedAt: new Date(),
+                  },
+                  update: {
+                    status: 'succeeded',
+                    providerOrderCode: orderGroup,
+                    usedMethod: 'haivan_api',
+                    completedB: tokenAmountB,
+                    lastCheckedAt: new Date(),
+                  },
+                })
+              }
+
+              const successNote = isBuffItem
+                ? `[Hải Vân Kho Sỉ - Buff ${tokenAmountB}B]: Đã tạo đơn thành công (Mã đơn: ${orderGroup}${balText}) · Mã mời: ${inviteCode || 'N/A'}`
+                : `[Đã mua từ Hải Vân Kho Sỉ thành công]: Mã đơn: ${orderGroup}${balText}`
+
+              await updateOrderNote(db, orderId, order.note, successNote)
             } else {
               if (buyRes.isOutOfStock) {
                 try {
@@ -650,14 +707,30 @@ export async function fulfillOrder(
                 }
               }
 
+              if (isBuffItem) {
+                await db.buffFulfillment.upsert({
+                  where: { orderItemId: item.id },
+                  create: {
+                    orderItemId: item.id,
+                    orderId: order.id,
+                    inviteCode: inviteCode || 'CHƯA_CÓ',
+                    tokenAmountB,
+                    status: 'failed',
+                    errorMessage: buyRes.error || 'Lỗi mua từ đại lý Hải Vân',
+                  },
+                  update: {
+                    status: 'failed',
+                    errorMessage: buyRes.error || 'Lỗi mua từ đại lý Hải Vân',
+                  },
+                })
+              }
+
               const noteMsg = buyRes.isInsufficientBalance
                 ? `[NGOẠI LỆ NGUỒN HÀNG HẢI VÂN]: Số dư ví Hải Vân không đủ (${buyRes.error}). Vui lòng nạp thêm tiền vào Hải Vân Kho Sỉ và bấm Giao Lại đơn hàng.`
                 : `[NGOẠI LỆ NGUỒN HÀNG HẢI VÂN]: Đại lý báo lỗi "${buyRes.error || 'Mua thất bại'}".`
 
-              await db.order.update({
-                where: { id: orderId },
-                data: { note: noteMsg },
-              })
+              const failNote = isBuffItem ? `${noteMsg} (Mã mời: ${inviteCode || 'N/A'})` : noteMsg
+              await updateOrderNote(db, orderId, order.note, failNote)
               totalDelivered += alreadyDelivered + localDelivered
             }
           } catch (haivanErr) {
@@ -727,12 +800,12 @@ export async function fulfillOrder(
               totalDelivered += alreadyDelivered + localDelivered + buyRes.items.length
 
               const orderIdStr = buyRes.order?.id || buyRes.order?.order_id || 'N/A'
-              await db.order.update({
-                where: { id: orderId },
-                data: {
-                  note: `[Đã mua từ Shop Xoài Non thành công]: Mã đơn: #${orderIdStr}`,
-                },
-              })
+              await updateOrderNote(
+                db,
+                orderId,
+                order.note,
+                `[Đã mua từ Shop Xoài Non thành công]: Mã đơn: #${orderIdStr}`
+              )
             } else {
               if (buyRes.isOutOfStock) {
                 try {
@@ -755,10 +828,7 @@ export async function fulfillOrder(
                 ? `[NGOẠI LỆ NGUỒN HÀNG SHOP XOÀI NON]: Số dư ví Shop Xoài Non không đủ (${buyRes.error}). Vui lòng nạp thêm tiền vào Shop Xoài Non và bấm Giao Lại đơn hàng.`
                 : `[NGOẠI LỆ NGUỒN HÀNG SHOP XOÀI NON]: Đại lý báo lỗi "${buyRes.error || 'Mua thất bại'}".`
 
-              await db.order.update({
-                where: { id: orderId },
-                data: { note: noteMsg },
-              })
+              await updateOrderNote(db, orderId, order.note, noteMsg)
               totalDelivered += alreadyDelivered + localDelivered
             }
           } catch (xoainonErr) {

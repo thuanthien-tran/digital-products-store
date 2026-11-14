@@ -428,19 +428,18 @@ export async function previewCouponCode(params: {
 }
 
 /**
- * Transactional coupon reservation:
- * Must run inside Prisma transaction when creating an order.
- * Ensures atomicity, optimistic locking (version) and quota guarantees.
+ * Validate and reserve coupon quota inside a transaction.
+ * Checks limits and updates version optimistically.
+ * Does NOT require Order to exist yet; redemption can be created via nested order.create.
  */
-export async function reserveCouponForOrder(
+export async function validateAndReserveCoupon(
   tx: Prisma.TransactionClient,
   params: {
     code: string
     email: string
     items: OrderItemEvalInput[]
-    orderId: string
   }
-): Promise<{ success: boolean; evaluation: CouponEvaluationResult; redemptionId?: string }> {
+): Promise<{ success: boolean; evaluation: CouponEvaluationResult; couponId?: string }> {
   const code = normalizeCouponCode(params.code)
   const normalizedEmail = params.email.trim().toLowerCase()
 
@@ -527,41 +526,74 @@ export async function reserveCouponForOrder(
     }
   }
 
+  return {
+    success: true,
+    evaluation,
+    couponId: coupon.id,
+  }
+}
+
+/**
+ * Transactional coupon reservation:
+ * Must run inside Prisma transaction when creating an order.
+ * Ensures atomicity, optimistic locking (version) and quota guarantees.
+ */
+export async function reserveCouponForOrder(
+  tx: Prisma.TransactionClient,
+  params: {
+    code: string
+    email: string
+    items: OrderItemEvalInput[]
+    orderId: string
+  }
+): Promise<{ success: boolean; evaluation: CouponEvaluationResult; redemptionId?: string }> {
+  const reservation = await validateAndReserveCoupon(tx, {
+    code: params.code,
+    email: params.email,
+    items: params.items,
+  })
+
+  if (!reservation.success || !reservation.couponId) {
+    return { success: false, evaluation: reservation.evaluation }
+  }
+
+  const normalizedEmail = params.email.trim().toLowerCase()
+
   // Check existing redemption for idempotency
   const existingRedemption = await tx.couponRedemption.findUnique({
     where: { orderId: params.orderId },
   })
   if (existingRedemption) {
     if (existingRedemption.status === "reserved" || existingRedemption.status === "redeemed") {
-      return { success: true, evaluation, redemptionId: existingRedemption.id }
+      return { success: true, evaluation: reservation.evaluation, redemptionId: existingRedemption.id }
     }
     const updatedRedemption = await tx.couponRedemption.update({
       where: { id: existingRedemption.id },
       data: {
         status: "reserved",
-        discountAmount: evaluation.discountCents,
+        discountAmount: reservation.evaluation.discountCents,
         reservedAt: new Date(),
         releasedAt: null,
         releaseReason: null,
       },
     })
-    return { success: true, evaluation, redemptionId: updatedRedemption.id }
+    return { success: true, evaluation: reservation.evaluation, redemptionId: updatedRedemption.id }
   }
 
   // Create redemption in 'reserved' state linked to order
   const redemption = await tx.couponRedemption.create({
     data: {
-      couponId: coupon.id,
+      couponId: reservation.couponId,
       orderId: params.orderId,
       email: normalizedEmail,
-      discountAmount: evaluation.discountCents,
+      discountAmount: reservation.evaluation.discountCents,
       status: "reserved",
     },
   })
 
   return {
     success: true,
-    evaluation,
+    evaluation: reservation.evaluation,
     redemptionId: redemption.id,
   }
 }

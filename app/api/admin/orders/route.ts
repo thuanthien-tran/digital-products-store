@@ -487,7 +487,13 @@ export async function GET(req: Request) {
         items: {
           include: {
             product: { select: { name: true } },
-            variant: { select: { name: true } },
+            variant: {
+              select: {
+                name: true,
+                provider: true,
+                connection: { select: { name: true, provider: true } },
+              },
+            },
             serials: { select: { content: true } },
           },
         },
@@ -513,6 +519,7 @@ export async function GET(req: Request) {
         createdAt: o.createdAt.toISOString(),
         paymentGateway: o.payments[0]?.gateway || null,
         note: o.note,
+        inviteCode: o.inviteCode,
         payments: o.payments.map((p) => ({
           id: p.id,
           amount: p.amount,
@@ -529,6 +536,10 @@ export async function GET(req: Request) {
             priceCents: i.priceCents,
             serials: serialList,
             serial: serialList.length > 0 ? serialList.join("\n") : null,
+            connectionName: i.connectionName || i.variant.connection?.name || i.variant.provider,
+            provider: i.variant.provider || i.variant.connection?.provider,
+            inviteCode: i.inviteCode || o.inviteCode,
+            tokenAmountB: i.tokenAmountB,
           }
         }),
       }
