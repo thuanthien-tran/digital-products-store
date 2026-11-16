@@ -48,6 +48,11 @@ next-env.d.ts
 *.db-journal
 *.db*bak*
 *.bak
+
+# Media and video generation
+/public/videos/
+/scripts/video-gen/
+
 *.sqlite
 *.sqlite3
 prisma/*.bak*
