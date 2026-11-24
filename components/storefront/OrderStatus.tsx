@@ -3,10 +3,12 @@
 import { useEffect, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { CheckCircle2, Copy, Check, AlertCircle, AlertTriangle, Loader2, Clock, ArrowLeft, RefreshCw, Zap } from "lucide-react"
+import { CheckCircle2, Copy, Check, AlertCircle, AlertTriangle, Loader2, Clock, ArrowLeft, RefreshCw, Zap, MessageCircle } from "lucide-react"
 import { formatPrice } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
+
+const ZALO_PHONE = (process.env.NEXT_PUBLIC_ZALO_PHONE_1 || "0356970964").replace(/\D/g, "")
 
 interface OrderStatusProps {
   orderId: string
@@ -376,14 +378,23 @@ export function OrderStatus({
           <p className="text-[11px] text-amber-300 bg-amber-500/10 border border-amber-500/20 p-3 rounded-xl max-w-md mx-auto leading-relaxed">
             ⚠️ <strong>Lưu ý:</strong> Vui lòng không quét mã chuyển khoản cho đơn hàng này. Nếu bạn đã lỡ chuyển khoản muộn, vui lòng liên hệ Zalo CSKH để được kích hoạt đơn hoặc hỗ trợ hoàn tiền ngay.
           </p>
-          <div className="pt-2 flex justify-center gap-3">
+          <div className="pt-2 flex flex-col sm:flex-row justify-center gap-3">
             <Link
               href="/"
-              className="px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:opacity-90 active:scale-95 transition-all inline-flex items-center gap-1.5"
+              className="h-11 px-4 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-caramel-light transition-btn inline-flex items-center justify-center gap-1.5"
             >
-              <ArrowLeft className="size-3.5" />
-              <span>Quay lại trang chủ tạo đơn mới</span>
+              <ArrowLeft className="size-4" />
+              <span>Quay lại tạo đơn mới</span>
             </Link>
+            <a
+              href={`https://zalo.me/${ZALO_PHONE}?text=${encodeURIComponent(`Chào shop CapyGo, mình cần hỗ trợ đơn hàng hết hạn #${orderCode}`)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="h-11 px-4 rounded-xl border border-border bg-card hover:bg-secondary text-foreground text-sm font-medium transition-btn inline-flex items-center justify-center gap-1.5"
+            >
+              <MessageCircle className="size-4 text-primary" />
+              <span>Liên hệ Zalo</span>
+            </a>
           </div>
         </div>
       </div>
@@ -577,13 +588,13 @@ export function OrderStatus({
                 <button
                   type="button"
                   onClick={() => copyText(copyVal, key)}
-                  className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+                  className="inline-flex size-8 items-center justify-center rounded-lg border border-border/70 bg-card hover:bg-secondary text-muted-foreground hover:text-foreground transition-btn shrink-0"
                   aria-label={`Sao chép ${label}`}
                 >
                   {copiedKey === key ? (
-                    <Check className="size-3 text-emerald-400" />
+                    <Check className="size-3.5 text-emerald-400" />
                   ) : (
-                    <Copy className="size-3" />
+                    <Copy className="size-3.5" />
                   )}
                 </button>
               </div>
@@ -598,19 +609,27 @@ export function OrderStatus({
         </div>
 
         {/* Manual Verification Button */}
-        <div className="pt-2 space-y-2">
+        <div className="pt-2 space-y-2.5">
           <Button
             type="button"
             disabled={verifying}
             onClick={handleManualCheck}
-            className="w-full py-5 rounded-xl bg-primary text-primary-foreground font-semibold flex items-center justify-center gap-2 shadow-lg shadow-primary/20 active:scale-[0.99] transition-all cursor-pointer"
+            className="w-full h-12 rounded-xl bg-primary text-primary-foreground hover:bg-caramel-light font-semibold text-sm flex items-center justify-center gap-2 transition-btn cursor-pointer"
           >
             <RefreshCw className={`size-4 ${verifying ? "animate-spin" : ""}`} />
-            <span>{verifying ? "Đang đối soát giao dịch SePay..." : "Tôi đã chuyển tiền (Kiểm tra ngay)"}</span>
+            <span>{verifying ? "Đang kiểm tra giao dịch..." : "Tôi đã chuyển tiền (Kiểm tra ngay)"}</span>
           </Button>
-          <p className="text-[11px] text-center text-muted-foreground">
-            Hệ thống đang tự động quét biến động số dư SePay mỗi 3 giây. Nếu bạn vừa chuyển xong, bấm nút trên để kích hoạt kiểm tra ngay lập tức.
-          </p>
+          <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground pt-0.5">
+            <span>Hệ thống tự kiểm tra mỗi 3 giây.</span>
+            <a
+              href={`https://zalo.me/${ZALO_PHONE}?text=${encodeURIComponent(`Chào shop CapyGo, mình cần hỗ trợ đơn hàng #${orderCode}`)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary hover:underline font-medium shrink-0"
+            >
+              Cần hỗ trợ? Zalo ↗
+            </a>
+          </div>
         </div>
       </div>
     </div>

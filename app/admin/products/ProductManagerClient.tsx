@@ -204,6 +204,8 @@ export function ProductManagerClient({ groups }: Props) {
   })
   const [saving, setSaving] = useState(false)
   const [confirmBelowCost, setConfirmBelowCost] = useState(false)
+  const [editModalTab, setEditModalTab] = useState<"info" | "pricing" | "delivery" | "content">("info")
+  const [showLivePreview, setShowLivePreview] = useState(true)
 
   // Add Manual Product Modal State
   const [isAddManualOpen, setIsAddManualOpen] = useState(false)
@@ -1536,19 +1538,59 @@ export function ProductManagerClient({ groups }: Props) {
                   )}
                 </div>
               </div>
-              <button
-                onClick={() => setEditingProduct(null)}
-                className="p-1 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground"
-              >
-                <X className="size-4" />
-              </button>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setShowLivePreview((prev) => !prev)}
+                  className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg border border-border bg-card hover:bg-secondary text-xs font-medium text-foreground transition-btn"
+                  aria-pressed={showLivePreview}
+                >
+                  <Eye className="size-3.5 text-primary" />
+                  <span className="hidden sm:inline">{showLivePreview ? "Ẩn xem trước" : "Hiện xem trước"}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingProduct(null)}
+                  className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground"
+                  aria-label="Đóng trình biên tập"
+                >
+                  <X className="size-4" />
+                </button>
+              </div>
             </div>
 
-            {/* Modal Body: Split view (Form on left, Real-time Live Card Preview on right) */}
+            {/* Section Tabs (preserves all unsaved form state across switches) */}
+            <div className="px-4 sm:px-6 py-2.5 border-b border-border bg-card flex items-center gap-1.5 overflow-x-auto no-scrollbar" role="tablist" aria-label="Nhóm cấu hình sản phẩm">
+              {(
+                [
+                  { id: "info", label: "Thông tin" },
+                  { id: "pricing", label: `Gói & giá (${editForm.variants.filter((v) => !v._delete).length})` },
+                  { id: "delivery", label: "Giao hàng" },
+                  { id: "content", label: "Nội dung" },
+                ] as const
+              ).map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={editModalTab === tab.id}
+                  onClick={() => setEditModalTab(tab.id)}
+                  className={`h-9 px-3.5 rounded-xl text-xs font-semibold whitespace-nowrap border transition-btn ${
+                    editModalTab === tab.id
+                      ? "bg-primary/15 text-primary border-primary/35"
+                      : "bg-transparent text-muted-foreground hover:text-foreground hover:bg-secondary border-transparent"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Modal Body: Split view (Form on left, Toggleable Live Card Preview on right) */}
             <div className="p-5 sm:p-6 overflow-y-auto space-y-4 text-xs flex-1">
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-                {/* Form Controls: lg:col-span-7 */}
-                <div className="lg:col-span-7 space-y-4">
+                {/* Form Controls */}
+                <div className={`${showLivePreview ? "lg:col-span-7" : "lg:col-span-12"} space-y-4`}>
                   {/* Provider Sync & Customization Status Banner */}
                   <div className="p-3 rounded-xl border border-purple-500/30 bg-purple-500/5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -1575,8 +1617,8 @@ export function ProductManagerClient({ groups }: Props) {
                     )}
                   </div>
 
-                  {/* 1. Cover Image 16:9 */}
-                  <div className="p-3.5 rounded-xl border border-border bg-secondary/20 space-y-3">
+                  {/* 1. Cover Image 16:9 (Tab: Thông tin) */}
+                  <div className={editModalTab === "info" ? "p-3.5 rounded-xl border border-border bg-secondary/20 space-y-3" : "hidden"}>
                     <div className="flex items-center justify-between">
                       <label className="text-[11px] font-bold uppercase tracking-wider text-primary flex items-center gap-1.5">
                         <ImageIcon className="size-3.5" />
@@ -1661,9 +1703,9 @@ export function ProductManagerClient({ groups }: Props) {
                     </p>
                   </div>
 
-                  {/* 2. Product Name, Category, Delivery & Fulfillment */}
-                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-                    <div className="sm:col-span-5">
+                  {/* 2A. Product Name, Category & Sort Order (Tab: Thông tin) */}
+                  <div className={editModalTab === "info" ? "grid grid-cols-1 sm:grid-cols-12 gap-3" : "hidden"}>
+                    <div className="sm:col-span-6">
                       <label className="block text-muted-foreground font-medium mb-1">
                         Tên sản phẩm trên website *
                       </label>
@@ -1705,7 +1747,24 @@ export function ProductManagerClient({ groups }: Props) {
                       </select>
                     </div>
 
-                    <div className="sm:col-span-3">
+                    <div className="sm:col-span-2">
+                      <label className="block text-muted-foreground font-medium mb-1" title="Số thứ tự ưu tiên hiển thị (1, 2, 3...)">
+                        STT
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        value={editForm.sortOrder || 1}
+                        onChange={(e) => setEditForm({ ...editForm, sortOrder: parseInt(e.target.value) || 1 })}
+                        className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground text-xs focus:outline-none focus:ring-1 focus:ring-primary font-bold text-center"
+                        title="Số thứ tự hiển thị trên website (1 là đầu tiên, 2, 3...)"
+                      />
+                    </div>
+                  </div>
+
+                  {/* 2B. Delivery, Fulfillment & Stock Override (Tab: Giao hàng) */}
+                  <div className={editModalTab === "delivery" ? "p-3.5 rounded-xl border border-border bg-secondary/20 grid grid-cols-1 sm:grid-cols-12 gap-3" : "hidden"}>
+                    <div className="sm:col-span-4">
                       <label className="block text-muted-foreground font-medium mb-1" title="Kênh xử lý đơn hàng">
                         Kênh xử lý đơn *
                       </label>
@@ -1758,35 +1817,21 @@ export function ProductManagerClient({ groups }: Props) {
                       </select>
                     </div>
 
-                    <div className="sm:col-span-2">
-                      <label className="block text-muted-foreground font-medium mb-1" title="Số thứ tự ưu tiên hiển thị (1, 2, 3...)">
-                        STT
-                      </label>
-                      <input
-                        type="number"
-                        min={1}
-                        value={editForm.sortOrder || 1}
-                        onChange={(e) => setEditForm({ ...editForm, sortOrder: parseInt(e.target.value) || 1 })}
-                        className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground text-xs focus:outline-none focus:ring-1 focus:ring-primary font-bold text-center"
-                        title="Số thứ tự hiển thị trên website (1 là đầu tiên, 2, 3...)"
-                      />
-                    </div>
-
-                    <div className="sm:col-span-2 flex items-center pt-5">
-                      <label className="flex items-center gap-1.5 cursor-pointer text-xs font-medium text-foreground select-none">
+                    <div className="sm:col-span-12 pt-1">
+                      <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-foreground select-none">
                         <input
                           type="checkbox"
                           checked={Boolean(editForm.requiresInviteCode)}
                           onChange={(e) => setEditForm({ ...editForm, requiresInviteCode: e.target.checked })}
                           className="size-4 rounded border-border bg-card text-caramel accent-caramel"
                         />
-                        <span>Cần Invite Code</span>
+                        <span>Yêu cầu khách nhập Mã mời (Invite Code) khi đặt hàng</span>
                       </label>
                     </div>
                   </div>
 
-                  {/* 3. Multi-Variant / Tier Management */}
-                  <div className="p-3.5 rounded-xl border border-border bg-secondary/20 space-y-3">
+                  {/* 3. Multi-Variant / Tier Management (Tab: Gói & giá) */}
+                  <div className={editModalTab === "pricing" ? "p-3.5 rounded-xl border border-border bg-secondary/20 space-y-3" : "hidden"}>
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-border/40">
                       <div>
                         <label className="text-[11px] font-bold uppercase tracking-wider text-primary block">
@@ -2074,8 +2119,8 @@ export function ProductManagerClient({ groups }: Props) {
                     </div>
                   )}
 
-                  {/* 4. Highlights on Card */}
-                  <div className="p-3.5 rounded-xl border border-border bg-secondary/20 space-y-2">
+                  {/* 4. Highlights on Card (Tab: Nội dung) */}
+                  <div className={editModalTab === "content" ? "p-3.5 rounded-xl border border-border bg-secondary/20 space-y-2" : "hidden"}>
                     <div className="flex items-center justify-between">
                       <label className="text-[11px] font-bold uppercase tracking-wider text-primary block">
                         Điểm nổi bật trên thẻ (2 - 3 ý chính)
@@ -2094,8 +2139,8 @@ export function ProductManagerClient({ groups }: Props) {
                     </p>
                   </div>
 
-                  {/* 4.1 Featured Product Toggle */}
-                  <div className="flex items-center justify-between p-3 rounded-xl border border-border bg-secondary/20 hover:border-caramel/40 transition-colors">
+                  {/* 4.1 Featured Product Toggle (Tab: Thông tin) */}
+                  <div className={editModalTab === "info" ? "flex items-center justify-between p-3 rounded-xl border border-border bg-secondary/20 hover:border-caramel/40 transition-colors" : "hidden"}>
                     <div className="flex items-center gap-2.5">
                       <div className="size-8 rounded-lg bg-caramel/10 border border-caramel/25 flex items-center justify-center shrink-0">
                         <Star className={`size-4 ${editForm.isFeatured ? "fill-caramel text-caramel" : "text-muted-foreground"}`} />
@@ -2118,8 +2163,8 @@ export function ProductManagerClient({ groups }: Props) {
                     />
                   </div>
 
-                  {/* 5. Standardized 4 Sections */}
-                  <div className="pt-2 border-t border-border/70 space-y-3">
+                  {/* 5. Standardized 4 Sections (Tab: Nội dung) */}
+                  <div className={editModalTab === "content" ? "pt-2 border-t border-border/70 space-y-3" : "hidden"}>
                     <span className="font-bold text-[11px] uppercase tracking-wider text-primary block">
                       Bố cục mô tả chi tiết:
                     </span>
@@ -2174,7 +2219,8 @@ export function ProductManagerClient({ groups }: Props) {
                   </div>
                 </div>
 
-                {/* Right Column: Real-time Live Card Preview (lg:col-span-5) */}
+                {/* Right Column: Toggleable Real-time Live Card Preview (lg:col-span-5) */}
+                {showLivePreview && (
                 <div className="lg:col-span-5 sticky top-0 space-y-3">
                   <div className="p-3.5 rounded-2xl border border-border/80 bg-secondary/30 backdrop-blur">
                     <div className="flex items-center justify-between pb-2 mb-3 border-b border-border/50">
@@ -2209,6 +2255,7 @@ export function ProductManagerClient({ groups }: Props) {
                     </p>
                   </div>
                 </div>
+                )}
               </div>
             </div>
 

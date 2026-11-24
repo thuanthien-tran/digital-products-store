@@ -5,19 +5,20 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
 import { formatPrice } from "@/lib/utils"
-import { 
-  ArrowRight, 
-  Loader2, 
-  AlertCircle, 
-  AlertTriangle, 
-  Plus, 
+import {
+  ArrowRight,
+  Loader2,
+  AlertCircle,
+  AlertTriangle,
+  Plus,
   Minus,
   ShieldCheck,
-  Zap,
   Clock,
   MessageCircle,
   Tag,
   CheckCircle2,
+  Check,
+  ChevronDown,
   X,
 } from "lucide-react"
 
@@ -112,7 +113,11 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
   const [couponLoading, setCouponLoading] = useState(false)
   const [couponError, setCouponError] = useState<string | null>(null)
   const [couponSuccessMessage, setCouponSuccessMessage] = useState<string | null>(null)
+  const [isCouponOpen, setIsCouponOpen] = useState(false)
   const couponAbortControllerRef = useRef<AbortController | null>(null)
+  const emailInputRef = useRef<HTMLInputElement>(null)
+  const inviteCodeInputRef = useRef<HTMLInputElement>(null)
+  const consentInputRef = useRef<HTMLInputElement>(null)
   const idempotencyKeyRef = useRef<string>(
     typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
       ? crypto.randomUUID()
@@ -291,6 +296,13 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
     return () => clearTimeout(timer)
   }, [selectedVariantId, quantity, handleApplyCoupon])
 
+  // Auto-open coupon panel whenever a coupon is applied or has an error
+  useEffect(() => {
+    if (appliedCoupon || couponError) {
+      setIsCouponOpen(true)
+    }
+  }, [appliedCoupon, couponError])
+
   // Validate email
   const validateEmailValue = (val: string): string | null => {
     const trimmed = val.trim()
@@ -363,6 +375,8 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
     setEmailTouched(true)
     if (err) {
       setEmailError(err)
+      emailInputRef.current?.focus()
+      emailInputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })
       return
     }
 
@@ -371,19 +385,23 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
       return
     }
 
-    if (!consentAgreed) {
-      setConsentError(true)
-      setSubmitError("Vui lòng tích chọn đồng ý với Điều khoản dịch vụ và Chính sách bảo mật trước khi tiếp tục.")
-      return
-    }
-
     if (isBuffProduct || product.requiresInviteCode) {
       const cleanCode = inviteCode.trim().toUpperCase()
       if (!cleanCode || cleanCode.length < 4 || cleanCode.length > 20) {
         setInviteCodeError("Mã mời phải từ 4 đến 20 ký tự chữ hoặc số.")
-        setSubmitError("Vui lòng nhập chính xác mã mời nhận token Muse AI để tiếp tục.")
+        setSubmitError("Vui lòng nhập chính xác mã mời nhận token để tiếp tục.")
+        inviteCodeInputRef.current?.focus()
+        inviteCodeInputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })
         return
       }
+    }
+
+    if (!consentAgreed) {
+      setConsentError(true)
+      setSubmitError("Vui lòng tích chọn đồng ý với Điều khoản dịch vụ và Chính sách bảo mật trước khi tiếp tục.")
+      consentInputRef.current?.focus()
+      consentInputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })
+      return
     }
 
     // Guard against double submission
@@ -445,31 +463,39 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
   }
 
   // Detect critical condition notes
-  const isKBH = /kbh|không bảo hành/i.test(`${selectedVariant?.name || ""} ${product.name}`)
+  const isKBH = /kbh|không bảo hành|no warranty|\(nw\)/i.test(`${selectedVariant?.name || ""} ${product.name}`)
   const isVPN = /vpn|ấn độ|india/i.test(`${selectedVariant?.name || ""} ${product.noticeNotes || ""}`)
 
+  // Compute Buff Token per-unit and total capacity (display only — preserves exact backend/provider logic)
+  const selectedUnitTokenB = (() => {
+    if (!selectedVariant) return null
+    const match = selectedVariant.name.match(/(\d+)\s*b\b/i)
+    if (match) return parseInt(match[1], 10)
+    return selectedVariant.tokenAmountB ?? null
+  })()
+  const totalTokenB = selectedUnitTokenB ? selectedUnitTokenB * quantity : null
+
   return (
-    <div className="rounded-2xl border border-border bg-card p-6 sm:p-7 shadow-xl shadow-black/40 text-foreground space-y-6">
+    <div className="rounded-2xl border border-border bg-card p-5 sm:p-6 text-foreground space-y-5">
       {/* A. Header: Title & Stock Status */}
-      <div className="flex items-center justify-between gap-3 pb-4 border-b border-border/60">
+      <div className="flex items-center justify-between gap-3 pb-4 border-b border-border">
         <div>
-          <h2 className="text-lg font-bold text-foreground tracking-tight">
-            Hoàn tất đơn hàng
+          <h2 className="text-base sm:text-lg font-bold text-foreground tracking-tight">
+            Đặt mua gói
           </h2>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Chọn gói và nhập email để tiến hành thanh toán
+          <p className="text-xs sm:text-[13px] text-muted-foreground mt-0.5">
+            Chọn gói phù hợp và điền thông tin nhận đơn
           </p>
         </div>
 
-        {/* Live Stock Status Indicator */}
         <div className="shrink-0">
           {isOutOfStock ? (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-secondary text-muted-foreground border border-border">
-              <span className="size-1.5 rounded-full bg-slate-500" />
-              Tạm hết hàng
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-secondary text-muted-foreground border border-border">
+              <span className="size-1.5 rounded-full bg-rose-400" />
+              Hết hàng
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">
               <span className="size-1.5 rounded-full bg-emerald-400" />
               Còn hàng
             </span>
@@ -537,19 +563,18 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
                       : "border-border/80 bg-secondary/30 hover:border-border hover:bg-secondary/60 cursor-pointer focus-visible:ring-2 focus-visible:ring-caramel-light focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   }`}
                 >
-                  {/* Left: Radio Dot & Package Title & Badges */}
+                  {/* Left: Radio Check Indicator & Package Title */}
                   <div className="flex items-start gap-3 min-w-0 pr-2">
-                    {/* Visual Radio Indicator */}
                     <div
-                      className={`size-4 rounded-full border flex items-center justify-center shrink-0 mt-0.5 transition-all ${
+                      className={`size-5 rounded-full border flex items-center justify-center shrink-0 mt-0.5 transition-btn ${
                         outOfStock
                           ? "border-border bg-secondary/20"
                           : isSelected
-                          ? "border-caramel bg-secondary/60 ring-2 ring-caramel/30"
-                          : "border-border bg-secondary/40 group-hover:border-muted-foreground/60"
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border bg-background group-hover:border-muted-foreground"
                       }`}
                     >
-                      {isSelected && <div className="size-2 rounded-full bg-caramel" />}
+                      {isSelected && <Check className="size-3" strokeWidth={3} />}
                     </div>
 
                     <div className="space-y-1 min-w-0">
@@ -635,6 +660,7 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
           </label>
           <div className="relative">
             <input
+              ref={emailInputRef}
               id="customer-email"
               type="email"
               autoComplete="email"
@@ -681,6 +707,7 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
               </span>
             </div>
             <input
+              ref={inviteCodeInputRef}
               id="customer-invite-code"
               type="text"
               maxLength={20}
@@ -785,151 +812,159 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
           </div>
         )}
 
-        {/* Coupon Code Input & Application */}
-        <div className="space-y-2 pt-1">
-          <label className="text-xs font-semibold text-foreground/90 flex items-center justify-between">
-            <span className="flex items-center gap-1.5">
-              <Tag className="size-3.5 text-caramel" />
-              Mã giảm giá (Coupon)
+        {/* Collapsible Coupon Code Section (auto-opens when applied or on error) */}
+        <div className="rounded-xl border border-border bg-background/60 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setIsCouponOpen((prev) => !prev)}
+            aria-expanded={isCouponOpen}
+            className="w-full min-h-[44px] px-3.5 py-2.5 flex items-center justify-between text-xs sm:text-[13px] font-medium text-foreground hover:bg-secondary/60 transition-btn cursor-pointer"
+          >
+            <span className="flex items-center gap-2">
+              <Tag className="size-4 text-primary shrink-0" />
+              <span>
+                {appliedCoupon
+                  ? `Mã giảm giá: ${appliedCoupon.code} (-${formatPrice(appliedCoupon.discountCents)})`
+                  : "Bạn có mã giảm giá?"}
+              </span>
             </span>
-            {appliedCoupon && (
-              <span className="text-[11px] text-emerald-400 font-medium">Đã áp dụng mã thành công</span>
-            )}
-          </label>
+            <ChevronDown
+              className={`size-4 text-muted-foreground transition-transform duration-150 ${
+                isCouponOpen ? "rotate-180" : ""
+              }`}
+            />
+          </button>
 
-          {appliedCoupon ? (
-            <div className="flex items-center justify-between p-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-xs">
-              <div className="flex items-center gap-2.5">
-                <CheckCircle2 className="size-4 text-emerald-400 shrink-0" />
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono font-bold text-emerald-300 tracking-wider">
-                      {appliedCoupon.code}
-                    </span>
-                    <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                      -{formatPrice(appliedCoupon.discountCents)}
-                    </span>
+          {isCouponOpen && (
+            <div className="px-3.5 pb-3.5 pt-1 space-y-2 border-t border-border/60">
+              {appliedCoupon ? (
+                <div className="flex items-center justify-between p-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-xs">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <CheckCircle2 className="size-4 text-emerald-400 shrink-0" />
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono font-bold text-emerald-300 tracking-wider">
+                          {appliedCoupon.code}
+                        </span>
+                        <span className="px-1.5 py-0.5 rounded text-xs font-semibold bg-emerald-500/20 text-emerald-300">
+                          -{formatPrice(appliedCoupon.discountCents)}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                        {appliedCoupon.name}
+                      </p>
+                    </div>
                   </div>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">
-                    {appliedCoupon.name}
-                  </p>
+                  <button
+                    type="button"
+                    onClick={handleRemoveCoupon}
+                    className="inline-flex items-center gap-1 min-h-[34px] px-2.5 py-1 rounded-lg border border-border bg-secondary hover:bg-secondary/80 text-xs font-medium text-foreground transition-btn cursor-pointer shrink-0"
+                    title="Bỏ mã giảm giá"
+                  >
+                    <X className="size-3.5" />
+                    <span>Bỏ mã</span>
+                  </button>
                 </div>
-              </div>
-              <button
-                type="button"
-                onClick={handleRemoveCoupon}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-border/80 bg-secondary/60 hover:bg-secondary text-[11px] font-semibold text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                title="Bỏ mã giảm giá"
-              >
-                <X className="size-3" />
-                <span>Bỏ mã</span>
-              </button>
-            </div>
-          ) : (
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <input
-                  type="text"
-                  value={couponInput}
-                  onChange={(e) => {
-                    setCouponInput(e.target.value.toUpperCase())
-                    if (couponError) setCouponError(null)
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault()
-                      handleApplyCoupon()
-                    }
-                  }}
-                  placeholder="Nhập mã ưu đãi..."
-                  className="w-full h-10 px-3.5 rounded-xl border border-border bg-secondary/40 font-mono text-xs uppercase placeholder:normal-case placeholder:font-sans placeholder:text-muted-foreground focus:border-caramel focus:ring-1 focus:ring-caramel outline-none transition-all"
-                />
-              </div>
-              <button
-                type="button"
-                onClick={() => handleApplyCoupon()}
-                disabled={couponLoading || !couponInput.trim()}
-                className="px-4 h-10 rounded-xl bg-secondary hover:bg-secondary/80 border border-border text-foreground font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer shrink-0"
-              >
-                {couponLoading ? (
-                  <Loader2 className="size-3.5 animate-spin" />
-                ) : (
-                  <span>Áp dụng</span>
-                )}
-              </button>
-            </div>
-          )}
+              ) : (
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <input
+                      type="text"
+                      value={couponInput}
+                      onChange={(e) => {
+                        setCouponInput(e.target.value.toUpperCase())
+                        if (couponError) setCouponError(null)
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault()
+                          handleApplyCoupon()
+                        }
+                      }}
+                      placeholder="Nhập mã ưu đãi..."
+                      aria-label="Nhập mã giảm giá"
+                      className="w-full h-11 px-3.5 rounded-xl border border-border bg-card font-mono text-sm uppercase placeholder:normal-case placeholder:font-sans placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-ring/30 outline-none transition-btn"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleApplyCoupon()}
+                    disabled={couponLoading || !couponInput.trim()}
+                    className="px-4 h-11 rounded-xl bg-secondary hover:bg-secondary/80 border border-border text-foreground font-semibold text-xs sm:text-sm transition-btn disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer shrink-0"
+                  >
+                    {couponLoading ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <span>Áp dụng</span>
+                    )}
+                  </button>
+                </div>
+              )}
 
-          {couponError && (
-            <p className="text-[11px] text-rose-400 font-medium flex items-center gap-1 animate-in fade-in duration-150">
-              <AlertCircle className="size-3 shrink-0" />
-              <span>{couponError}</span>
-            </p>
-          )}
+              {couponError && (
+                <p className="text-xs text-rose-400 font-medium flex items-center gap-1.5">
+                  <AlertCircle className="size-3.5 shrink-0" />
+                  <span>{couponError}</span>
+                </p>
+              )}
 
-          {couponSuccessMessage && !couponError && (
-            <p className="text-[11px] text-emerald-400 font-medium flex items-center gap-1 animate-in fade-in duration-150">
-              <CheckCircle2 className="size-3 shrink-0" />
-              <span>{couponSuccessMessage}</span>
-            </p>
+              {couponSuccessMessage && !couponError && (
+                <p className="text-xs text-emerald-400 font-medium flex items-center gap-1.5">
+                  <CheckCircle2 className="size-3.5 shrink-0" />
+                  <span>{couponSuccessMessage}</span>
+                </p>
+              )}
+            </div>
           )}
         </div>
 
         {/* E. Tóm tắt thanh toán */}
-        <div className="p-4 rounded-xl border border-border/80 bg-secondary/30 space-y-2 text-xs text-muted-foreground">
-          {/* Tạm tính */}
-          <div className="flex items-center justify-between">
-            <span>Tạm tính:</span>
-            <span className="text-foreground/90 tabular-nums font-medium">
-              {formatPrice(subtotalPrice)}
-            </span>
-          </div>
-
-          {/* Chiết khấu niêm yết nếu có compareAtPrice */}
-          {hasValidCompare && compareTotalPrice && savingsAmount && savingsAmount > 0 && (
-            <div className="flex items-center justify-between text-muted-foreground/80">
-              <span className="flex items-center gap-1.5">
-                <span>Tiết kiệm giá gốc:</span>
-                {discountPercent && (
-                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-secondary text-muted-foreground border border-border">
-                    −{discountPercent}%
-                  </span>
-                )}
-              </span>
-              <span className="tabular-nums">
-                −{formatPrice(savingsAmount)}
+        <div className="p-4 rounded-xl border border-border bg-background/70 space-y-2 text-xs sm:text-[13px] text-muted-foreground">
+          {/* Buff Token total volume breakdown */}
+          {isBuffProduct && selectedUnitTokenB && totalTokenB && (
+            <div className="flex items-center justify-between pb-2 mb-1 border-b border-border/60">
+              <span>Tổng dung lượng nạp ({selectedUnitTokenB}B × {quantity}):</span>
+              <span className="font-semibold text-primary tabular-nums">
+                {totalTokenB}B Token (~{totalTokenB} tỷ)
               </span>
             </div>
           )}
 
+          {/* Tạm tính */}
+          <div className="flex items-center justify-between">
+            <span>Tạm tính:</span>
+            <span className="text-foreground tabular-nums font-medium">
+              {formatPrice(subtotalPrice)}
+            </span>
+          </div>
+
           {/* Mã giảm giá Coupon */}
           {appliedCoupon && discountAmount > 0 && (
-            <div className="flex items-center justify-between text-emerald-400 font-semibold">
-              <span className="flex items-center gap-1.5">
-                <span>Mã giảm giá ({appliedCoupon.code}):</span>
-              </span>
-              <span className="tabular-nums font-bold">
+            <div className="flex items-center justify-between text-emerald-400 font-medium">
+              <span>Mã giảm giá ({appliedCoupon.code}):</span>
+              <span className="tabular-nums font-semibold">
                 −{formatPrice(discountAmount)}
               </span>
             </div>
           )}
 
-          <div className="pt-2 border-t border-border/60 flex items-center justify-between">
-            <span className="text-sm font-semibold text-foreground/90">Tổng thanh toán:</span>
-            <span className="text-2xl font-extrabold text-oat-cream tracking-tight tabular-nums">
+          <div className="pt-2.5 border-t border-border flex items-center justify-between">
+            <span className="text-sm font-semibold text-foreground">Tổng thanh toán:</span>
+            <span className="text-2xl font-bold text-foreground tracking-tight tabular-nums">
               {formatPrice(finalPrice)}
             </span>
           </div>
         </div>
 
-        {/* Consent Checkbox theo Luật Bảo vệ dữ liệu cá nhân 91/2025/QH15 & NĐ 356/2025/NĐ-CP */}
+        {/* Consent Checkbox */}
         <div className="pt-0.5">
-          <label className={`flex items-start gap-2.5 p-3 rounded-xl border transition-all duration-150 cursor-pointer select-none ${
+          <label className={`flex items-start gap-2.5 p-3.5 rounded-xl border transition-btn cursor-pointer select-none ${
             consentError && !consentAgreed
-              ? "border-red-500/60 bg-red-500/10 text-red-200 shadow-xs"
-              : "border-border/70 bg-secondary/20 hover:border-caramel/40 hover:bg-secondary/35 text-muted-foreground hover:text-foreground"
+              ? "border-rose-500/60 bg-rose-500/10 text-rose-200"
+              : "border-border bg-background/50 hover:border-primary/40 text-muted-foreground hover:text-foreground"
           }`}>
             <input
+              ref={consentInputRef}
               type="checkbox"
               checked={consentAgreed}
               onChange={(e) => {
@@ -939,14 +974,14 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
                   if (submitError?.includes("đồng ý")) setSubmitError(null)
                 }
               }}
-              className="mt-0.5 size-4 rounded border-border text-caramel focus:ring-caramel-light shrink-0 cursor-pointer accent-caramel"
+              className="mt-0.5 size-4 rounded border-border text-primary focus:ring-ring shrink-0 cursor-pointer accent-caramel"
             />
             <span className="text-xs leading-relaxed">
               Tôi đã đọc và đồng ý với{" "}
               <Link
                 href="/dieu-khoan-dich-vu"
                 target="_blank"
-                className="text-caramel font-semibold underline underline-offset-2 hover:text-caramel-light transition-colors"
+                className="text-primary font-semibold underline underline-offset-2 hover:text-caramel-light"
                 onClick={(e) => e.stopPropagation()}
               >
                 Điều khoản dịch vụ
@@ -955,12 +990,12 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
               <Link
                 href="/chinh-sach-bao-mat"
                 target="_blank"
-                className="text-caramel font-semibold underline underline-offset-2 hover:text-caramel-light transition-colors"
+                className="text-primary font-semibold underline underline-offset-2 hover:text-caramel-light"
                 onClick={(e) => e.stopPropagation()}
               >
                 Chính sách bảo mật
               </Link>{" "}
-              của CapyGo.
+              của CAPYGO.
             </span>
           </label>
         </div>
@@ -1027,15 +1062,11 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
           </>
         )}
 
-        {/* Trust Badges */}
-        <div className="pt-3 border-t border-border/40 flex items-center justify-center gap-4 text-[11px] text-muted-foreground">
-          <span className="inline-flex items-center gap-1">
-            <Zap className="size-3 text-caramel" />
-            Giao tự động
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <ShieldCheck className="size-3 text-caramel" />
-            Thanh toán an toàn
+        {/* Trust Note */}
+        <div className="pt-3 border-t border-border/60 flex items-center justify-center gap-4 text-xs text-muted-foreground">
+          <span className="inline-flex items-center gap-1.5">
+            <ShieldCheck className="size-3.5 text-primary" />
+            Thông tin bàn giao hiển thị trong đơn hàng
           </span>
         </div>
       </form>

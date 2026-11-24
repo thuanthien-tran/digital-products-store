@@ -4,7 +4,6 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { MessageCircle, Eye } from "lucide-react"
-import { OfficeCapybara } from "@/components/storefront/OfficeCapybara"
 import type { VisitorStatsPayload } from "@/components/storefront/VisitorTracker"
 
 const ZALO_PHONE = process.env.NEXT_PUBLIC_ZALO_PHONE_1 || "0356970964"
@@ -22,11 +21,14 @@ export function Footer({ initialSettings }: FooterProps) {
   const pathname = usePathname()
   const cleanZaloPhone = ZALO_PHONE.replace(/\D/g, "")
 
-  const [settings, setSettings] = useState(() => initialSettings || {
-    siteName: process.env.NEXT_PUBLIC_STORE_NAME || "ACCGIARE",
-    logoUrl: null,
-    initials: "AG",
-  })
+  const [settings, setSettings] = useState(
+    () =>
+      initialSettings || {
+        siteName: process.env.NEXT_PUBLIC_STORE_NAME || "CAPYGO",
+        logoUrl: null,
+        initials: "CG",
+      }
+  )
   const [visitorStats, setVisitorStats] = useState<VisitorStatsPayload | null>(null)
 
   useEffect(() => {
@@ -38,7 +40,7 @@ export function Footer({ initialSettings }: FooterProps) {
             setSettings({
               siteName: data.siteName,
               logoUrl: data.logoUrl || null,
-              initials: data.initials || "AG",
+              initials: data.initials || "CG",
             })
           }
         })
@@ -91,95 +93,92 @@ export function Footer({ initialSettings }: FooterProps) {
   }
 
   return (
-    <footer className="border-t border-border/60 bg-[#101416] text-foreground mt-16 sm:mt-20">
-      <div className="mx-auto w-full max-w-7xl px-4 sm:px-8 lg:px-12 py-8 sm:py-10 space-y-6 sm:space-y-8">
-        {/* HÀNG CHÍNH */}
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 sm:gap-8">
-          {/* Nhóm bên trái: Capybara pixel art & Thương hiệu */}
-          <div className="flex items-center gap-3.5 sm:gap-5">
-            <OfficeCapybara />
-
-            <div className="space-y-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="flex size-7 sm:size-8 items-center justify-center rounded-lg bg-secondary border border-border text-xs font-bold text-accent tracking-wider shadow-xs overflow-hidden">
-                  {settings.logoUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={settings.logoUrl}
-                      alt={settings.siteName}
-                      className="size-full object-cover rounded-lg"
-                    />
-                  ) : (
-                    settings.initials
-                  )}
-                </span>
-                <span className="font-heading font-extrabold text-base sm:text-lg tracking-tight text-foreground">
-                  {settings.siteName}
-                </span>
-              </div>
-              <p className="text-xs sm:text-[13px] text-muted-foreground/90 max-w-sm sm:max-w-md leading-relaxed">
-                Hệ thống tài khoản và phần mềm công nghệ phục vụ công việc, sáng tạo và học tập.
-              </p>
+    <footer className="border-t border-border bg-card text-foreground mt-16">
+      <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 py-8 sm:py-10 space-y-6">
+        {/* Main Row */}
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+          {/* Brand */}
+          <div className="space-y-2 max-w-md">
+            <div className="flex items-center gap-2.5">
+              <span className="flex size-8 items-center justify-center rounded-xl bg-secondary border border-border text-xs font-bold text-primary tracking-wider overflow-hidden shrink-0">
+                {settings.logoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={settings.logoUrl}
+                    alt={settings.siteName}
+                    className="size-full object-cover"
+                  />
+                ) : (
+                  settings.initials
+                )}
+              </span>
+              <span className="font-heading font-bold text-base tracking-tight text-foreground">
+                {settings.siteName}
+              </span>
             </div>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Cửa hàng tài khoản, phần mềm, dịch vụ nâng cấp và API phục vụ công việc, sáng tạo và học tập.
+            </p>
           </div>
 
-          {/* Nhóm bên phải: Điều hướng & Nút Zalo */}
-          <div className="flex flex-wrap items-center gap-x-5 sm:gap-x-6 gap-y-3 pt-2 lg:pt-0">
+          {/* Navigation & Support */}
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
             <Link
               href="/san-pham"
-              className="text-xs sm:text-sm font-medium text-muted-foreground hover:text-caramel-light focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel-light focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-md transition-colors duration-150"
+              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
             >
-              Sản phẩm & Gói
+              Sản phẩm
             </Link>
-
+            <Link
+              href="/lookup"
+              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
+            >
+              Tra cứu đơn
+            </Link>
             <Link
               href="/#how"
               onClick={(e) => handleNavScroll(e, "how")}
-              className="text-xs sm:text-sm font-medium text-muted-foreground hover:text-caramel-light focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel-light focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-md transition-colors duration-150"
+              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
             >
-              Hướng dẫn mua hàng
+              Hướng dẫn
             </Link>
-
             <Link
               href="/#faq"
               onClick={(e) => handleNavScroll(e, "faq")}
-              className="text-xs sm:text-sm font-medium text-muted-foreground hover:text-caramel-light focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel-light focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-md transition-colors duration-150"
+              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
             >
               FAQ
             </Link>
-
             <a
               href={`https://zalo.me/${cleanZaloPhone}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-3.5 py-2 sm:px-4 sm:py-2 rounded-xl border border-caramel/50 bg-caramel/10 text-caramel hover:bg-caramel/20 hover:border-caramel-light hover:text-caramel-light text-xs sm:text-sm font-medium transition-all duration-150 shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel-light focus-visible:ring-offset-2 focus-visible:ring-offset-background active:scale-95"
+              className="inline-flex items-center gap-2 h-10 px-4 rounded-xl border border-primary/40 bg-primary/10 text-primary hover:bg-primary/15 text-sm font-medium transition-btn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              <MessageCircle className="size-4 shrink-0 text-caramel" />
+              <MessageCircle className="size-4 shrink-0" />
               <span>Liên hệ Zalo</span>
             </a>
           </div>
         </div>
 
-        {/* TUYÊN BỐ MIỄN TRỪ TRÁCH NHIỆM VỀ THƯƠNG HIỆU (DISCLAIMER) */}
-        <div className="p-3 rounded-xl border border-border/40 bg-secondary/20 text-[11px] text-muted-foreground/80 leading-relaxed">
-          <strong>* Tuyên bố miễn trừ trách nhiệm sở hữu trí tuệ:</strong> {settings.siteName} là nền tảng bán lẻ và cung cấp dịch vụ số độc lập. Tất cả hình ảnh, tên gọi và logo của các thương hiệu bên thứ ba (như Canva, YouTube, Netflix, ChatGPT, Spotify, Duolingo, v.v.) thuộc bản quyền sở hữu của các tổ chức chủ quản tương ứng và chỉ được sử dụng cho mục đích mô tả sản phẩm theo nguyên tắc sử dụng hợp lý.
+        {/* Disclaimer */}
+        <div className="p-3.5 rounded-xl border border-border bg-background/60 text-xs text-muted-foreground leading-relaxed">
+          <strong className="text-foreground/90 font-medium">Miễn trừ trách nhiệm:</strong>{" "}
+          {settings.siteName} là nền tảng phân phối dịch vụ số độc lập. Tên gọi, logo và hình ảnh của các thương hiệu bên thứ ba thuộc quyền sở hữu của các tổ chức tương ứng và chỉ dùng cho mục đích mô tả sản phẩm.
         </div>
 
-        {/* HÀNG CUỐI: Bản quyền, Thống kê truy cập & Liên kết chính sách chuẩn mực */}
-        <div className="border-t border-border/50 pt-5 sm:pt-6 flex flex-col md:flex-row items-center justify-between gap-3 sm:gap-4 text-xs text-muted-foreground">
-          <div className="flex flex-wrap items-center justify-center md:justify-start gap-3">
-            <p>© {currentYear} {settings.siteName}. All rights reserved.</p>
+        {/* Bottom Row */}
+        <div className="border-t border-border pt-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 text-xs text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-3">
+            <p>© {currentYear} {settings.siteName}. Bảo lưu mọi quyền.</p>
 
             {visitorStats?.showVisitorStats && (
               <div
-                className="inline-flex items-center gap-2.5 px-3 py-1 rounded-full bg-secondary/50 border border-border/60 text-[11px] text-muted-foreground/90"
+                className="inline-flex items-center gap-2.5 px-3 py-1 rounded-full bg-secondary border border-border text-xs text-muted-foreground"
                 title="Thống kê lượt truy cập thực tế"
               >
-                <span className="inline-flex items-center gap-1.5 font-medium text-foreground/90">
-                  <span className="relative flex size-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                    <span className="relative inline-flex rounded-full size-2 bg-emerald-500" />
-                  </span>
+                <span className="inline-flex items-center gap-1.5 font-medium text-foreground">
+                  <span className="size-2 rounded-full bg-emerald-400" aria-hidden="true" />
                   <span>
                     Đang truy cập:{" "}
                     <strong className="font-semibold text-emerald-400 tabular-nums">
@@ -187,12 +186,12 @@ export function Footer({ initialSettings }: FooterProps) {
                     </strong>
                   </span>
                 </span>
-                <span className="text-border">•</span>
+                <span className="text-border">·</span>
                 <span className="inline-flex items-center gap-1">
-                  <Eye className="size-3 text-caramel shrink-0" />
+                  <Eye className="size-3.5 text-primary shrink-0" aria-hidden="true" />
                   <span>
-                    Tổng truy cập:{" "}
-                    <strong className="font-semibold text-foreground/90 tabular-nums">
+                    Tổng:{" "}
+                    <strong className="font-semibold text-foreground tabular-nums">
                       {visitorStats.totalVisits.toLocaleString("vi-VN")}
                     </strong>
                   </span>
@@ -201,24 +200,24 @@ export function Footer({ initialSettings }: FooterProps) {
             )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-x-4 sm:gap-x-6 gap-y-2 text-xs">
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs">
             <Link
               href="/dieu-khoan-dich-vu"
-              className="hover:text-caramel-light focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel-light rounded transition-colors duration-150"
+              className="hover:text-foreground transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
             >
               Điều khoản dịch vụ
             </Link>
             <Link
               href="/chinh-sach-bao-hanh"
-              className="hover:text-caramel-light focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel-light rounded transition-colors duration-150"
+              className="hover:text-foreground transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
             >
               Chính sách bảo hành &amp; Hoàn tiền
             </Link>
             <Link
               href="/chinh-sach-bao-mat"
-              className="hover:text-caramel-light focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel-light rounded transition-colors duration-150"
+              className="hover:text-foreground transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
             >
-              Chính sách bảo vệ dữ liệu cá nhân
+              Bảo vệ dữ liệu cá nhân
             </Link>
           </div>
         </div>

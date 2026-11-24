@@ -97,9 +97,16 @@ export function PixelCapybara() {
     return false
   })
   const isPausedRef = useRef(isPaused)
+  const startLoopRef = useRef<(() => void) | null>(null)
+  const renderOnceRef = useRef<(() => void) | null>(null)
 
   useEffect(() => {
     isPausedRef.current = isPaused
+    if (isPaused) {
+      renderOnceRef.current?.()
+    } else {
+      startLoopRef.current?.()
+    }
   }, [isPaused])
 
   // Touch tracking to distinguish swipe-scroll from real tap
@@ -321,20 +328,33 @@ export function PixelCapybara() {
   }, [])
 
   useEffect(() => {
-    // Visibility API: pause when tab inactive
+    // Visibility API: stop loop when tab inactive, restart when visible
     const handleVisibility = () => {
-      stateRef.current.isTabVisible = document.visibilityState === "visible"
+      const visible = document.visibilityState === "visible"
+      stateRef.current.isTabVisible = visible
+      if (visible && !isPausedRef.current) {
+        stateRef.current.lastTimestamp = 0
+        startLoopRef.current?.()
+      }
     }
     document.addEventListener("visibilitychange", handleVisibility)
     return () => document.removeEventListener("visibilitychange", handleVisibility)
   }, [])
 
   useEffect(() => {
-    // IntersectionObserver: pause when out of viewport
+    // IntersectionObserver: stop loop when out of viewport, restart when entering
     if (!containerRef.current) return
     const observer = new IntersectionObserver(
       ([entry]) => {
         stateRef.current.isIntersecting = entry.isIntersecting
+        if (entry.isIntersecting) {
+          if (isPausedRef.current) {
+            renderOnceRef.current?.()
+          } else {
+            stateRef.current.lastTimestamp = 0
+            startLoopRef.current?.()
+          }
+        }
       },
       { threshold: 0.05 }
     )
@@ -352,7 +372,14 @@ export function PixelCapybara() {
     const ctx = canvas.getContext("2d")
     if (!ctx) return
 
-    let animId: number
+    let animId: number | null = null
+
+    const stopLoop = () => {
+      if (animId !== null) {
+        cancelAnimationFrame(animId)
+        animId = null
+      }
+    }
 
     // Pixel drawing helper (snaps coordinates to whole pixels)
     function px(x: number, y: number, w: number, h: number, color: string) {
@@ -392,9 +419,9 @@ export function PixelCapybara() {
       const dt = Math.min((now - s.lastTimestamp) / 1000, 0.1)
       s.lastTimestamp = now
 
-      // Halt execution when off-screen or tab hidden (TRUE 0% CPU consumption)
+      // Truly halt RAF when off-screen or tab hidden
       if (!s.isIntersecting || !s.isTabVisible) {
-        animId = requestAnimationFrame(loop)
+        animId = null
         return
       }
 
@@ -819,37 +846,69 @@ export function PixelCapybara() {
         drawAngerMark(headX + 2 * P, veinY, 7 * dpr)
       }
 
+      if (!isPausedRef.current && s.isIntersecting && s.isTabVisible) {
+        animId = requestAnimationFrame(loop)
+      } else {
+        animId = null
+      }
+    }
+
+    const startLoop = () => {
+      if (animId !== null) return
+      const s = stateRef.current
+      if (!s.isIntersecting || !s.isTabVisible) return
+      s.lastTimestamp = 0
       animId = requestAnimationFrame(loop)
     }
 
-    animId = requestAnimationFrame(loop)
-    return () => cancelAnimationFrame(animId)
+    const renderOnce = () => {
+      stopLoop()
+      loop(performance.now())
+    }
+
+    startLoopRef.current = startLoop
+    renderOnceRef.current = renderOnce
+
+    // Initial render: either start loop or draw one static frame for reduced-motion/paused
+    if (isPausedRef.current) {
+      renderOnce()
+    } else {
+      startLoop()
+    }
+
+    const handleResize = () => {
+      if (isPausedRef.current) {
+        renderOnce()
+      }
+    }
+    window.addEventListener("resize", handleResize)
+
+    return () => {
+      stopLoop()
+      window.removeEventListener("resize", handleResize)
+      startLoopRef.current = null
+      renderOnceRef.current = null
+    }
   }, [])
 
   return (
     <div
       ref={containerRef}
-      className="relative w-full rounded-2xl border border-teal-500/25 bg-slate-950/75 backdrop-blur-xl shadow-2xl overflow-hidden select-none transition-all duration-300 hover:border-teal-500/40"
+      className="relative w-full rounded-xl border border-border bg-background overflow-hidden select-none"
     >
-      {/* Top subtle glow rim */}
-      <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-teal-400/40 to-transparent pointer-events-none" />
-
-      {/* Top Left Hint Line */}
-      <div className="absolute top-2.5 left-3 pointer-events-none z-10 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-900/80 border border-teal-500/25 text-[11px] font-medium text-teal-300 backdrop-blur-md shadow-sm">
-        <span className="relative flex size-1.5">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-teal-400 opacity-75" />
-          <span className="relative inline-flex size-1.5 rounded-full bg-teal-400" />
-        </span>
-        <span>Chạm vào để đánh thức Capypara</span>
+      {/* Subtle interaction hint */}
+      <div className="absolute top-2.5 left-3 pointer-events-none z-10 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-card/90 border border-border text-xs font-medium text-muted-foreground">
+        <span className="size-1.5 rounded-full bg-primary" aria-hidden="true" />
+        <span>Chạm vào Capybara</span>
       </div>
 
-      {/* Accessible Motion Pause / Play Control (Top Right) */}
+      {/* Accessible Motion Pause / Play Control */}
       <button
         type="button"
-        onClick={() => setIsPaused(!isPaused)}
+        onClick={() => setIsPaused((prev) => !prev)}
         aria-label={isPaused ? "Tiếp tục chuyển động capybara" : "Tạm dừng chuyển động capybara"}
         title={isPaused ? "Tiếp tục chuyển động" : "Tạm dừng chuyển động"}
-        className="absolute top-2.5 right-3 z-10 p-1.5 rounded-lg bg-slate-900/60 hover:bg-slate-800/80 text-teal-300/80 hover:text-teal-200 border border-teal-500/20 backdrop-blur-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400"
+        className="absolute top-2.5 right-2.5 z-10 inline-flex size-8 items-center justify-center rounded-lg bg-card/90 hover:bg-secondary text-muted-foreground hover:text-foreground border border-border transition-btn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         {isPaused ? <Play className="size-3.5" /> : <Pause className="size-3.5" />}
       </button>
@@ -862,8 +921,8 @@ export function PixelCapybara() {
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
         onKeyDown={onKeyDown}
-        className="relative w-full h-[115px] sm:h-[126px] md:h-[135px] cursor-pointer flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 rounded-2xl"
-        aria-label="Capybara pixel ngâm hồ nước thư giãn. Chạm vào để đánh thức."
+        className="relative w-full h-[118px] sm:h-[144px] lg:h-[188px] cursor-pointer flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl"
+        aria-label="Capybara pixel ngâm hồ nước thư giãn. Chạm vào để tương tác."
       >
         <canvas
           ref={canvasRef}

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { ChevronDown, HelpCircle } from "lucide-react"
+import { ChevronDown } from "lucide-react"
 
 export interface FaqItem {
   q: string
@@ -13,7 +13,6 @@ interface FaqAccordionProps {
 }
 
 export function FaqAccordion({ items }: FaqAccordionProps) {
-  // Default first item is open (index 0)
   const [openIndex, setOpenIndex] = useState<number | null>(0)
 
   const toggleItem = (index: number) => {
@@ -21,21 +20,14 @@ export function FaqAccordion({ items }: FaqAccordionProps) {
   }
 
   return (
-    <div className="w-full max-w-3xl mx-auto space-y-3">
+    <div className="w-full max-w-3xl mx-auto divide-y divide-border rounded-2xl border border-border bg-card overflow-hidden">
       {items.map((item, idx) => {
         const isOpen = openIndex === idx
         const questionId = `faq-q-${idx}`
         const answerId = `faq-a-${idx}`
 
         return (
-          <div
-            key={idx}
-            className={`rounded-2xl border transition-all duration-200 backdrop-blur-md overflow-hidden ${
-              isOpen
-                ? "border-caramel/40 bg-card/90 shadow-md shadow-caramel/10"
-                : "border-border/75 bg-card/60 hover:border-caramel/30 hover:bg-card/80"
-            }`}
-          >
+          <div key={idx} className="transition-colors duration-150">
             <h3>
               <button
                 type="button"
@@ -43,36 +35,19 @@ export function FaqAccordion({ items }: FaqAccordionProps) {
                 aria-expanded={isOpen}
                 aria-controls={answerId}
                 onClick={() => toggleItem(idx)}
-                className="w-full flex items-center justify-between gap-3.5 p-4 sm:p-5 text-left text-foreground transition-colors group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel-light focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                className="w-full flex items-center justify-between gap-4 px-5 py-4 text-left text-foreground hover:bg-secondary/60 transition-btn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
               >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div
-                    className={`size-7 sm:size-8 rounded-lg border flex items-center justify-center shrink-0 transition-colors ${
-                      isOpen
-                        ? "border-caramel/40 bg-caramel/15 text-caramel-light"
-                        : "border-border/70 bg-secondary/60 text-muted-foreground group-hover:text-caramel-light group-hover:border-caramel/30"
-                    }`}
-                    aria-hidden="true"
-                  >
-                    <HelpCircle className="size-4" strokeWidth={2} />
-                  </div>
-                  <span
-                    className={`text-sm sm:text-base font-semibold tracking-tight transition-colors ${
-                      isOpen ? "text-caramel-light" : "text-foreground group-hover:text-caramel-light"
-                    }`}
-                  >
-                    {item.q}
-                  </span>
-                </div>
+                <span className="text-sm sm:text-[15px] font-semibold leading-snug">
+                  {item.q}
+                </span>
 
-                <div
-                  className={`size-6 rounded-full flex items-center justify-center shrink-0 transition-transform duration-200 ${
-                    isOpen ? "rotate-180 text-caramel" : "text-muted-foreground group-hover:text-caramel-light"
+                <ChevronDown
+                  className={`size-4 shrink-0 text-muted-foreground transition-transform duration-200 ${
+                    isOpen ? "rotate-180 text-primary" : ""
                   }`}
+                  strokeWidth={2}
                   aria-hidden="true"
-                >
-                  <ChevronDown className="size-4" strokeWidth={2.5} />
-                </div>
+                />
               </button>
             </h3>
 
@@ -81,9 +56,9 @@ export function FaqAccordion({ items }: FaqAccordionProps) {
                 id={answerId}
                 role="region"
                 aria-labelledby={questionId}
-                className="px-4 sm:px-5 pb-4 sm:pb-5 pt-0 text-xs sm:text-sm text-muted-foreground/90 leading-relaxed border-t border-border/40 mt-1 pt-3 animate-fade-down"
+                className="px-5 pb-4 pt-0 text-sm text-muted-foreground leading-relaxed animate-fade-in"
               >
-                <p className="pl-10 sm:pl-11">{item.a}</p>
+                <p>{item.a}</p>
               </div>
             )}
           </div>

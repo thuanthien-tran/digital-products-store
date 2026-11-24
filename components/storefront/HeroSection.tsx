@@ -1,6 +1,7 @@
 "use client"
 
-import { Zap, ShieldCheck, Clock, QrCode, ArrowDown } from "lucide-react"
+import Link from "next/link"
+import { ArrowDown, ShieldCheck, FileCheck2, Clock } from "lucide-react"
 import { PixelCapybara } from "@/components/storefront/PixelCapybara"
 import type { SiteSettingsData } from "@/lib/settings"
 
@@ -8,121 +9,95 @@ interface HeroSectionProps {
   settings?: SiteSettingsData | null
 }
 
-const SLOGAN_FEATURES = [
-  {
-    icon: Zap,
-    title: "Giao Hàng Siêu Tốc",
-    desc: "Nhận tài khoản ngay qua màn hình và email.",
-    theme: {
-      card: "border-border/75 hover:border-caramel/50 hover:bg-secondary/40 hover:shadow-lg hover:shadow-black/25",
-      iconBg: "bg-caramel/10 border-caramel/25 text-caramel group-hover:border-caramel/45 group-hover:bg-caramel/20 group-hover:text-caramel-light",
-    },
-  },
-  {
-    icon: QrCode,
-    title: "VietQR Thông Minh",
-    desc: "Quét QR, duyệt đơn trong 3–5 giây.",
-    theme: {
-      card: "border-border/75 hover:border-sage/50 hover:bg-secondary/40 hover:shadow-lg hover:shadow-black/25",
-      iconBg: "bg-sage/10 border-sage/25 text-sage group-hover:border-sage/45 group-hover:bg-sage/20 group-hover:text-sage",
-    },
-  },
+const TRUST_NOTES = [
   {
     icon: ShieldCheck,
-    title: "Bảo Hành Trọn Gói",
-    desc: "Bảo hành 1 đổi 1 suốt thời hạn sử dụng.",
-    theme: {
-      card: "border-border/75 hover:border-caramel/50 hover:bg-secondary/40 hover:shadow-lg hover:shadow-black/25",
-      iconBg: "bg-caramel/10 border-caramel/25 text-caramel group-hover:border-caramel/45 group-hover:bg-caramel/20 group-hover:text-caramel-light",
-    },
+    text: "Chính sách bảo hành rõ theo từng gói",
+  },
+  {
+    icon: FileCheck2,
+    text: "Thông tin bàn giao hiển thị trong đơn hàng",
   },
   {
     icon: Clock,
-    title: "Hỗ Trợ Kỹ Thuật 24/7",
-    desc: "Hỗ trợ kỹ thuật qua Zalo 0356 970 964",
-    theme: {
-      card: "border-border/75 hover:border-caramel/50 hover:bg-secondary/40 hover:shadow-lg hover:shadow-black/25",
-      iconBg: "bg-caramel/10 border-caramel/25 text-caramel group-hover:border-caramel/45 group-hover:bg-caramel/20 group-hover:text-caramel-light",
-    },
+    text: "Thời gian xử lý tùy loại sản phẩm",
   },
 ]
 
 export function HeroSection({ settings }: HeroSectionProps) {
-  const heroCtaText = settings?.heroCtaText || "Khám phá các gói"
+  const heroTitle =
+    settings?.heroTitle?.trim() || "Tài khoản và công cụ số cho nhu cầu của bạn."
+  const heroSubtitle =
+    settings?.heroSubtitle?.trim() ||
+    "Chọn gói phù hợp, xem rõ giá, hình thức bàn giao và điều kiện bảo hành trước khi thanh toán."
+  const heroCtaText = settings?.heroCtaText?.trim() || "Khám phá các gói"
 
   const handleScrollToCatalog = (e: React.MouseEvent<HTMLAnchorElement>) => {
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
     e.preventDefault()
-    const target = document.getElementById("catalog-heading") || document.getElementById("products")
+    const target =
+      document.getElementById("catalog-heading") ||
+      document.getElementById("products")
     if (target) {
       target.scrollIntoView({
-        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+          ? "auto"
+          : "smooth",
       })
       window.history.pushState(null, "", "#catalog-heading")
     }
   }
 
   return (
-    <section className="relative pt-1 sm:pt-3 pb-1 sm:pb-2 space-y-3.5 sm:space-y-4 w-full overflow-hidden">
-      {/* 1. Atmospheric Studio Spotlight Beam & Ambient Depth */}
-      <div
-        className="absolute top-0 left-1/2 -translate-x-1/2 -z-10 w-full max-w-4xl h-72 pointer-events-none select-none overflow-hidden"
-        aria-hidden="true"
-      >
-        {/* Soft Radial Caramel Spotlight */}
-        <div className="absolute -top-16 left-1/2 -translate-x-1/2 w-[480px] sm:w-[680px] h-[300px] bg-[radial-gradient(ellipse_at_top,rgba(230,166,111,0.18),rgba(242,188,142,0.06)_50%,transparent_75%)] blur-2xl" />
+    <section className="w-full rounded-2xl border border-border bg-card p-5 sm:p-7 lg:p-8">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-center">
+        {/* Left: Core message & primary action */}
+        <div className="lg:col-span-7 space-y-4">
+          <div className="space-y-2.5">
+            <h1 className="font-heading font-bold tracking-tight text-[26px] sm:text-[32px] lg:text-[40px] leading-[1.18] text-foreground">
+              {heroTitle}
+            </h1>
+            <p className="text-sm sm:text-base text-muted-foreground leading-relaxed max-w-xl">
+              {heroSubtitle}
+            </p>
+          </div>
 
-        {/* Crisp Studio Rim Light */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-2/3 h-[1px] bg-gradient-to-r from-transparent via-caramel/40 to-transparent" />
-      </div>
-
-      {/* Centered CTA Button */}
-      <div className="text-center pt-1 pb-1 max-w-4xl mx-auto px-2 sm:px-4">
-        <div className="animate-fade-up">
-          <a
-            href="#catalog-heading"
-            onClick={handleScrollToCatalog}
-            className="inline-flex items-center gap-2 px-6 sm:px-7 py-2.5 sm:py-3 rounded-full bg-caramel hover:bg-caramel-light active:bg-[#D9955C] text-espresso font-semibold text-sm sm:text-[15px] shadow-md shadow-black/30 hover:shadow-caramel/25 active:scale-95 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel-light focus-visible:ring-offset-2 focus-visible:ring-offset-background group"
-          >
-            <span>{heroCtaText}</span>
-            <ArrowDown className="size-4 transition-transform duration-200 group-hover:translate-y-0.5" strokeWidth={2.5} />
-          </a>
-        </div>
-      </div>
-
-      {/* 4.5. Chill Pixel Capybara Ambient Mascot */}
-      <div className="animate-fade-up w-full" style={{ animationDelay: "300ms" }}>
-        <PixelCapybara />
-      </div>
-
-      {/* 5. 4 Slogan / Feature Cards (Unified motion, distinct accent colors) */}
-      <div
-        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-3.5 w-full animate-fade-up pt-0 sm:pt-0.5"
-        style={{ animationDelay: "350ms" }}
-      >
-        {SLOGAN_FEATURES.map((item, idx) => {
-          const IconComponent = item.icon
-          return (
-            <div
-              key={idx}
-              className={`group flex items-start gap-3 p-3.5 sm:p-4 rounded-2xl border bg-card/65 backdrop-blur-md transition-all duration-200 ease-out hover:-translate-y-0.5 cursor-default select-none ${item.theme.card}`}
+          <div className="flex flex-wrap items-center gap-3 pt-1">
+            <a
+              href="#catalog-heading"
+              onClick={handleScrollToCatalog}
+              className="inline-flex items-center justify-center gap-2 min-h-[44px] px-5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-caramel-light active:scale-[0.98] transition-btn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
+              <span>{heroCtaText}</span>
+              <ArrowDown className="size-4" strokeWidth={2.25} />
+            </a>
+
+            <Link
+              href="/san-pham"
+              className="inline-flex items-center justify-center min-h-[44px] px-4 rounded-xl border border-border bg-background hover:bg-secondary text-foreground font-medium text-sm transition-btn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              Xem tất cả sản phẩm
+            </Link>
+          </div>
+
+          {/* Concise, honest operational notes */}
+          <div className="pt-2 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-border/70">
+            {TRUST_NOTES.map(({ icon: Icon, text }) => (
               <div
-                className={`size-10 sm:size-11 rounded-xl border flex items-center justify-center shrink-0 transition-all duration-200 ${item.theme.iconBg}`}
+                key={text}
+                className="inline-flex items-center gap-2 text-xs sm:text-[13px] text-muted-foreground"
               >
-                <IconComponent className="size-5 sm:size-5.5" strokeWidth={2.2} />
+                <Icon className="size-3.5 text-primary shrink-0" strokeWidth={2} />
+                <span>{text}</span>
               </div>
-              <div className="space-y-0.5 min-w-0">
-                <h3 className="font-semibold text-sm sm:text-[14.5px] text-foreground group-hover:text-white transition-colors duration-200 tracking-tight leading-snug">
-                  {item.title}
-                </h3>
-                <p className="text-xs text-muted-foreground/85 group-hover:text-slate-200 transition-colors duration-200 leading-relaxed font-normal">
-                  {item.desc}
-                </p>
-              </div>
-            </div>
-          )
-        })}
+            ))}
+          </div>
+        </div>
+
+        {/* Right: Signature Pixel Capybara Mascot (compact on mobile, side-by-side on desktop) */}
+        <div className="lg:col-span-5">
+          <PixelCapybara />
+        </div>
       </div>
     </section>
   )

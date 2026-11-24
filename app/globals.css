@@ -3,46 +3,61 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* CapyGo Palette: Deep Charcoal, Subtle Borders, Warm Capybara Fur Accent */
-  --background: 220 11% 7%;      /* #101114 */
-  --foreground: 220 13% 96%;     /* #F3F4F6 */
-  
-  --card: 220 13% 10%;           /* #17191E */
-  --card-foreground: 220 13% 96%;/* #F3F4F6 */
-  
-  --popover: 220 13% 10%;        /* #17191E */
-  --popover-foreground: 220 13% 96%;
-  
-  --primary: 28 71% 67%;         /* #E6A66F Caramel (Main Action) */
-  --primary-foreground: 21 30% 11%; /* #251A14 Espresso Brown */
-  
-  --secondary: 220 14% 15%;      /* #20232B (Surface Hover) */
-  --secondary-foreground: 220 13% 96%;
-  
-  --muted: 220 14% 14%;          /* #1E2128 */
-  --muted-foreground: 218 15% 70%;/* #A8B0BF */
-  
-  --accent: 28 71% 67%;          /* #E6A66F Caramel */
-  --accent-foreground: 21 30% 11%; /* #251A14 Espresso Brown */
-  
-  --destructive: 0 84% 60%;      /* #EF4444 / #F87171 */
-  --destructive-foreground: 0 0% 100%;
-  
-  --success: 160 84% 39%;        /* #10B981 / #34D399 */
-  --warning: 43 96% 56%;         /* #FBBF24 */
-  
-  --border: 220 15% 20%;         /* #2B303B */
-  --input: 220 15% 20%;          /* #2B303B */
-  --ring: 28 79% 75%;            /* #F2BC8E Light Caramel Focus Ring */
+  /* =========================================================================
+   * CAPYGO Design System Tokens — Minimalist Tech Store
+   * ========================================================================= */
+  /* Core Surfaces */
+  --background: 225 11% 7%;       /* #101114 Charcoal background */
+  --foreground: 220 14% 96%;      /* #F3F4F6 Primary text */
 
-  /* CapyGo Brand Palette Tokens */
-  --caramel: 28 71% 67%;         /* #E6A66F */
-  --caramel-light: 28 79% 75%;   /* #F2BC8E */
-  --espresso: 21 30% 11%;        /* #251A14 */
-  --oat-cream: 33 58% 91%;       /* #F5E9DA */
-  --sage: 107 17% 69%;           /* #A8BDA2 */
-  
-  --radius: 8px;
+  --card: 218 14% 11%;            /* #181B20 Elevated surface */
+  --card-foreground: 220 14% 96%; /* #F3F4F6 */
+
+  --popover: 218 14% 11%;         /* #181B20 */
+  --popover-foreground: 220 14% 96%;
+
+  /* Primary Brand Accent (Caramel) */
+  --primary: 28 71% 67%;          /* #E6A66F Caramel */
+  --primary-foreground: 21 30% 11%; /* #251A14 Deep Espresso text on Caramel */
+
+  /* Secondary / Hover Surfaces */
+  --secondary: 224 15% 15%;       /* #20232B Surface hover */
+  --secondary-foreground: 220 14% 96%;
+
+  --muted: 220 14% 14%;           /* #1E2128 Subtle container */
+  --muted-foreground: 219 15% 70%; /* #A8B0BF Secondary text */
+
+  --accent: 28 71% 67%;           /* #E6A66F Caramel */
+  --accent-foreground: 21 30% 11%; /* #251A14 */
+
+  /* Semantic Status */
+  --destructive: 0 78% 60%;       /* #E84848 */
+  --destructive-foreground: 0 0% 100%;
+  --success: 160 65% 42%;         /* #25B184 */
+  --warning: 38 92% 55%;          /* #F5A623 */
+
+  /* Borders & Focus */
+  --border: 221 16% 20%;          /* #2B303B Hairline border */
+  --input: 221 16% 20%;           /* #2B303B */
+  --ring: 28 79% 75%;             /* #F2BC8E Accessible focus ring */
+
+  /* Brand Palette Extensions */
+  --caramel: 28 71% 67%;          /* #E6A66F */
+  --caramel-light: 28 79% 75%;    /* #F2BC8E */
+  --espresso: 21 30% 11%;         /* #251A14 */
+  --oat-cream: 33 58% 91%;        /* #F5E9DA */
+  --sage: 107 17% 69%;            /* #A8BDA2 */
+
+  /* Category Accent Tokens (subtle badges & image accents only) */
+  --cat-ai: 263 70% 72%;          /* Purple for AI */
+  --cat-design: 173 68% 52%;      /* Teal for Đồ họa & Thiết kế */
+  --cat-office: 213 85% 65%;      /* Blue for Văn phòng & Tiện ích */
+
+  /* Radii & Motion */
+  --radius: 12px;
+  --duration-btn: 140ms;
+  --duration-card: 180ms;
+  --duration-dialog: 200ms;
 }
 
 @theme inline {
@@ -71,19 +86,18 @@
   --color-espresso: hsl(var(--espresso));
   --color-oat-cream: hsl(var(--oat-cream));
   --color-sage: hsl(var(--sage));
-  
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 14px;
   --radius-xl: 16px;
 
   --font-sans: var(--font-be-vietnam-pro), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-body: var(--font-be-vietnam-pro), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-heading: var(--font-plus-jakarta-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-heading: var(--font-be-vietnam-pro), var(--font-plus-jakarta-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 
-  --ease-apple: cubic-bezier(0.16, 1, 0.3, 1);
-  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
 }
 
 html {
@@ -98,19 +112,19 @@ body {
   font-family: var(--font-sans);
   background-color: hsl(var(--background));
   color: hsl(var(--foreground));
+  font-size: 15px;
+  line-height: 1.55;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Headings default to font-sans (Be Vietnam Pro) so card titles, table headers, and modals retain readable body typography */
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-sans);
 }
 
-/* Major section headings & Hero title use Plus Jakarta Sans */
 .font-heading {
   font-family: var(--font-heading);
-  letter-spacing: -0.015em;
+  letter-spacing: -0.02em;
 }
 
 .font-sans, .font-body {
@@ -121,67 +135,44 @@ h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-mono);
 }
 
-/* Smooth motion utilities */
-@keyframes fade-up {
-  0% {
-    opacity: 0;
-    transform: translateY(16px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes fade-in {
+/* Restraint-focused subtle motion utilities (opacity & transform only) */
+@keyframes fade-in-subtle {
   0% {
     opacity: 0;
   }
   100% {
     opacity: 1;
   }
-}
-
-@keyframes pulse-subtle {
-  0%, 100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.85;
-    transform: scale(1.03);
-  }
-}
-
-.animate-fade-up {
-  animation: fade-up 0.5s var(--ease-apple) both;
 }
 
 .animate-fade-in {
-  animation: fade-in 0.4s var(--ease-apple) both;
+  animation: fade-in-subtle 180ms var(--ease-standard) both;
 }
 
-.transition-smooth {
-  transition-property: transform, box-shadow, border-color, background-color, opacity;
-  transition-timing-function: var(--ease-apple);
-  transition-duration: 250ms;
+/* Kept as no-op opacity-safe class for backwards compatibility with any secondary pages */
+.animate-fade-up {
+  animation: fade-in-subtle 180ms var(--ease-standard) both;
 }
 
-.hover-lift {
-  will-change: transform, box-shadow;
-  transition: transform 0.25s var(--ease-apple), box-shadow 0.25s var(--ease-apple), border-color 0.25s var(--ease-apple);
+.transition-btn {
+  transition: background-color var(--duration-btn) var(--ease-standard),
+              border-color var(--duration-btn) var(--ease-standard),
+              color var(--duration-btn) var(--ease-standard),
+              opacity var(--duration-btn) var(--ease-standard),
+              transform var(--duration-btn) var(--ease-standard);
 }
 
-.hover-lift:hover {
-  transform: translateY(-4px);
+.transition-card {
+  transition: border-color var(--duration-card) var(--ease-standard),
+              background-color var(--duration-card) var(--ease-standard);
 }
 
 .active-bounce {
-  transition: transform 0.12s var(--ease-apple);
+  transition: transform 120ms var(--ease-standard);
 }
 
 .active-bounce:active {
-  transform: scale(0.97);
+  transform: scale(0.98);
 }
 
 /* Reduced motion preference */
@@ -194,7 +185,7 @@ h1, h2, h3, h4, h5, h6 {
   }
 }
 
-/* Scrollbar */
+/* Clean Scrollbar */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: hsl(var(--background)); }
 ::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 4px; }

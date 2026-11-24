@@ -54,9 +54,9 @@ function LoginForm() {
         <p className="text-xs text-muted-foreground">Đăng nhập để quản lý đơn hàng, kho serials và sản phẩm</p>
       </div>
 
-      <Card className="border-border/80 bg-card/60 backdrop-blur-xl">
+      <Card className="border-border bg-card rounded-2xl">
         <CardHeader className="space-y-1 pb-4">
-          <CardTitle className="text-base font-bold">Xác thực hệ thống</CardTitle>
+          <CardTitle className="text-base font-semibold">Xác thực hệ thống</CardTitle>
           <CardDescription className="text-xs">
             Vui lòng nhập tài khoản và mật khẩu quản trị viên để tiếp tục
           </CardDescription>
@@ -64,24 +64,28 @@ function LoginForm() {
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">
             {isTimeout && !error && (
-              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-500 text-xs font-semibold flex items-center gap-2">
+              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-medium flex items-center gap-2">
                 <Clock className="size-4 shrink-0" />
                 <span>Phiên đăng nhập hết hạn</span>
               </div>
             )}
 
             {error && (
-              <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs font-semibold">
+              <div role="alert" className="p-3 rounded-xl bg-destructive/10 border border-destructive/30 text-destructive text-xs font-medium">
                 {error}
               </div>
             )}
 
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-muted-foreground">Tài khoản</label>
+              <label htmlFor="admin-username" className="text-xs font-semibold text-muted-foreground block">
+                Tài khoản
+              </label>
               <div className="relative">
                 <User className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
                 <Input
-                  className="pl-10"
+                  id="admin-username"
+                  autoComplete="username"
+                  className="pl-10 h-11 rounded-xl"
                   placeholder="Tên đăng nhập"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
@@ -91,11 +95,15 @@ function LoginForm() {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-muted-foreground">Mật khẩu</label>
+              <label htmlFor="admin-password" className="text-xs font-semibold text-muted-foreground block">
+                Mật khẩu
+              </label>
               <div className="relative">
                 <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
                 <Input
-                  className="pl-10"
+                  id="admin-password"
+                  autoComplete="current-password"
+                  className="pl-10 h-11 rounded-xl"
                   type="password"
                   placeholder="••••••••"
                   value={password}
@@ -105,7 +113,7 @@ function LoginForm() {
               </div>
             </div>
 
-            <Button type="submit" className="w-full font-bold" disabled={loading}>
+            <Button type="submit" className="w-full h-11 rounded-xl font-semibold" disabled={loading}>
               {loading ? <Loader2 className="size-4 animate-spin mr-2" /> : null}
               {loading ? "Đang xác thực..." : "Đăng nhập Admin"}
             </Button>

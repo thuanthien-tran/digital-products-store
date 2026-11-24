@@ -4,7 +4,6 @@ import { Footer } from "@/components/storefront/Footer"
 import { HeroSection } from "@/components/storefront/HeroSection"
 import { StorefrontCatalog } from "@/components/storefront/StorefrontCatalog"
 import { ZaloWidget } from "@/components/storefront/ZaloWidget"
-import { ScrollReveal } from "@/components/ui/ScrollReveal"
 import { FaqAccordion } from "@/components/storefront/FaqAccordion"
 
 export const dynamic = "force-dynamic"
@@ -16,109 +15,96 @@ export default async function HomePage() {
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground selection:bg-primary/20 selection:text-primary">
       <Header initialSettings={settings} />
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 sm:px-6 pt-3 sm:pt-5 pb-10 sm:pb-14 space-y-7 sm:space-y-9">
-        {/* Top Minimalist Hero Section */}
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 sm:px-6 pt-5 sm:pt-7 pb-12 space-y-10 sm:space-y-12">
+        {/* 1. Compact Hero & Pixel Capybara */}
         <HeroSection settings={settings} />
 
-        {/* Dynamic Storefront with Search, Price Filter, Category Pills & Products */}
+        {/* 2. Featured Packages + Search, Category Filter & Product List */}
         <StorefrontCatalog groups={groups} products={products} />
 
-        {/* How it works 4-steps with Staggered Scroll Reveal */}
-        <section id="how" className="space-y-6 sm:space-y-8 pt-6 sm:pt-8 border-t border-border/70 scroll-mt-24">
-          <ScrollReveal>
-            <div className="text-center space-y-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-accent">Quy trình đơn giản</span>
-              <h2 className="text-[22px] sm:text-2xl md:text-[28px] font-heading font-bold tracking-tight text-oat-cream">
-                Mua Hàng Trong 4 Bước
-              </h2>
-            </div>
-          </ScrollReveal>
+        {/* 3. How It Works (4 clear, honest steps) */}
+        <section id="how" className="space-y-5 pt-8 border-t border-border scroll-mt-20">
+          <div className="space-y-1">
+            <h2 className="font-heading font-bold text-xl sm:text-2xl tracking-tight text-foreground">
+              Hướng dẫn mua hàng
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Quy trình đặt hàng và nhận thông tin sản phẩm tại CAPYGO.
+            </p>
+          </div>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 items-stretch">
             {[
               {
                 step: "01",
-                title: "Chọn gói tài khoản",
-                desc: "Duyệt qua danh mục và chọn gói thời hạn phù hợp với nhu cầu công việc của bạn.",
-                color: "text-caramel",
-                borderHover: "hover:border-caramel/40 hover:shadow-black/30",
+                title: "Chọn gói phù hợp",
+                desc: "Xem kỹ hình thức sử dụng (slot, tài khoản cấp sẵn, nâng cấp chính chủ), thời hạn và điều kiện bảo hành.",
               },
               {
                 step: "02",
-                title: "Nhập Email nhận key",
-                desc: "Điền địa chỉ email của bạn để hệ thống tự động lưu biên lai và gửi thông tin dự phòng.",
-                color: "text-caramel-light",
-                borderHover: "hover:border-caramel-light/40 hover:shadow-black/30",
+                title: "Nhập thông tin nhận đơn",
+                desc: "Điền email nhận thông tin đơn hàng (và mã mời nếu là gói nạp token).",
               },
               {
                 step: "03",
-                title: "Quét mã VietQR",
-                desc: "Mở app ngân hàng quét mã QR, chuyển đúng nội dung định sẵn trong 3 giây.",
-                color: "text-sage",
-                borderHover: "hover:border-sage/40 hover:shadow-black/30",
+                title: "Chuyển khoản qua VietQR",
+                desc: "Quét mã VietQR hoặc chuyển khoản đúng số tiền và nội dung mã đơn hiển thị trên trang thanh toán.",
               },
               {
                 step: "04",
-                title: "Nhận tài khoản ngay",
-                desc: "Màn hình tự động hiển thị tài khoản/key ngay lập tức kèm hướng dẫn kích hoạt chi tiết.",
-                color: "text-caramel",
-                borderHover: "hover:border-caramel/40 hover:shadow-black/30",
+                title: "Nhận thông tin trong đơn hàng",
+                desc: "Thông tin bàn giao được hiển thị trực tiếp trên trang đơn hàng. Thời gian xử lý tùy loại sản phẩm.",
               },
-            ].map(({ step, title, desc, color, borderHover }, idx) => (
-              <ScrollReveal key={step} delayMs={idx * 90}>
-                <div
-                  className={`group relative h-full rounded-2xl border border-border/80 bg-card/60 p-6 space-y-3 backdrop-blur shadow-sm transition-all duration-300 hover:-translate-y-2 hover:shadow-xl hover:bg-card/90 overflow-hidden ${borderHover}`}
-                >
-                  <span
-                    className={`text-4xl font-black ${color} opacity-25 transition-all duration-300 group-hover:opacity-75 group-hover:scale-110 inline-block`}
-                  >
-                    {step}
-                  </span>
-                  <h3 className="font-semibold text-sm text-foreground transition-colors duration-200 group-hover:text-caramel-light">
-                    {title}
-                  </h3>
-                  <p className="text-xs text-muted-foreground leading-relaxed group-hover:text-slate-200 transition-colors duration-200">
-                    {desc}
-                  </p>
-                </div>
-              </ScrollReveal>
+            ].map(({ step, title, desc }) => (
+              <div
+                key={step}
+                className="rounded-2xl border border-border bg-card p-5 space-y-2.5"
+              >
+                <span className="inline-block font-mono text-xs font-semibold text-primary bg-primary/10 border border-primary/25 px-2.5 py-0.5 rounded-lg">
+                  Bước {step}
+                </span>
+                <h3 className="font-semibold text-[15px] text-foreground leading-snug">
+                  {title}
+                </h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  {desc}
+                </p>
+              </div>
             ))}
           </div>
         </section>
 
-        {/* FAQ Section with Staggered Scroll Reveal */}
-        <section id="faq" className="space-y-6 sm:space-y-8 scroll-mt-24 pt-6 sm:pt-8 border-t border-border/70">
-          <ScrollReveal>
-            <div className="text-center space-y-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-accent">Giải đáp thắc mắc</span>
-              <h2 className="text-[22px] sm:text-2xl md:text-[28px] font-heading font-bold tracking-tight text-oat-cream">
-                Câu Hỏi Thường Gặp
-              </h2>
-            </div>
-          </ScrollReveal>
+        {/* 4. FAQ Section */}
+        <section id="faq" className="space-y-5 pt-8 border-t border-border scroll-mt-20">
+          <div className="space-y-1 text-center max-w-2xl mx-auto">
+            <h2 className="font-heading font-bold text-xl sm:text-2xl tracking-tight text-foreground">
+              Câu hỏi thường gặp
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Giải đáp nhanh về cách nhận hàng, thanh toán và chính sách bảo hành.
+            </p>
+          </div>
 
-          <ScrollReveal delayMs={100}>
-            <FaqAccordion
-              items={[
-                {
-                  q: "Sau khi thanh toán xong tôi nhận tài khoản ở đâu?",
-                  a: "Hệ thống hoạt động hoàn toàn tự động 24/7. Ngay sau khi chuyển khoản thành công, thông tin tài khoản / key bản quyền sẽ hiển thị trực tiếp trên màn hình đơn hàng và được tự động gửi kèm về email của bạn.",
-                },
-                {
-                  q: "Có hỗ trợ thanh toán qua VietQR không?",
-                  a: "Có. Hệ thống hỗ trợ quét mã VietQR tự động qua tất cả ngân hàng tại Việt Nam (MBBank, Vietcombank, Techcombank, ACB...). Bạn chỉ cần quét mã QR là hệ thống tự xác nhận trong vòng 3 – 5 giây.",
-                },
-                {
-                  q: "Nếu tôi nhập sai email thì có lấy lại được tài khoản không?",
-                  a: "Thông tin tài khoản vẫn hiển thị trực tiếp trên trang đơn hàng của bạn ngay khi thanh toán. Ngoài ra, bạn có thể vào mục Kiểm Tra Đơn Hàng trên thanh menu hoặc liên hệ Zalo để được hỗ trợ kiểm tra lại ngay.",
-                },
-                {
-                  q: "Chính sách bảo hành như thế nào?",
-                  a: "Mọi tài khoản và mã bản quyền trong hệ thống đều được kiểm tra trước khi nạp kho. Các gói có chính sách bảo hành 1 đổi 1 trong suốt thời hạn gói nếu phát sinh sự cố từ phía tài khoản.",
-                },
-              ]}
-            />
-          </ScrollReveal>
+          <FaqAccordion
+            items={[
+              {
+                q: "Sau khi thanh toán xong tôi nhận sản phẩm ở đâu?",
+                a: "Thông tin bàn giao (tài khoản, mã kích hoạt hoặc tiến trình nạp dịch vụ) được hiển thị trực tiếp trên trang chi tiết đơn hàng của bạn. Bạn nên lưu lại đường dẫn đơn hàng để tiện xem lại khi cần.",
+              },
+              {
+                q: "Thời gian xử lý đơn hàng mất bao lâu?",
+                a: "Hệ thống nhận đơn và đối soát chuyển khoản VietQR hoạt động tự động. Với sản phẩm có sẵn trong kho tự động, thông tin sẽ hiển thị sau khi đối soát thành công; với sản phẩm nạp dịch vụ hoặc liên hệ thủ công, thời gian xử lý tùy thuộc vào từng gói và khung giờ hỗ trợ của nhân viên.",
+              },
+              {
+                q: "Chính sách bảo hành áp dụng như thế nào?",
+                a: "Chính sách bảo hành áp dụng theo từng gói sản phẩm và được ghi rõ trên thẻ sản phẩm cũng như trang chi tiết trước khi mua (bao gồm các gói có bảo hành theo thời hạn, bảo hành giới hạn ngày, hoặc không bảo hành KBH).",
+              },
+              {
+                q: "Tôi cần hỗ trợ hoặc lỡ đóng trang đơn hàng thì làm sao?",
+                a: "Bạn có thể xem hướng dẫn tại mục Tra cứu đơn hoặc nhắn trực tiếp qua Zalo hỗ trợ kèm mã đơn hàng và ảnh biên lai chuyển khoản để nhân viên kiểm tra trong giờ làm việc.",
+              },
+            ]}
+          />
         </section>
       </main>
       <Footer initialSettings={settings} />

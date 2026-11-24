@@ -1,9 +1,11 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Menu, X, ShoppingBag, BookOpen, HelpCircle, Phone, Home } from "lucide-react"
+import { Menu, X, ShoppingBag, Search, HelpCircle, MessageCircle } from "lucide-react"
+
+const ZALO_PHONE = (process.env.NEXT_PUBLIC_ZALO_PHONE_1 || "0356970964").replace(/\D/g, "")
 
 interface HeaderProps {
   initialSettings?: {
@@ -15,14 +17,18 @@ interface HeaderProps {
 
 export function Header({ initialSettings }: HeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [scrolled, setScrolled] = useState(false)
   const pathname = usePathname()
+  const menuButtonRef = useRef<HTMLButtonElement>(null)
+  const drawerRef = useRef<HTMLDivElement>(null)
 
-  const [settings, setSettings] = useState(() => initialSettings || {
-    siteName: process.env.NEXT_PUBLIC_STORE_NAME || "ACCGIARE",
-    logoUrl: null,
-    initials: "AG",
-  })
+  const [settings, setSettings] = useState(
+    () =>
+      initialSettings || {
+        siteName: process.env.NEXT_PUBLIC_STORE_NAME || "CAPYGO",
+        logoUrl: null,
+        initials: "CG",
+      }
+  )
 
   useEffect(() => {
     if (!initialSettings) {
@@ -33,7 +39,7 @@ export function Header({ initialSettings }: HeaderProps) {
             setSettings({
               siteName: data.siteName,
               logoUrl: data.logoUrl || null,
-              initials: data.initials || "AG",
+              initials: data.initials || "CG",
             })
           }
         })
@@ -41,14 +47,48 @@ export function Header({ initialSettings }: HeaderProps) {
     }
   }, [initialSettings])
 
+  // Close on Escape, trap focus inside mobile drawer, and lock body scroll cleanly
   useEffect(() => {
-    const handleScroll = () => {
-      setScrolled(window.scrollY > 15)
+    if (!mobileMenuOpen) return
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = "hidden"
+
+    const drawerEl = drawerRef.current
+    const focusableSelectors =
+      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    const focusables = drawerEl
+      ? Array.from(drawerEl.querySelectorAll<HTMLElement>(focusableSelectors))
+      : []
+
+    focusables[0]?.focus()
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setMobileMenuOpen(false)
+        menuButtonRef.current?.focus()
+        return
+      }
+
+      if (e.key === "Tab" && focusables.length > 0) {
+        const first = focusables[0]
+        const last = focusables[focusables.length - 1]
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault()
+          last.focus()
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault()
+          first.focus()
+        }
+      }
     }
-    handleScroll()
-    window.addEventListener("scroll", handleScroll, { passive: true })
-    return () => window.removeEventListener("scroll", handleScroll)
-  }, [])
+
+    document.addEventListener("keydown", handleKeyDown)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      document.removeEventListener("keydown", handleKeyDown)
+    }
+  }, [mobileMenuOpen])
 
   // Handle hash scrolling when arriving from another page or hash changes
   useEffect(() => {
@@ -101,161 +141,138 @@ export function Header({ initialSettings }: HeaderProps) {
   }
 
   const navLinks = [
-    { href: "/", label: "Trang chủ", icon: Home },
-    { href: "/san-pham", label: "Sản phẩm & Gói", icon: ShoppingBag },
-    { href: "/#how", label: "Hướng dẫn mua hàng", icon: BookOpen },
-    { href: "/#faq", label: "Hỗ trợ & FAQ", icon: HelpCircle },
+    { href: "/san-pham", label: "Sản phẩm", icon: ShoppingBag },
+    { href: "/lookup", label: "Tra cứu đơn", icon: Search },
+    { href: "/#faq", label: "Hỗ trợ", icon: HelpCircle },
   ]
 
   return (
-    <header
-      className={`sticky top-0 z-40 w-full transition-all duration-300 relative ${
-        scrolled
-          ? "border-b border-border/80 bg-background/80 backdrop-blur-xl shadow-lg shadow-black/40"
-          : "border-b border-border/40 bg-background/60 backdrop-blur-md"
-      }`}
-    >
-      {/* Vệt ánh sáng gradient loang tinh tế ở đáy viền Header (Phong cách Vercel/Apple Studio) */}
-      <div
-        className={`pointer-events-none absolute bottom-0 left-1/2 -translate-x-1/2 h-[1px] w-3/5 max-w-4xl bg-gradient-to-r from-transparent via-caramel/50 to-transparent transition-opacity duration-500 ${
-          scrolled ? "opacity-100" : "opacity-40"
-        }`}
-      />
-
-      <div className="mx-auto flex h-18 sm:h-20 w-full max-w-7xl items-center justify-between px-4 sm:px-8 lg:px-12 relative">
-        {/* [KHỐI TRÁI]: Logo Thương Hiệu Cửa Hàng */}
-        <div className="flex items-center gap-3.5 shrink-0 z-10">
-          <Link href="/" className="flex items-center gap-3.5 group active-bounce">
-            <span className="flex size-11 sm:size-12 items-center justify-center rounded-2xl bg-gradient-to-br from-secondary via-card to-secondary border border-border/80 text-sm font-bold text-accent tracking-wider shadow-md transition-all duration-300 group-hover:scale-105 group-hover:border-accent/60 group-hover:shadow-xl group-hover:shadow-caramel/20 overflow-hidden">
-              {settings.logoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={settings.logoUrl}
-                  alt={settings.siteName}
-                  className="size-full object-cover rounded-2xl"
-                />
-              ) : (
-                settings.initials
-              )}
-            </span>
-            <div className="flex flex-col">
-              <span className="font-heading font-extrabold text-base sm:text-lg tracking-tight text-foreground transition-colors duration-200 group-hover:text-accent">
-                {settings.siteName}
-              </span>
-            </div>
-          </Link>
-        </div>
-
-        {/* [KHỐI GIỮA]: Menu Điều Hướng Căn Giữa Tuyệt Đối + Hiệu Ứng Underline Glow */}
-        <nav
-          className="hidden md:flex items-center gap-1 lg:gap-2 absolute left-1/2 -translate-x-1/2 z-10"
-          aria-label="Điều hướng chính"
+    <header className="sticky top-0 z-40 w-full border-b border-border bg-background/95 backdrop-blur-md">
+      <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
+        {/* Left: Logo */}
+        <Link
+          href="/"
+          onClick={(e) => handleNavClick(e, "/")}
+          className="flex items-center gap-3 shrink-0 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl"
         >
-          {navLinks.map((link) => {
-            const isActive = link.href === "/" ? pathname === "/" : pathname.startsWith(link.href)
-            return (
-              <Link
-                key={link.href}
-                href={link.href}
-                onClick={(e) => handleNavClick(e, link.href)}
-                className={`group relative px-4 py-2.5 text-xs lg:text-sm font-medium transition-all duration-200 rounded-xl active-bounce ${
-                  isActive
-                    ? "text-foreground font-semibold"
-                    : "text-muted-foreground hover:text-foreground hover:bg-white/[0.04]"
-                }`}
-              >
-                <span>{link.label}</span>
+          <span className="flex size-9 items-center justify-center rounded-xl bg-card border border-border text-xs font-bold text-primary tracking-wider overflow-hidden shrink-0 transition-btn group-hover:border-primary/50">
+            {settings.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={settings.logoUrl}
+                alt={settings.siteName}
+                className="size-full object-cover"
+              />
+            ) : (
+              settings.initials
+            )}
+          </span>
+          <span className="font-heading font-bold text-base tracking-tight text-foreground group-hover:text-primary transition-colors duration-150 whitespace-nowrap">
+            {settings.siteName}
+          </span>
+        </Link>
 
-                {/* Đường kẻ phát sáng Neon Underline mở rộng từ tâm khi Hover hoặc Active */}
-                <span
-                  className={`absolute bottom-0.5 left-3 right-3 h-[2px] rounded-full bg-gradient-to-r from-caramel via-caramel-light to-caramel transition-all duration-300 ease-out origin-center ${
+        {/* Center/Right: Navigation (Flex layout — never overlaps on medium screens) */}
+        <div className="hidden md:flex items-center gap-1 lg:gap-2 min-w-0">
+          <nav className="flex items-center gap-1" aria-label="Điều hướng chính">
+            {navLinks.map((link) => {
+              const isActive =
+                link.href === "/san-pham"
+                  ? pathname.startsWith("/san-pham")
+                  : link.href === "/lookup"
+                  ? pathname.startsWith("/lookup")
+                  : false
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  onClick={(e) => handleNavClick(e, link.href)}
+                  className={`px-3.5 py-2 text-sm font-medium rounded-xl transition-btn whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                     isActive
-                      ? "scale-x-100 opacity-100 shadow-[0_0_10px_rgba(230,166,111,0.6)]"
-                      : "scale-x-0 opacity-0 group-hover:scale-x-100 group-hover:opacity-100 group-hover:shadow-[0_0_8px_rgba(230,166,111,0.4)]"
+                      ? "bg-secondary text-foreground font-semibold"
+                      : "text-muted-foreground hover:text-foreground hover:bg-secondary/70"
                   }`}
-                />
-              </Link>
-            )
-          })}
-        </nav>
+                >
+                  {link.label}
+                </Link>
+              )
+            })}
+          </nav>
 
-        {/* [KHỐI PHẢI]: Hotline Hỗ trợ, Badge Trạng Thái Tự Động 24/7 & Nút Menu Mobile */}
-        <div className="flex items-center gap-2 sm:gap-3 shrink-0 z-10">
-          {/* Hotline / Zalo Support Link */}
+          <div className="h-4 w-px bg-border mx-1.5" aria-hidden="true" />
+
           <a
-            href="https://zalo.me/0356970964"
+            href={`https://zalo.me/${ZALO_PHONE}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-secondary/60 hover:bg-secondary border border-border/80 hover:border-caramel/50 text-xs font-medium text-muted-foreground hover:text-caramel-light transition-all backdrop-blur shadow-sm group"
-            title="Nhắn tin Zalo hỗ trợ: 0356 970 964"
+            className="inline-flex items-center gap-2 h-9 px-3.5 rounded-xl border border-border bg-card hover:bg-secondary hover:border-primary/40 text-sm font-medium text-foreground transition-btn whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <Phone className="size-3 text-caramel group-hover:scale-110 transition-transform" />
-            <span>Hỗ trợ: <strong className="font-semibold text-foreground group-hover:text-caramel-light tabular-nums">0356 970 964</strong></span>
+            <MessageCircle className="size-4 text-primary shrink-0" />
+            <span>Zalo hỗ trợ</span>
           </a>
-
-          {/* Badge Hệ Thống Tự Động Online */}
-          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-950/30 border border-emerald-500/20 text-xs font-medium text-emerald-400 backdrop-blur shadow-sm">
-            <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span>Tự động 24/7</span>
-          </div>
-
-          {/* Nút Hamburger Mobile */}
-          <button
-            type="button"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden flex size-10 items-center justify-center rounded-xl border border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-all active-bounce focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            aria-expanded={mobileMenuOpen}
-            aria-label={mobileMenuOpen ? "Đóng menu" : "Mở menu"}
-          >
-            {mobileMenuOpen ? <X className="size-5" /> : <Menu className="size-5" />}
-          </button>
         </div>
+
+        {/* Mobile Menu Toggle */}
+        <button
+          ref={menuButtonRef}
+          type="button"
+          onClick={() => setMobileMenuOpen((prev) => !prev)}
+          className="md:hidden inline-flex size-11 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-secondary transition-btn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          aria-expanded={mobileMenuOpen}
+          aria-controls="mobile-nav-drawer"
+          aria-label={mobileMenuOpen ? "Đóng menu điều hướng" : "Mở menu điều hướng"}
+        >
+          {mobileMenuOpen ? <X className="size-5" /> : <Menu className="size-5" />}
+        </button>
       </div>
 
-      {/* Mobile Drawer Menu với hiệu ứng kính mờ và chia khối */}
+      {/* Mobile Drawer */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-b border-border bg-card/95 backdrop-blur-xl px-5 py-5 space-y-2 animate-fade-down shadow-2xl">
-          <div className="flex items-center justify-between pb-3 mb-2 border-b border-border/50 text-xs text-muted-foreground">
-            <span>Danh mục điều hướng</span>
-            <div className="flex items-center gap-1.5 text-emerald-400">
-              <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span>Hệ thống online</span>
-            </div>
-          </div>
-
+        <div
+          id="mobile-nav-drawer"
+          ref={drawerRef}
+          role="dialog"
+          aria-label="Menu điều hướng di động"
+          className="md:hidden border-b border-border bg-card px-4 py-4 space-y-1.5 animate-fade-in"
+        >
           {navLinks.map((link) => {
             const Icon = link.icon
-            const isActive = link.href === "/" ? pathname === "/" : pathname.startsWith(link.href)
+            const isActive =
+              link.href === "/san-pham"
+                ? pathname.startsWith("/san-pham")
+                : link.href === "/lookup"
+                ? pathname.startsWith("/lookup")
+                : false
             return (
               <Link
                 key={link.href}
                 href={link.href}
                 onClick={(e) => handleNavClick(e, link.href)}
-                className={`flex items-center gap-3 px-3.5 py-2.5 text-sm font-medium rounded-xl transition-colors ${
+                className={`flex items-center gap-3 min-h-[44px] px-3.5 py-2.5 text-sm font-medium rounded-xl transition-btn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                   isActive
-                    ? "bg-caramel/15 text-caramel-light font-semibold border border-caramel/25"
-                    : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+                    ? "bg-secondary text-foreground font-semibold border border-border"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/70"
                 }`}
               >
-                <Icon className={`size-4 ${isActive ? "text-caramel" : "text-accent"}`} strokeWidth={1.75} />
+                <Icon className="size-4 text-primary shrink-0" strokeWidth={1.75} />
                 <span>{link.label}</span>
               </Link>
             )
           })}
 
-          <div className="pt-2 border-t border-border/40">
+          <div className="pt-2 mt-2 border-t border-border">
             <a
-              href="https://zalo.me/0356970964"
+              href={`https://zalo.me/${ZALO_PHONE}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center justify-between p-3 rounded-xl bg-secondary/50 border border-border/70 text-xs font-medium text-muted-foreground hover:text-foreground"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex items-center justify-between min-h-[44px] px-3.5 py-2.5 rounded-xl bg-secondary border border-border text-sm font-medium text-foreground hover:border-primary/40 transition-btn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              <div className="flex items-center gap-2">
-                <Phone className="size-3.5 text-caramel" />
-                <span>Hỗ trợ Zalo:</span>
-                <span className="font-bold text-foreground tabular-nums">0356 970 964</span>
-              </div>
-              <span className="text-[11px] text-caramel font-semibold">Nhắn tin ↗</span>
+              <span className="flex items-center gap-2.5">
+                <MessageCircle className="size-4 text-primary shrink-0" />
+                <span>Nhắn tin Zalo hỗ trợ</span>
+              </span>
+              <span className="text-xs text-primary font-semibold">Mở ↗</span>
             </a>
           </div>
         </div>
