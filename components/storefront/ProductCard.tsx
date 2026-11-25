@@ -93,6 +93,7 @@ function detectUsageMode(name: string, deliveryType: string): string {
 
 /**
  * Only infer duration for single-variant products so multi-variant products never show misleading duration.
+ * Explicitly avoids mistaking token/memory quantities (e.g. "50M Token", "100M") for months.
  */
 function detectSingleDuration(
   name: string,
@@ -101,17 +102,71 @@ function detectSingleDuration(
 ): string | null {
   if (hasMultipleVariants) return null
   const combined = `${name} ${variants[0]?.name || ""}`.toLowerCase()
-  const viMatch = combined.match(/(\d+\s*(?:tháng|thang|năm|nam|ngày|ngay|tuần|tuan|giờ|gio))/i)
-  if (viMatch) return viMatch[1].trim()
-  const enMatch = combined.match(/\b(\d+)\s*(days?|months?|years?|m|d)\b/i)
-  if (enMatch) {
-    const num = enMatch[1]
-    const unit = enMatch[2].toLowerCase()
-    if (unit === "m" || unit.startsWith("month")) return `${num} tháng`
-    if (unit === "d" || unit.startsWith("day")) return `${num} ngày`
-    if (unit.startsWith("year")) return `${num} năm`
+
+  // 1. Vietnamese explicit duration words
+  const viMatch = combined.match(/(\d+)\s*(tháng|thang|năm|nam|ngày|ngay|tuần|tuan|giờ|gio)\b/i)
+  if (viMatch) {
+    const num = viMatch[1]
+    const unit = viMatch[2].toLowerCase()
+    if (unit === "thang" || unit === "tháng") return `${num} tháng`
+    if (unit === "nam" || unit === "năm") return `${num} năm`
+    if (unit === "ngay" || unit === "ngày") return `${num} ngày`
+    if (unit === "tuan" || unit === "tuần") return `${num} tuần`
+    if (unit === "gio" || unit === "giờ") return `${num} giờ`
   }
+
+  // 2. English full duration words (checked BEFORE shorthand m/d so "50M Token - 2 days" yields "2 ngày")
+  const enFullMatch = combined.match(/\b(\d+)\s*(days?|months?|years?|weeks?|hours?)\b/i)
+  if (enFullMatch) {
+    const num = enFullMatch[1]
+    const unit = enFullMatch[2].toLowerCase()
+    if (unit.startsWith("month")) return `${num} tháng`
+    if (unit.startsWith("day")) return `${num} ngày`
+    if (unit.startsWith("year")) return `${num} năm`
+    if (unit.startsWith("week")) return `${num} tuần`
+    if (unit.startsWith("hour")) return `${num} giờ`
+  }
+
+  // 3. Shorthand like "18M" or "30D" — ONLY when not followed by token/credit/size units and within sane bounds
+  const shortMatch = combined.match(/\b(\d{1,3})\s*(m|d)\b(?!\s*(?:token|tokens|credit|credits|b\b|k\b|mb|gb))/i)
+  if (shortMatch) {
+    const num = parseInt(shortMatch[1], 10)
+    const unit = shortMatch[2].toLowerCase()
+    if (unit === "m" && num >= 1 && num <= 36) return `${num} tháng`
+    if (unit === "d" && num >= 1 && num <= 365) return `${num} ngày`
+  }
+
   if (combined.includes("vĩnh viễn") || combined.includes("lifetime")) return "Vĩnh viễn"
+  return null
+}
+
+/**
+ * Extract a concise, single-line customer benefit from real highlights or description.
+ */
+function extractShortBenefit(highlights?: string[], description?: string): string | null {
+  const isBareHeading = (line: string) =>
+    /^(thông tin\s*&\s*quyền lợi|mô tả sản phẩm|lưu ý|hướng dẫn|bảo hành)\s*:?$/i.test(line)
+
+  if (highlights && highlights.length > 0) {
+    for (const h of highlights) {
+      const clean = h.replace(/^[-*•\s#]+/, "").replace(/\*\*/g, "").trim()
+      if (clean.length >= 6 && !isBareHeading(clean)) return clean
+    }
+  }
+  if (description && description.trim()) {
+    const lines = description
+      .split(/\r?\n/)
+      .map((l) => l.replace(/^[-*•\s#>]+/, "").replace(/\*\*/g, "").trim())
+      .filter(
+        (l) =>
+          l.length >= 8 &&
+          !isBareHeading(l) &&
+          !/^lưu ý|^hướng dẫn|^bảo hành|^chính sách bảo hành/i.test(l)
+      )
+    if (lines.length > 0) {
+      return lines[0]
+    }
+  }
   return null
 }
 
@@ -194,10 +249,12 @@ function detectWarrantySummary(
 export function ProductCard({
   name,
   slug,
+  description,
   images = [],
   groupName = "Chưa phân loại",
   deliveryType = "serials",
   statusOverride = "auto",
+  highlights = [],
   warrantyTerms,
   noticeNotes,
   variants = [],
@@ -212,6 +269,7 @@ export function ProductCard({
 
   const pricing = calculateProductPricing(variants, statusOverride)
   const categoryAccent = getCategoryAccent(groupName)
+  const hasDistinctPrices = new Set(variants.map((v) => v.priceCents)).size > 1
 
   const primaryImage =
     !imgError && images && images.length > 0 && images[0]?.trim()
@@ -221,6 +279,7 @@ export function ProductCard({
   const isContactOnly = deliveryType === "contact"
   const usageMode = detectUsageMode(name, deliveryType)
   const duration = detectSingleDuration(name, variants, pricing.hasMultipleVariants)
+  const shortBenefit = extractShortBenefit(highlights, description)
   const warrantySummary = detectWarrantySummary(
     name,
     warrantyTerms,
@@ -266,115 +325,144 @@ export function ProductCard({
   }, [popoverOpen])
 
   const metaLine = [
-    usageMode,
     pricing.hasMultipleVariants ? `${variants.length} gói` : duration,
+    usageMode,
   ]
     .filter(Boolean)
     .join(" · ")
 
   return (
     <article
-      className={`group relative flex flex-col justify-between h-full rounded-2xl border bg-card transition-card ${
-        featured
-          ? "border-primary/40 hover:border-primary/70"
-          : "border-border hover:border-primary/40"
+      className={`group relative flex flex-col justify-between h-full rounded-2xl border bg-card transition-card hover:-translate-y-0.5 ${
+        pricing.isOutOfStock && !isContactOnly
+          ? "border-border/80 opacity-90 hover:border-border"
+          : featured
+          ? "border-primary/45 hover:border-primary/80 shadow-[0_8px_28px_-12px_rgba(230,166,111,0.22)]"
+          : "border-border hover:border-primary/45"
       } ${className}`}
     >
       {/* Top Section */}
       <div className="flex flex-col flex-1">
-        {/* 1. 16:9 Image Frame (overflow-hidden stays ONLY on image wrapper, never clipping popovers) */}
-        <div className="relative aspect-video w-full overflow-hidden rounded-t-[15px] bg-background border-b border-border">
-          <Link
-            href={`/product/${slug}`}
-            className="block w-full h-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            tabIndex={-1}
-            aria-hidden="true"
+        {/* 1. Unified Dark-Framed Media Container (normalizes white & dark logos consistently) */}
+        <div className="p-3 pb-0">
+          <div
+            className={`relative h-32 sm:h-36 w-full overflow-hidden rounded-xl border flex items-center justify-center ${
+              featured && !pricing.isOutOfStock
+                ? "bg-gradient-to-b from-primary/[0.06] to-background border-primary/25"
+                : "bg-background border-border/70"
+            }`}
           >
-            {primaryImage ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={primaryImage}
-                alt={name}
-                className="w-full h-full object-cover"
-                onError={() => setImgError(true)}
-                loading="lazy"
-              />
-            ) : (
-              <div className="w-full h-full flex flex-col items-center justify-center bg-background select-none p-4">
+            <Link
+              href={`/product/${slug}`}
+              className="w-full h-full flex items-center justify-center p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              tabIndex={-1}
+              aria-hidden="true"
+            >
+              {primaryImage ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={primaryImage}
+                  alt=""
+                  className="max-h-full max-w-full object-contain rounded-lg transition-transform duration-[180ms] ease-out group-hover:scale-[1.02]"
+                  onError={() => setImgError(true)}
+                  loading="lazy"
+                />
+              ) : (
                 <div
                   className={`size-12 rounded-xl flex items-center justify-center border ${categoryAccent.iconBg}`}
                 >
                   <BrandIcon name={name} className="size-6" />
                 </div>
-              </div>
-            )}
-          </Link>
+              )}
+            </Link>
 
-          {/* Subtle Category Label (top-left) */}
-          <span
-            className={`absolute top-2.5 left-2.5 inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-0.5 rounded-lg border bg-background/90 ${categoryAccent.badge} pointer-events-none`}
-          >
-            <span className={`size-1.5 rounded-full ${categoryAccent.dot}`} aria-hidden="true" />
-            <span className="max-w-[140px] truncate">{groupName}</span>
-          </span>
-
-          {/* Out-of-stock pill only when actually out of stock (avoids redundant "Còn hàng" noise on every card) */}
-          {pricing.isOutOfStock && !isContactOnly && (
-            <span className="absolute top-2.5 right-2.5 inline-flex items-center px-2.5 py-0.5 rounded-lg text-xs font-semibold bg-background/95 text-rose-300 border border-rose-500/40 pointer-events-none">
-              Hết hàng
+            {/* Subtle Category Label (top-left) */}
+            <span
+              className={`absolute top-2 left-2 inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-0.5 rounded-md border bg-card/90 backdrop-blur-xs ${categoryAccent.badge} pointer-events-none`}
+            >
+              <span className={`size-1.5 rounded-full ${categoryAccent.dot}`} aria-hidden="true" />
+              <span className="max-w-[130px] truncate">{groupName}</span>
             </span>
-          )}
+          </div>
         </div>
 
-        {/* 2. Content Body */}
-        <div className="flex flex-col flex-1 p-4 sm:p-5 gap-2.5">
-          {/* Product Name (16–18px) */}
+        {/* 2. Content Body — Consistent Reading Order */}
+        <div className="flex flex-col flex-1 px-4 pt-3.5 pb-3 gap-1.5">
+          {/* Product Name (max 2 lines, consistent min-height so cards align) */}
           <Link
             href={`/product/${slug}`}
+            title={name}
             className="block group/title focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
           >
-            <h3 className="font-sans font-semibold text-base sm:text-[17px] text-foreground group-hover/title:text-primary transition-colors duration-150 leading-snug line-clamp-2 break-words">
+            <h3 className="font-sans font-semibold text-[15px] sm:text-base text-foreground group-hover/title:text-primary transition-colors duration-150 leading-snug line-clamp-2 min-h-[2.5rem] break-words">
               {name}
             </h3>
           </Link>
 
-          {/* Usage Mode · Duration / Package Count (13px, clearly readable on mobile & desktop) */}
-          <p className="text-[13px] text-muted-foreground leading-snug">
+          {/* Short Benefit (1 clean line) */}
+          {shortBenefit && (
+            <p className="text-xs text-muted-foreground/90 leading-snug line-clamp-1">
+              {shortBenefit}
+            </p>
+          )}
+
+          {/* Duration · Delivery / Usage Mode */}
+          <p className="text-xs text-muted-foreground leading-snug pt-0.5">
             {metaLine}
           </p>
 
-          {/* Warranty / Critical Condition (12–13px, always visible on mobile, never hidden in tooltip only) */}
-          <div className="relative flex items-start justify-between gap-2 pt-0.5">
-            <div
-              className={`inline-flex items-start gap-1.5 text-xs sm:text-[13px] leading-snug ${
-                warrantySummary.isWarning
-                  ? "text-amber-300 font-medium"
-                  : "text-muted-foreground"
-              }`}
-            >
-              {warrantySummary.isWarning ? (
-                <AlertCircle className="size-3.5 text-amber-400 shrink-0 mt-0.5" aria-hidden="true" />
-              ) : (
-                <ShieldCheck className="size-3.5 text-muted-foreground/80 shrink-0 mt-0.5" aria-hidden="true" />
+          {/* Warranty & Stock Status Row */}
+          <div className="relative flex items-center justify-between gap-2 pt-1 mt-auto">
+            <div className="flex items-center gap-1 min-w-0">
+              <div
+                className={`inline-flex items-center gap-1 text-[11px] sm:text-xs leading-snug min-w-0 ${
+                  warrantySummary.isWarning
+                    ? "text-amber-300 font-medium"
+                    : "text-muted-foreground"
+                }`}
+              >
+                {warrantySummary.isWarning ? (
+                  <AlertCircle className="size-3 text-amber-400 shrink-0" aria-hidden="true" />
+                ) : (
+                  <ShieldCheck className="size-3 text-muted-foreground/80 shrink-0" aria-hidden="true" />
+                )}
+                <span className="truncate">{warrantySummary.text}</span>
+              </div>
+
+              {hasDetailPopover && (
+                <button
+                  ref={triggerRef}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setPopoverOpen((prev) => !prev)
+                  }}
+                  aria-expanded={popoverOpen}
+                  aria-controls={popoverId}
+                  aria-label={`Xem điều kiện gói ${name}`}
+                  className="inline-flex items-center justify-center size-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-btn shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <Info className="size-3.5" />
+                </button>
               )}
-              <span>{warrantySummary.text}</span>
             </div>
 
-            {hasDetailPopover && (
-              <button
-                ref={triggerRef}
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setPopoverOpen((prev) => !prev)
-                }}
-                aria-expanded={popoverOpen}
-                aria-controls={popoverId}
-                aria-label={`Xem điều kiện gói ${name}`}
-                className="inline-flex items-center justify-center size-7 -mr-1 -mt-0.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-btn shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <Info className="size-3.5" />
-              </button>
+            {/* Clean Inline Stock Indicator */}
+            {isContactOnly ? (
+              <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground shrink-0">
+                <span className="size-1.5 rounded-full bg-primary" aria-hidden="true" />
+                Liên hệ
+              </span>
+            ) : pricing.isOutOfStock ? (
+              <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-rose-300/90 shrink-0">
+                <span className="size-1.5 rounded-full bg-rose-400" aria-hidden="true" />
+                Hết hàng
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-emerald-400 shrink-0">
+                <span className="size-1.5 rounded-full bg-emerald-400" aria-hidden="true" />
+                Còn hàng
+              </span>
             )}
 
             {/* Unclipped Accessible Popover */}
@@ -409,20 +497,22 @@ export function ProductCard({
         </div>
       </div>
 
-      {/* 3. Footer: Price & Primary Action */}
-      <div className="px-4 sm:px-5 pb-4 sm:pb-5 pt-3 border-t border-border/70 flex flex-col gap-3 mt-auto">
-        <PriceDisplay
-          priceCents={pricing.lowestPrice}
-          compareAtPriceCents={pricing.comparePrice}
-          prefix={pricing.hasMultipleVariants ? "Từ" : undefined}
-        />
+      {/* 3. Footer: Aligned Price & Compact Action Button */}
+      <div className="px-4 py-3 border-t border-border/60 flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <PriceDisplay
+            priceCents={pricing.lowestPrice}
+            compareAtPriceCents={pricing.comparePrice}
+            prefix={hasDistinctPrices ? "Từ" : undefined}
+          />
+        </div>
 
-        {/* Action Button (min-h 44px for mobile tap ergonomics) */}
+        {/* Action Button */}
         {isContactOnly ? (
           <Button
             asChild
             variant="outline"
-            className="w-full h-11 rounded-xl text-sm font-semibold border-border hover:border-primary/50 hover:bg-secondary text-foreground transition-btn"
+            className="h-9 px-3.5 rounded-xl text-xs font-semibold border-border hover:border-primary/50 hover:bg-secondary text-foreground transition-btn shrink-0"
           >
             <a
               href={`https://zalo.me/${ZALO_PHONE}?text=${encodeURIComponent(
@@ -432,15 +522,15 @@ export function ProductCard({
               rel="noopener noreferrer"
               aria-label={`Liên hệ Zalo tư vấn mua ${name}`}
             >
-              <MessageCircle className="size-4 text-primary" />
-              <span>Liên hệ Zalo</span>
+              <MessageCircle className="size-3.5 text-primary" />
+              <span>Liên hệ</span>
             </a>
           </Button>
         ) : pricing.isOutOfStock ? (
           <Button
             asChild
             variant="outline"
-            className="w-full h-11 rounded-xl text-sm font-medium border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-btn"
+            className="h-9 px-3 rounded-xl text-xs font-medium border-border/80 text-muted-foreground hover:text-foreground hover:bg-secondary transition-btn shrink-0"
           >
             <a
               href={`https://zalo.me/${ZALO_PHONE}?text=${encodeURIComponent(
@@ -450,8 +540,7 @@ export function ProductCard({
               rel="noopener noreferrer"
               aria-label={`Liên hệ Zalo hỏi hàng ${name}`}
             >
-              <MessageCircle className="size-4" />
-              <span>Hết hàng · Liên hệ</span>
+              <span>Hỏi hàng</span>
             </a>
           </Button>
         ) : (
@@ -460,13 +549,13 @@ export function ProductCard({
             variant={featured ? "default" : "secondary"}
             className={
               featured
-                ? "w-full h-11 rounded-xl text-sm font-semibold bg-primary text-primary-foreground hover:bg-caramel-light transition-btn"
-                : "w-full h-11 rounded-xl text-sm font-semibold bg-secondary text-foreground border border-border hover:border-primary/50 hover:bg-primary hover:text-primary-foreground transition-btn"
+                ? "h-9 px-3.5 rounded-xl text-xs font-semibold bg-primary text-primary-foreground hover:bg-caramel-light transition-btn shrink-0"
+                : "h-9 px-3.5 rounded-xl text-xs font-semibold bg-secondary text-foreground border border-border hover:border-primary/50 hover:bg-primary hover:text-primary-foreground transition-btn shrink-0"
             }
           >
             <Link href={`/product/${slug}`}>
-              <span>{pricing.hasMultipleVariants ? "Chọn gói" : "Xem chi tiết"}</span>
-              <ArrowRight className="size-4" strokeWidth={2.2} />
+              <span>Chọn gói</span>
+              <ArrowRight className="size-3.5" strokeWidth={2.2} />
             </Link>
           </Button>
         )}

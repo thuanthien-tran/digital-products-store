@@ -1,0 +1,15 @@
+# Bảng Đối Chiếu Chức Năng — CAPYGO Motion & Futuristic Depth Polish
+
+> **Mục tiêu:** Cửa hàng công nghệ tối giản — chuyển động mượt, chiều sâu tương lai, ánh sáng mềm.
+> **Cập nhật:** 2026-11-25
+
+| Chức năng | Vị trí hiện tại | Thay đổi đã áp dụng | Cách kiểm tra | Kết quả |
+| :--- | :--- | :--- | :--- | :--- |
+| Hệ thống Motion Tokens & Reduced Motion | `app/globals.css` | Chuẩn hóa 5 nhóm tốc độ (`150ms`, `210ms`, `260ms`, `380ms`, `15s`), easing `--ease-out-soft`, tiện ích `.ambient-caramel-orb`, `.featured-sheen-once`, `.animate-price-flash`, `.accordion-grid`; tắt chuyển động trang trí khi `prefers-reduced-motion: reduce` | `tsc --noEmit`, rà soát CSS & kiểm tra thực tế | Đã đạt |
+| Header & Điều hướng cuộn mượt + Mobile Drawer | `components/storefront/Header.tsx` | Kính tối nhẹ tăng chiều sâu khi cuộn (`scrollY > 12`), giữ cố định chiều cao `64.8px`, không dùng `transition: all`, giữ nguyên focus trap & phím `Escape` | Kiểm tra trực tiếp 390 / 768 / 1440px + cuộn trang | Đã đạt |
+| Hero & Capy Pixel (Ánh sáng mềm + Parallax nhẹ) | `components/storefront/HeroSection.tsx`, `PixelCapybara.tsx` | Vùng sáng caramel mờ trôi chậm (`15s`) phía sau minh họa Capy (không chạy qua chữ), parallax cực nhẹ (`±4px`) bằng DOM ref trên `pointer: fine` (tắt trên cảm ứng & reduced-motion), giữ nút tạm dừng & tương tác | Kiểm tra trực tiếp 390 / 768 / 1440px + ESLint 0 lỗi | Đã đạt |
+| Gói nổi bật (60/40 Bento — Card chính Caramel sáng) | `components/storefront/FeaturedBentoShowcase.tsx`, `StorefrontCatalog.tsx` | Card chính nền caramel sáng chữ đen than + nút tối chữ trắng ngà; vệt phản chiếu chạy 1 lần khi vào viewport (`IntersectionObserver`); spotlight theo con trỏ bằng CSS variables (không dùng React state); giữ nguyên thứ tự & lựa chọn từ Admin | Kiểm tra trực tiếp 390 / 768 / 1440px + ESLint 0 lỗi | Đã đạt |
+| Danh mục, Tìm kiếm, Bộ lọc & Thẻ sản phẩm | `components/storefront/StorefrontCatalog.tsx`, `ProductCard.tsx` | Thanh đánh dấu tab danh mục trượt mượt bằng GPU `transform`; bỏ `transition-all`, hover nâng nhẹ + phóng ảnh tối đa `1.02`; giữ ổn định ô tìm kiếm & nội dung đã gõ khi đổi tab | Kiểm tra trực tiếp 390 / 768 / 1440px + gõ lọc & đổi tab | Đã đạt |
+| Chọn gói, Biến thể, Invite Code, Coupon & Form mua | `components/storefront/PurchaseForm.tsx` | Đổi `transition-all` sang `transition-ui`/`transition-btn`; thêm `.animate-price-flash` khi đổi tổng tiền (không đếm giả); bảo toàn 100% payload, Invite Code, coupon & chống gửi trùng | Kiểm tra trực tiếp `/product/youtube-premium-chinh-chu`, `/product/muse-ai...` | Đã đạt UI (ghi nhận lỗi tồn tại trước trên dữ liệu `MUSE AI` ở báo cáo) |
+| Accordion FAQ mượt & không kẹt focus | `components/storefront/FaqAccordion.tsx` | Mở/đóng chiều cao mượt bằng CSS Grid `0fr → 1fr` (`260ms`), gắn `aria-hidden` khi đóng | Kiểm tra trực tiếp 390 / 1440px + ESLint 0 lỗi | Đã đạt |
+| Thanh toán & Trạng thái đơn hàng | `components/storefront/OrderStatus.tsx` | Xác minh không tiến trình giả, dừng polling ở trạng thái cuối, không làm mới QR/bàn giao chỉ để chạy hiệu ứng | Rà soát mã nguồn + `tsc --noEmit` | Chưa xác minh luồng giao dịch thật (tránh phát sinh thanh toán thật) |

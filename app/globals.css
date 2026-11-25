@@ -53,11 +53,19 @@
   --cat-design: 173 68% 52%;      /* Teal for Đồ họa & Thiết kế */
   --cat-office: 213 85% 65%;      /* Blue for Văn phòng & Tiện ích */
 
-  /* Radii & Motion */
+  /* Radii & Motion Tokens (Unified CAPYGO Motion System) */
   --radius: 12px;
-  --duration-btn: 140ms;
-  --duration-card: 180ms;
-  --duration-dialog: 200ms;
+  --motion-fast: 150ms;           /* Buttons, hover, focus (120–180ms) */
+  --motion-ui: 210ms;             /* Tabs, variants, state switches (180–240ms) */
+  --motion-overlay: 260ms;        /* Modal, drawer, accordion (220–320ms) */
+  --motion-reveal: 380ms;         /* Scroll reveal (300–450ms) */
+  --motion-ambient: 15s;          /* Decorative soft light cycle (12–18s) */
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* Backwards-compatible aliases */
+  --duration-btn: var(--motion-fast);
+  --duration-card: var(--motion-ui);
+  --duration-dialog: var(--motion-overlay);
 }
 
 @theme inline {
@@ -155,28 +163,114 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .transition-btn {
-  transition: background-color var(--duration-btn) var(--ease-standard),
-              border-color var(--duration-btn) var(--ease-standard),
-              color var(--duration-btn) var(--ease-standard),
-              opacity var(--duration-btn) var(--ease-standard),
-              transform var(--duration-btn) var(--ease-standard);
+  transition: background-color var(--motion-fast) var(--ease-out-soft),
+              border-color var(--motion-fast) var(--ease-out-soft),
+              color var(--motion-fast) var(--ease-out-soft),
+              opacity var(--motion-fast) var(--ease-out-soft),
+              transform var(--motion-fast) var(--ease-out-soft);
 }
 
 .transition-card {
-  transition: border-color var(--duration-card) var(--ease-standard),
-              background-color var(--duration-card) var(--ease-standard);
+  transition: transform var(--motion-ui) var(--ease-out-soft),
+              border-color var(--motion-ui) var(--ease-out-soft),
+              background-color var(--motion-ui) var(--ease-out-soft),
+              box-shadow var(--motion-ui) var(--ease-out-soft);
+}
+
+.transition-ui {
+  transition: transform var(--motion-ui) var(--ease-out-soft),
+              opacity var(--motion-ui) var(--ease-out-soft),
+              border-color var(--motion-ui) var(--ease-out-soft),
+              background-color var(--motion-ui) var(--ease-out-soft),
+              color var(--motion-ui) var(--ease-out-soft);
+}
+
+/* Slow ambient soft caramel orb (15s cycle, GPU transform/opacity only) */
+@keyframes ambient-caramel-drift {
+  0%, 100% {
+    transform: translate3d(-6%, -4%, 0) scale(1);
+    opacity: 0.42;
+  }
+  50% {
+    transform: translate3d(6%, 4%, 0) scale(1.07);
+    opacity: 0.62;
+  }
+}
+
+.ambient-caramel-orb {
+  animation: ambient-caramel-drift var(--motion-ambient) ease-in-out infinite;
+}
+
+/* One-time soft ivory sheen sweep on flagship Featured card */
+@keyframes featured-sheen-sweep {
+  0% {
+    transform: translate3d(-130%, 0, 0) skewX(-18deg);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.45;
+  }
+  80% {
+    opacity: 0.35;
+  }
+  100% {
+    transform: translate3d(230%, 0, 0) skewX(-18deg);
+    opacity: 0;
+  }
+}
+
+.featured-sheen-once {
+  animation: featured-sheen-sweep 1100ms var(--ease-out-soft) 180ms 1 both;
+}
+
+/* Brief crisp price update flash (instant value change, no fake number rolling) */
+@keyframes price-update-flash {
+  0% {
+    opacity: 0.55;
+    transform: translateY(-2px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-price-flash {
+  animation: price-update-flash var(--motion-ui) var(--ease-out-soft) both;
+}
+
+/* Smooth CSS Grid Accordion Panel (never clips long content) */
+.accordion-grid {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition: grid-template-rows var(--motion-overlay) var(--ease-out-soft),
+              opacity var(--motion-ui) var(--ease-out-soft);
+}
+
+.accordion-grid[data-open="true"] {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.accordion-grid-inner {
+  overflow: hidden;
 }
 
 .active-bounce {
-  transition: transform 120ms var(--ease-standard);
+  transition: transform 120ms var(--ease-out-soft);
 }
 
 .active-bounce:active {
   transform: scale(0.98);
 }
 
-/* Reduced motion preference */
+/* Reduced motion preference: disable decorative motion, keep crisp state feedback */
 @media (prefers-reduced-motion: reduce) {
+  .ambient-caramel-orb,
+  .featured-sheen-once {
+    animation: none !important;
+  }
   *, ::before, ::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;

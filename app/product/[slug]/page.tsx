@@ -6,7 +6,6 @@ import { Header } from "@/components/storefront/Header"
 import { Footer } from "@/components/storefront/Footer"
 import { ZaloWidget } from "@/components/storefront/ZaloWidget"
 import { PurchaseForm } from "@/components/storefront/PurchaseForm"
-import { BrandIcon } from "@/components/storefront/BrandIcons"
 import { ProductDetailImage } from "@/components/storefront/ProductDetailImage"
 import { ChevronRight, ShieldCheck, AlertCircle } from "lucide-react"
 
@@ -107,8 +106,51 @@ export default async function ProductPage({ params }: Props) {
   }
   const primaryImage = parsedImages[0] || null
 
+  let parsedHighlights: string[] = []
+  try {
+    const rawH = (product as { highlights?: string | null }).highlights
+    parsedHighlights = rawH ? JSON.parse(rawH) : []
+  } catch {
+    parsedHighlights = []
+  }
+  const cleanHighlights = parsedHighlights
+    .map((h) => String(h || "").replace(/^[-*•\s]+/, "").trim())
+    .filter((h) => h.length > 0)
+
+  const normalizedInstructions = (product.serviceInstructions || "").trim()
+  const normalizedNotice = (product.noticeNotes || "").trim()
+  const normalizedWarranty = (product.warrantyTerms || "").trim()
+  const showSeparateNotice =
+    normalizedNotice.length > 0 && normalizedNotice !== normalizedWarranty
+
   const rawDesc = product.description || ""
-  const descParagraphs = rawDesc.split("\n").filter((p) => p.trim().length > 0)
+  const descParagraphs = rawDesc
+    .split("\n")
+    .map((p) => p.trim())
+    .filter((p) => {
+      if (!p) return false
+      const plain = p.replace(/\*\*/g, "").trim()
+      // Skip bare generic headings like "Thông tin & Quyền lợi:"
+      if (/^(thông tin\s*&\s*quyền lợi|mô tả sản phẩm)\s*:?$/i.test(plain)) return false
+      // Avoid duplicating dedicated Instructions / Warranty / Notice blocks inside description
+      if (normalizedInstructions && (/^hướng dẫn sử dụng|^hướng dẫn kích hoạt/i.test(plain) || normalizedInstructions.includes(plain))) {
+        return false
+      }
+      if (normalizedWarranty && (/^chính sách bảo hành|^bảo hành\s*:/i.test(plain) || normalizedWarranty.includes(plain))) {
+        return false
+      }
+      if (showSeparateNotice && (/^lưu ý quan trọng/i.test(plain) || normalizedNotice.includes(plain))) {
+        return false
+      }
+      return true
+    })
+
+  // Lead benefit shown directly under the title (avoid repeating it in the lower description block)
+  const leadSummary = descParagraphs[0] || cleanHighlights[0] || null
+  const remainingDescParagraphs =
+    descParagraphs.length > 0 && leadSummary === descParagraphs[0]
+      ? descParagraphs.slice(1)
+      : descParagraphs
 
   const isAllOutOfStock =
     product.statusOverride === "out_of_stock" ||
@@ -158,34 +200,15 @@ export default async function ProductPage({ params }: Props) {
           - Desktop (lg): Summary (left top) + Details (left bottom) alongside sticky PurchaseForm (right).
         */}
         <div className="grid gap-6 lg:grid-cols-12 lg:grid-rows-[auto_1fr] items-start">
-          {/* 1. Product Summary Header Card */}
-          <div className="lg:col-start-1 lg:col-span-7 lg:row-start-1 rounded-2xl border border-border bg-card overflow-hidden">
-            <ProductDetailImage
-              imageUrl={primaryImage}
-              name={product.name}
-              groupName={product.group?.name}
-            />
-
-            <div className="p-5 sm:p-6 space-y-4">
-              <div className="flex items-start gap-3.5">
-                <div className="size-11 rounded-xl bg-secondary border border-border flex items-center justify-center text-muted-foreground shrink-0 mt-0.5">
-                  <BrandIcon name={product.name} className="size-5" />
-                </div>
-                <div className="space-y-1.5 min-w-0">
-                  {product.group && (
-                    <span className="text-xs font-medium text-primary block">
-                      {product.group.name}
-                    </span>
-                  )}
-                  <h1 className="font-heading text-xl sm:text-2xl font-bold tracking-tight text-foreground leading-snug break-words">
-                    {product.name}
-                  </h1>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2.5 pt-2 border-t border-border/70 text-xs sm:text-[13px]">
+          {/* 1. Product Header: Title & Benefit FIRST -> Compact Framed Visual */}
+          <div className="lg:col-start-1 lg:col-span-7 lg:row-start-1 space-y-4">
+            <div className="space-y-2.5">
+              <div className="flex flex-wrap items-center gap-2.5">
+                <h1 className="font-heading text-2xl sm:text-[28px] font-bold tracking-tight text-foreground leading-tight break-words">
+                  {product.name}
+                </h1>
                 <span
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium border ${
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border shrink-0 ${
                     isAllOutOfStock
                       ? "bg-rose-500/10 text-rose-300 border-rose-500/30"
                       : product.deliveryType === "contact"
@@ -206,28 +229,40 @@ export default async function ProductPage({ params }: Props) {
                     {isAllOutOfStock
                       ? "Tạm hết hàng"
                       : product.deliveryType === "contact"
-                      ? "Tư vấn & Đặt qua Zalo"
+                      ? "Đặt qua Zalo"
                       : "Còn hàng"}
                   </span>
                 </span>
-
-                <span className="text-muted-foreground">
-                  Bàn giao: <strong className="text-foreground font-medium">{deliverySummary}</strong>
-                </span>
               </div>
 
-              {isKBH && (
-                <div className="flex items-start gap-2.5 p-3 rounded-xl border border-amber-500/30 bg-amber-500/10 text-xs sm:text-[13px] text-amber-200 leading-relaxed">
-                  <AlertCircle className="size-4 text-amber-400 shrink-0 mt-0.5" />
-                  <span>
-                    <strong>Lưu ý bảo hành:</strong> Sản phẩm thuộc diện không bảo hành (KBH) hoặc bảo hành giới hạn. Vui lòng đọc kỹ điều kiện trước khi thanh toán.
-                  </span>
-                </div>
+              {leadSummary && (
+                <p className="text-sm sm:text-[15px] text-muted-foreground leading-relaxed">
+                  {renderFormattedText(leadSummary)}
+                </p>
               )}
+
+              <p className="text-xs text-muted-foreground">
+                Bàn giao: <span className="text-foreground font-medium">{deliverySummary}</span>
+              </p>
             </div>
+
+            <ProductDetailImage
+              imageUrl={primaryImage}
+              name={product.name}
+              groupName={product.group?.name}
+            />
+
+            {isKBH && !showSeparateNotice && (
+              <div className="flex items-start gap-2.5 p-3.5 rounded-xl border border-amber-500/30 bg-amber-500/10 text-xs sm:text-[13px] text-amber-200 leading-relaxed">
+                <AlertCircle className="size-4 text-amber-400 shrink-0 mt-0.5" />
+                <span>
+                  <strong>Lưu ý bảo hành:</strong> Sản phẩm thuộc diện không bảo hành (KBH) hoặc bảo hành giới hạn. Vui lòng đọc kỹ điều kiện trước khi thanh toán.
+                </span>
+              </div>
+            )}
           </div>
 
-          {/* 2. Purchase Form */}
+          {/* 2. Sticky Purchase Form (Right Column on Desktop) */}
           <div className="lg:col-start-8 lg:col-span-5 lg:row-start-1 lg:row-span-2 lg:sticky lg:top-20">
             <PurchaseForm
               product={{
@@ -245,57 +280,78 @@ export default async function ProductPage({ params }: Props) {
             />
           </div>
 
-          {/* 3. Detailed Description, Instructions & Warranty */}
-          <div className="lg:col-start-1 lg:col-span-7 lg:row-start-2 rounded-2xl border border-border bg-card p-5 sm:p-6 space-y-6">
-            {descParagraphs.length > 0 && (
-              <section className="space-y-2.5">
-                <h2 className="text-base font-semibold text-foreground">
-                  Thông tin &amp; Quyền lợi
+          {/* 3. Non-Repeating Structured Details (Left Column Bottom) */}
+          <div className="lg:col-start-1 lg:col-span-7 lg:row-start-2 space-y-6 pt-2">
+            {(cleanHighlights.length > 0 || normalizedInstructions.length > 0) && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-border">
+                {cleanHighlights.length > 0 && (
+                  <section className="space-y-2.5">
+                    <h2 className="text-sm font-semibold text-foreground uppercase tracking-wide">
+                      Điểm nổi bật
+                    </h2>
+                    <ul className="space-y-2 text-sm text-muted-foreground leading-relaxed">
+                      {cleanHighlights.map((item, idx) => (
+                        <li key={idx} className="flex items-start gap-2">
+                          <span className="size-1.5 rounded-full bg-primary mt-2 shrink-0" />
+                          <span>{renderFormattedText(item)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                )}
+
+                {normalizedInstructions.length > 0 && (
+                  <section className="space-y-2.5">
+                    <h2 className="text-sm font-semibold text-foreground uppercase tracking-wide">
+                      Hướng dẫn kích hoạt
+                    </h2>
+                    <div className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">
+                      {normalizedInstructions}
+                    </div>
+                  </section>
+                )}
+              </div>
+            )}
+
+            {remainingDescParagraphs.length > 0 && (
+              <section className="pt-5 border-t border-border space-y-2.5">
+                <h2 className="text-sm font-semibold text-foreground uppercase tracking-wide">
+                  Thông tin chi tiết
                 </h2>
                 <div className="space-y-2 text-sm text-muted-foreground leading-relaxed">
-                  {descParagraphs.map((para, i) => (
+                  {remainingDescParagraphs.map((para, i) => (
                     <p key={i}>{renderFormattedText(para)}</p>
                   ))}
                 </div>
               </section>
             )}
 
-            {product.serviceInstructions && (
+            {showSeparateNotice && (
               <section className="pt-5 border-t border-border space-y-2.5">
-                <h2 className="text-base font-semibold text-foreground">
-                  Hướng dẫn sử dụng / kích hoạt
+                <h2 className="text-sm font-semibold text-amber-300 uppercase tracking-wide flex items-center gap-1.5">
+                  <AlertCircle className="size-4 text-amber-400" />
+                  <span>Lưu ý quan trọng</span>
                 </h2>
-                <div className="p-4 rounded-xl border border-border bg-background text-sm text-muted-foreground leading-relaxed whitespace-pre-line">
-                  {product.serviceInstructions}
-                </div>
-              </section>
-            )}
-
-            {product.noticeNotes && (
-              <section className="pt-5 border-t border-border space-y-2.5">
-                <h2 className="text-base font-semibold text-foreground">
-                  Lưu ý quan trọng
-                </h2>
-                <div className="p-4 rounded-xl border border-amber-500/25 bg-amber-500/5 text-sm text-amber-200/90 leading-relaxed whitespace-pre-line">
-                  {product.noticeNotes}
+                <div className="text-sm text-amber-200/90 leading-relaxed whitespace-pre-line">
+                  {normalizedNotice}
                 </div>
               </section>
             )}
 
             <section className="pt-5 border-t border-border space-y-2.5">
-              <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
+              <h2 className="text-sm font-semibold text-foreground uppercase tracking-wide flex items-center gap-1.5">
                 <ShieldCheck className="size-4 text-primary" />
                 <span>Chính sách bảo hành</span>
               </h2>
-              {product.warrantyTerms && product.warrantyTerms.trim() ? (
+              {normalizedWarranty ? (
                 <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">
-                  {product.warrantyTerms}
+                  {normalizedWarranty}
                 </p>
               ) : (
                 <ul className="space-y-2 text-sm text-muted-foreground leading-relaxed">
                   <li className="flex items-start gap-2">
                     <span className="size-1.5 rounded-full bg-primary mt-2 shrink-0" />
-                    <span>Chính sách bảo hành áp dụng theo từng gói cụ thể đã ghi rõ trên tên và mô tả sản phẩm.</span>
+                    <span>Chính sách bảo hành áp dụng theo từng gói cụ thể đã ghi rõ trên sản phẩm.</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="size-1.5 rounded-full bg-primary mt-2 shrink-0" />

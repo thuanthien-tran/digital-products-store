@@ -753,9 +753,11 @@ export function AdminDashboardClient({
                 </div>
 
                 {/* Status Indicator */}
-                <div className="pt-3 mt-3 border-t border-border/40 flex items-center justify-between text-[10.5px]">
-                  <span className="uppercase text-[9.5px] font-bold text-muted-foreground font-mono">
-                    {p.provider}
+                <div className="pt-3 mt-3 border-t border-border/40 flex items-center justify-between gap-2 text-[11px]">
+                  <span className="text-[10.5px] text-muted-foreground font-mono truncate">
+                    {p.lastSyncedAt
+                      ? new Date(p.lastSyncedAt).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })
+                      : p.provider.toUpperCase()}
                   </span>
                   <span
                     className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
@@ -1026,8 +1028,8 @@ export function AdminDashboardClient({
         </div>
       </div>
 
-      {/* TRAFFIC & LOW STOCK ALERTS (GIỮ NGUYÊN TÍNH NĂNG CŨ) */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      {/* TRAFFIC & LOW STOCK ALERTS */}
+      <div className="grid gap-6 lg:grid-cols-2 items-start">
         {/* Visitor Stats */}
         <div className="rounded-2xl border border-border/80 bg-card/60 p-5 space-y-4 backdrop-blur shadow-sm">
           <div className="flex items-center justify-between">

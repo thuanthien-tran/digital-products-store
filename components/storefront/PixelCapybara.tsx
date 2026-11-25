@@ -921,7 +921,7 @@ export function PixelCapybara() {
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
         onKeyDown={onKeyDown}
-        className="relative w-full h-[118px] sm:h-[144px] lg:h-[188px] cursor-pointer flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl"
+        className="relative w-full h-[120px] sm:h-[136px] lg:h-[168px] cursor-pointer flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl"
         aria-label="Capybara pixel ngâm hồ nước thư giãn. Chạm vào để tương tác."
       >
         <canvas

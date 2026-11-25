@@ -182,13 +182,29 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
     variants.some((v) => Boolean(v.tokenAmountB)) ||
     /buff/i.test(`${product.name} ${selectedVariant?.name || ""}`)
 
+  const isVariantOutOfStock = useCallback(
+    (v: PurchaseVariant): boolean => {
+      if (product.statusOverride === "out_of_stock") return true
+      if (v.isActive === false) return true
+      if (product.statusOverride === "in_stock" || product.deliveryType === "contact") return false
+      const isBuffVariant = isBuffProduct || Boolean(v.tokenAmountB) || /buff|\d+b/i.test(v.name)
+      if (isBuffVariant) return false
+      return getEffectiveStock(v) <= 0
+    },
+    [product.statusOverride, product.deliveryType, isBuffProduct, getEffectiveStock]
+  )
+
   // Buff Token Muse AI allows flexible quantity up to 5
   const isFixedPackage = isBuffProduct ? false : product.quantityMode === "fixed_package"
   const rawStock = selectedVariant ? getEffectiveStock(selectedVariant) : 0
   const effectiveStock = selectedVariant
-    ? (isBuffProduct ? Math.max(rawStock, 999) : rawStock)
+    ? product.statusOverride === "out_of_stock"
+      ? 0
+      : isBuffProduct
+      ? Math.max(rawStock, 999)
+      : rawStock
     : 0
-  const isOutOfStock = !selectedVariant || (isBuffProduct ? (selectedVariant.isActive === false) : effectiveStock <= 0)
+  const isOutOfStock = !selectedVariant || isVariantOutOfStock(selectedVariant)
 
   // Quantity limits: Buff Token Muse AI supports up to 5 per order
   const maxAllowedQuantity = isBuffProduct
@@ -332,25 +348,25 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
 
   // Handle keyboard navigation for radio group
   const handleKeyDown = (e: React.KeyboardEvent, currentIndex: number) => {
-    const availableVariants = variants.filter((v) => getEffectiveStock(v) > 0)
+    const availableVariants = variants.filter((v) => !isVariantOutOfStock(v))
     if (availableVariants.length === 0) return
 
     let nextIndex = -1
     if (e.key === "ArrowDown" || e.key === "ArrowRight") {
       e.preventDefault()
       nextIndex = (currentIndex + 1) % variants.length
-      while (getEffectiveStock(variants[nextIndex]) === 0 && nextIndex !== currentIndex) {
+      while (isVariantOutOfStock(variants[nextIndex]) && nextIndex !== currentIndex) {
         nextIndex = (nextIndex + 1) % variants.length
       }
     } else if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
       e.preventDefault()
       nextIndex = (currentIndex - 1 + variants.length) % variants.length
-      while (getEffectiveStock(variants[nextIndex]) === 0 && nextIndex !== currentIndex) {
+      while (isVariantOutOfStock(variants[nextIndex]) && nextIndex !== currentIndex) {
         nextIndex = (nextIndex - 1 + variants.length) % variants.length
       }
     }
 
-    if (nextIndex >= 0 && variants[nextIndex] && getEffectiveStock(variants[nextIndex]) > 0) {
+    if (nextIndex >= 0 && variants[nextIndex] && !isVariantOutOfStock(variants[nextIndex])) {
       const nextVariant = variants[nextIndex]
       setSelectedVariantId(nextVariant.id)
       setQuantity(1)
@@ -360,7 +376,7 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
 
   const handleSelectVariant = (id: string) => {
     const v = variants.find((item) => item.id === id)
-    if (!v || getEffectiveStock(v) <= 0) return
+    if (!v || isVariantOutOfStock(v)) return
     setSelectedVariantId(id)
     setQuantity(1)
     setSubmitError(null)
@@ -526,8 +542,7 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
             {variants.map((v, idx) => {
               const isSelected = selectedVariantId === v.id
               const vStock = getEffectiveStock(v)
-              const isBuffVariant = isBuffProduct || Boolean(v.tokenAmountB) || /buff|\d+b/i.test(v.name)
-              const outOfStock = isBuffVariant ? (v.isActive === false) : vStock <= 0
+              const outOfStock = isVariantOutOfStock(v)
               const durationTag = detectDurationTag(v.name)
               const conditionBadge = detectVariantBadge(v.name)
               const hasDiscount = Boolean(v.compareAtPriceCents && v.compareAtPriceCents > v.priceCents)
@@ -555,7 +570,7 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
                       handleKeyDown(e, idx)
                     }
                   }}
-                  className={`group relative flex flex-col sm:flex-row sm:items-center justify-between p-3.5 sm:p-4 rounded-xl border text-left transition-all select-none outline-none ${
+                  className={`group relative flex flex-col sm:flex-row sm:items-center justify-between p-3.5 sm:p-4 rounded-xl border text-left transition-ui select-none outline-none ${
                     outOfStock
                       ? "opacity-40 cursor-not-allowed bg-secondary/10 border-border/40"
                       : isSelected
@@ -950,7 +965,10 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
 
           <div className="pt-2.5 border-t border-border flex items-center justify-between">
             <span className="text-sm font-semibold text-foreground">Tổng thanh toán:</span>
-            <span className="text-2xl font-bold text-foreground tracking-tight tabular-nums">
+            <span
+              key={finalPrice}
+              className="text-2xl font-bold text-foreground tracking-tight tabular-nums animate-price-flash"
+            >
               {formatPrice(finalPrice)}
             </span>
           </div>
@@ -1011,7 +1029,7 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
               )}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="w-full h-12 rounded-xl text-sm font-bold bg-sky-500 hover:bg-sky-400 active:bg-sky-600 text-white shadow-md shadow-sky-500/20 transition-all duration-150 flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full h-12 rounded-xl text-sm font-bold bg-sky-500 hover:bg-sky-400 active:bg-sky-600 text-white shadow-md shadow-sky-500/20 transition-btn flex items-center justify-center gap-2 cursor-pointer"
             >
               <MessageCircle className="size-5" />
               <span>Liên hệ Zalo để đặt hàng ngay</span>
@@ -1025,7 +1043,7 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
             <button
               type="submit"
               disabled={loading || isOutOfStock}
-              className="w-full h-12 rounded-xl text-sm font-bold bg-caramel hover:bg-caramel-light active:bg-[#D9955C] text-espresso shadow-sm transition-all duration-150 flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel-light focus-visible:ring-offset-2 focus-visible:ring-offset-background cursor-pointer"
+              className="w-full h-12 rounded-xl text-sm font-bold bg-caramel hover:bg-caramel-light active:bg-[#D9955C] text-espresso shadow-sm transition-btn flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel-light focus-visible:ring-offset-2 focus-visible:ring-offset-background cursor-pointer"
             >
               {loading ? (
                 <>

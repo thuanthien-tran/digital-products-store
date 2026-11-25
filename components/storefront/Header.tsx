@@ -17,9 +17,21 @@ interface HeaderProps {
 
 export function Header({ initialSettings }: HeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [isScrolled, setIsScrolled] = useState(false)
   const pathname = usePathname()
   const menuButtonRef = useRef<HTMLButtonElement>(null)
   const drawerRef = useRef<HTMLDivElement>(null)
+
+  // Smooth scroll-aware glass elevation without changing header height
+  useEffect(() => {
+    const onScroll = () => {
+      const next = window.scrollY > 12
+      setIsScrolled((prev) => (prev === next ? prev : next))
+    }
+    onScroll()
+    window.addEventListener("scroll", onScroll, { passive: true })
+    return () => window.removeEventListener("scroll", onScroll)
+  }, [])
 
   const [settings, setSettings] = useState(
     () =>
@@ -147,7 +159,13 @@ export function Header({ initialSettings }: HeaderProps) {
   ]
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-border bg-background/95 backdrop-blur-md">
+    <header
+      className={`sticky top-0 z-40 w-full border-b transition-[background-color,border-color,box-shadow] duration-[210ms] ${
+        isScrolled
+          ? "border-border bg-background/88 backdrop-blur-md shadow-[0_8px_24px_-16px_rgba(0,0,0,0.75)]"
+          : "border-border/60 bg-background/95 backdrop-blur-xs"
+      }`}
+    >
       <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
         {/* Left: Logo */}
         <Link

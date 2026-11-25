@@ -17,7 +17,9 @@ import {
   RefreshCw,
   UploadCloud,
   Star,
-  FileSpreadsheet
+  FileSpreadsheet,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react"
 import { ProductCard } from "@/components/storefront/ProductCard"
 import { MUSE_BUFF_STANDARD_PACKAGES, calculateExpectedBuffCost } from "@/lib/buff-pricing"
@@ -178,6 +180,8 @@ export function ProductManagerClient({ groups }: Props) {
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [isDeletingBulk, setIsDeletingBulk] = useState(false)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState<string>("15")
 
   // Editor Modal State
   const [editingProduct, setEditingProduct] = useState<ProductItem | null>(null)
@@ -801,14 +805,22 @@ export function ProductManagerClient({ groups }: Props) {
     }
   }
 
-  const isAllSelected = products.length > 0 && products.every((p) => selectedIds.includes(p.id))
-  const isSomeSelected = products.some((p) => selectedIds.includes(p.id)) && !isAllSelected
+  const numericPageSize = pageSize === "all" ? Math.max(products.length, 1) : parseInt(pageSize, 10) || 15
+  const totalPages = pageSize === "all" ? 1 : Math.max(1, Math.ceil(products.length / numericPageSize))
+  const safePage = Math.min(page, totalPages)
+  const paginatedProducts =
+    pageSize === "all"
+      ? products
+      : products.slice((safePage - 1) * numericPageSize, safePage * numericPageSize)
+
+  const isAllSelected = paginatedProducts.length > 0 && paginatedProducts.every((p) => selectedIds.includes(p.id))
+  const isSomeSelected = paginatedProducts.some((p) => selectedIds.includes(p.id)) && !isAllSelected
 
   const handleToggleSelectAll = () => {
     if (isAllSelected) {
       setSelectedIds([])
     } else {
-      setSelectedIds(products.map((p) => p.id))
+      setSelectedIds(paginatedProducts.map((p) => p.id))
     }
   }
 
@@ -959,7 +971,11 @@ export function ProductManagerClient({ groups }: Props) {
           {/* Status Tabs */}
           <div className="flex items-center gap-1.5 p-1 rounded-xl bg-secondary/50 border border-border w-fit text-xs">
             <button
-              onClick={() => setActiveTab("published")}
+              onClick={() => {
+                setActiveTab("published")
+                setPage(1)
+                setSelectedIds([])
+              }}
               className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
                 activeTab === "published"
                   ? "bg-primary text-primary-foreground shadow-sm font-semibold"
@@ -969,7 +985,11 @@ export function ProductManagerClient({ groups }: Props) {
               Đang bán ({counts.published})
             </button>
             <button
-              onClick={() => setActiveTab("draft")}
+              onClick={() => {
+                setActiveTab("draft")
+                setPage(1)
+                setSelectedIds([])
+              }}
               className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
                 activeTab === "draft"
                   ? "bg-primary text-primary-foreground shadow-sm font-semibold"
@@ -979,7 +999,11 @@ export function ProductManagerClient({ groups }: Props) {
               Bản nháp ({counts.draft})
             </button>
             <button
-              onClick={() => setActiveTab("hidden")}
+              onClick={() => {
+                setActiveTab("hidden")
+                setPage(1)
+                setSelectedIds([])
+              }}
               className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
                 activeTab === "hidden"
                   ? "bg-primary text-primary-foreground shadow-sm font-semibold"
@@ -989,7 +1013,11 @@ export function ProductManagerClient({ groups }: Props) {
               Tạm ẩn ({counts.hidden})
             </button>
             <button
-              onClick={() => setActiveTab("customized")}
+              onClick={() => {
+                setActiveTab("customized")
+                setPage(1)
+                setSelectedIds([])
+              }}
               className={`px-3 py-1.5 rounded-lg font-medium transition-colors flex items-center gap-1.5 ${
                 activeTab === "customized"
                   ? "bg-purple-600 text-white shadow-sm font-semibold"
@@ -1001,7 +1029,11 @@ export function ProductManagerClient({ groups }: Props) {
               <span>Đã chỉnh sửa ({counts.customized || 0})</span>
             </button>
             <button
-              onClick={() => setActiveTab("all")}
+              onClick={() => {
+                setActiveTab("all")
+                setPage(1)
+                setSelectedIds([])
+              }}
               className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
                 activeTab === "all"
                   ? "bg-primary text-primary-foreground shadow-sm font-semibold"
@@ -1019,6 +1051,8 @@ export function ProductManagerClient({ groups }: Props) {
               onClick={() => {
                 const nextVal = featuredFilter === "featured" ? "all" : "featured"
                 setFeaturedFilter(nextVal)
+                setPage(1)
+                setSelectedIds([])
                 if (nextVal === "featured" && activeTab !== "published" && activeTab !== "all") {
                   setActiveTab("published")
                 }
@@ -1043,20 +1077,23 @@ export function ProductManagerClient({ groups }: Props) {
               title="Số sản phẩm nổi bật đang hiển thị trên trang chủ (tối đa 6)"
             >
               <Star className="size-3 text-caramel fill-caramel" />
-              <span>Đã chọn <strong>{counts.featured}/6</strong></span>
+              <span>Nổi bật: <strong>{counts.featured}/6</strong></span>
             </span>
           </div>
         </div>
 
         {/* Right Search & Add manual */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5">
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
             <input
               type="text"
               placeholder="Tìm sản phẩm..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => {
+                setSearch(e.target.value)
+                setPage(1)
+              }}
               className="pl-8 pr-3 py-1.5 rounded-lg border border-border bg-card text-xs focus:outline-none focus:ring-1 focus:ring-primary w-48 sm:w-64"
             />
           </div>
@@ -1128,10 +1165,10 @@ export function ProductManagerClient({ groups }: Props) {
       )}
 
       {/* Products Table */}
-      <div className="rounded-xl border border-border bg-card overflow-hidden">
-        <div className="overflow-x-auto">
+      <div className="rounded-xl border border-border bg-card overflow-hidden shadow-sm">
+        <div className="overflow-auto max-h-[62vh]">
           <table className="w-full text-xs text-left min-w-[1080px]">
-            <thead className="bg-secondary/40 text-muted-foreground border-b border-border uppercase font-semibold text-[10px] tracking-wider">
+            <thead className="sticky top-0 z-10 bg-secondary/95 backdrop-blur-sm text-muted-foreground border-b border-border uppercase font-semibold text-[10px] tracking-wider shadow-xs">
               <tr>
                 <th className="py-3 px-3 w-10 text-center">
                   <input
@@ -1157,8 +1194,8 @@ export function ProductManagerClient({ groups }: Props) {
                 </th>
                 <th className="py-3 px-4 min-w-[260px]">Sản phẩm</th>
                 <th className="py-3 px-4 whitespace-nowrap">Danh mục</th>
-                <th className="py-3 px-4 whitespace-nowrap">Giá đại lý</th>
-                <th className="py-3 px-4 whitespace-nowrap">Giá bán</th>
+                <th className="py-3 px-4 text-right whitespace-nowrap">Giá đại lý</th>
+                <th className="py-3 px-4 text-right whitespace-nowrap">Giá bán</th>
                 <th className="py-3 px-4 text-center whitespace-nowrap">Tồn kho</th>
                 <th className="py-3 px-4 text-center whitespace-nowrap">Trạng thái</th>
                 <th className="py-3 px-4 text-right whitespace-nowrap min-w-[170px]">Thao tác</th>
@@ -1171,14 +1208,14 @@ export function ProductManagerClient({ groups }: Props) {
                     Đang tải danh sách sản phẩm...
                   </td>
                 </tr>
-              ) : products.length === 0 ? (
+              ) : paginatedProducts.length === 0 ? (
                 <tr>
                   <td colSpan={10} className="py-12 text-center text-muted-foreground">
                     Không có sản phẩm nào trong mục này.
                   </td>
                 </tr>
               ) : (
-                products.map((p) => {
+                paginatedProducts.map((p) => {
                   const mainVariant = p.variants[0]
                   const totalStock = p.variants.reduce((sum, v) => sum + v.stock, 0)
                   const hasDraft = p.hasPendingChanges
@@ -1189,12 +1226,10 @@ export function ProductManagerClient({ groups }: Props) {
                       key={p.id}
                       className={`transition-colors ${
                         p.hasChangeAlert
-                          ? "bg-amber-500/5 hover:bg-amber-500/10 border-l-2 border-l-amber-500"
+                          ? "hover:bg-secondary/30 border-l-2 border-l-amber-400"
                           : isSelected
-                          ? "bg-primary/5 hover:bg-primary/10"
-                          : p.isCustomized
-                          ? "bg-purple-500/[0.04] hover:bg-purple-500/[0.08] border-l-2 border-l-purple-500/70"
-                          : "hover:bg-secondary/20"
+                          ? "bg-primary/[0.06] hover:bg-primary/10"
+                          : "hover:bg-secondary/30"
                       }`}
                     >
                       {/* Checkbox */}
@@ -1346,7 +1381,7 @@ export function ProductManagerClient({ groups }: Props) {
                       </td>
 
                       {/* Provider Wholesale Price (Giá đại lý) */}
-                      <td className="py-3 px-4 tabular-nums whitespace-nowrap">
+                      <td className="py-3 px-4 text-right tabular-nums whitespace-nowrap">
                         {p.variants.length > 1 ? (
                           <div>
                             {(() => {
@@ -1378,7 +1413,7 @@ export function ProductManagerClient({ groups }: Props) {
                       </td>
 
                       {/* Price */}
-                      <td className="py-3 px-4 tabular-nums whitespace-nowrap">
+                      <td className="py-3 px-4 text-right tabular-nums whitespace-nowrap">
                         {p.variants.length > 1 ? (
                           <div>
                             {(() => {
@@ -1499,6 +1534,74 @@ export function ProductManagerClient({ groups }: Props) {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Pagination & Page-size Footer */}
+        <div className="px-4 py-3 border-t border-border bg-secondary/20 flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2 tabular-nums">
+            <span>
+              {products.length === 0
+                ? "Không có sản phẩm nào"
+                : pageSize === "all"
+                ? `Hiển thị tất cả ${products.length} sản phẩm`
+                : `Hiển thị ${(safePage - 1) * numericPageSize + 1}–${Math.min(
+                    safePage * numericPageSize,
+                    products.length
+                  )} / ${products.length} sản phẩm`}
+            </span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="flex items-center gap-1.5">
+              <span>Mỗi trang:</span>
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(e.target.value)
+                  setPage(1)
+                  setSelectedIds([])
+                }}
+                className="px-2 py-1 rounded-lg border border-border bg-card text-foreground text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+              >
+                <option value="15">15</option>
+                <option value="30">30</option>
+                <option value="50">50</option>
+                <option value="all">Tất cả</option>
+              </select>
+            </label>
+
+            {pageSize !== "all" && totalPages > 1 && (
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  disabled={safePage <= 1 || loading}
+                  onClick={() => {
+                    setPage((p) => Math.max(1, p - 1))
+                    setSelectedIds([])
+                  }}
+                  className="p-1.5 rounded-lg border border-border bg-card hover:bg-secondary text-foreground disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  title="Trang trước"
+                >
+                  <ChevronLeft className="size-3.5" />
+                </button>
+                <span className="px-2 font-medium text-foreground tabular-nums">
+                  Trang {safePage} / {totalPages}
+                </span>
+                <button
+                  type="button"
+                  disabled={safePage >= totalPages || loading}
+                  onClick={() => {
+                    setPage((p) => Math.min(totalPages, p + 1))
+                    setSelectedIds([])
+                  }}
+                  className="p-1.5 rounded-lg border border-border bg-card hover:bg-secondary text-foreground disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  title="Trang sau"
+                >
+                  <ChevronRight className="size-3.5" />
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

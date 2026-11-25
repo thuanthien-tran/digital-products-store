@@ -317,7 +317,7 @@ export function SettingsClient({ initialData }: { initialData: InitialSettings }
   }
 
   return (
-    <div className="space-y-8">
+    <div className={`space-y-8 ${isDirty ? "pb-20" : ""}`}>
       {/* Page Header */}
       <div>
         <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
@@ -984,6 +984,43 @@ export function SettingsClient({ initialData }: { initialData: InitialSettings }
           </div>
         </div>
       </div>
+
+      {/* Sticky SaveBar when there are unsaved changes */}
+      {isDirty && (
+        <div
+          role="region"
+          aria-label="Thanh lưu thay đổi cài đặt"
+          className="sticky bottom-4 z-30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 rounded-xl border border-caramel/40 bg-card/95 backdrop-blur-md shadow-xl"
+        >
+          <div className="flex items-center gap-2.5 text-xs">
+            <span className="size-2 rounded-full bg-caramel animate-pulse shrink-0" />
+            <span className="font-semibold text-foreground">Bạn có thay đổi chưa lưu</span>
+            {nameError && (
+              <span className="text-destructive font-medium">· {nameError}</span>
+            )}
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={handleReset}
+              disabled={isSaving}
+              className="px-3 py-1.5 rounded-lg border border-border bg-secondary/50 hover:bg-secondary text-xs font-semibold text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 transition-colors disabled:opacity-50"
+            >
+              <RotateCcw className="size-3.5" />
+              <span>Hoàn tác</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={!canSave}
+              className="px-4 py-1.5 rounded-lg bg-caramel text-espresso hover:opacity-90 text-xs font-bold inline-flex items-center gap-1.5 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isSaving ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
+              <span>{isSaving ? "Đang lưu..." : "Lưu cài đặt"}</span>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

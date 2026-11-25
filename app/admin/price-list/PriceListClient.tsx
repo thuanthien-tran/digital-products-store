@@ -13,6 +13,7 @@ import {
   Sparkles, 
   FileText, 
   ChevronRight, 
+  ChevronDown,
   Palette, 
   Sliders, 
   Layers, 
@@ -87,8 +88,18 @@ export function PriceListClient() {
   const [isSavingPublish, setIsSavingPublish] = useState(false)
   const [copiedCtvLink, setCopiedCtvLink] = useState(false)
 
-  // Search filter inside editor
+  // Search filter & collapsible groups inside editor
   const [editorSearch, setEditorSearch] = useState("")
+  const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(new Set())
+
+  const toggleGroupCollapse = (groupId: string) => {
+    setCollapsedGroupIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(groupId)) next.delete(groupId)
+      else next.add(groupId)
+      return next
+    })
+  }
 
   // Linking Modal State
   const [linkingTarget, setLinkingTarget] = useState<{ groupId: string; itemId: string; currentName: string } | null>(null)
@@ -649,76 +660,87 @@ export function PriceListClient() {
           </div>
         </div>
 
-        {/* Global Action Buttons */}
+        {/* Global Action Buttons — Grouped by Lưu | Dữ liệu | Xuất menu */}
         <div className="flex flex-wrap items-center gap-2">
-          {/* Save & Publish to KTV Live Page */}
-          <button
-            type="button"
-            onClick={handleSaveAndPublishCtv}
-            disabled={isSavingPublish}
-            className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm disabled:opacity-50"
-            title="Lưu cấu hình menu hiện tại lên trang xem của KTV (/ktv)"
-          >
-            {isSavingPublish ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
-            <span>{isSavingPublish ? "Đang lưu..." : "Lưu menu"}</span>
-          </button>
+          {/* Group 1: Save */}
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={handleSaveAndPublishCtv}
+              disabled={isSavingPublish}
+              className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm disabled:opacity-50"
+              title="Lưu cấu hình menu hiện tại lên trang xem của KTV (/ktv)"
+            >
+              {isSavingPublish ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
+              <span>{isSavingPublish ? "Đang lưu..." : "Lưu menu"}</span>
+            </button>
+          </div>
 
-          {/* Sync Prices from Web */}
-          <button
-            type="button"
-            onClick={handleSyncLinkedPrices}
-            disabled={isSyncingPrices}
-            className="px-3 py-1.5 rounded-lg border border-primary/40 bg-primary/10 hover:bg-primary/20 text-xs font-semibold text-primary flex items-center gap-1.5 transition-all shadow-sm disabled:opacity-50"
-            title="Đồng bộ ngay giá bán và tồn kho từ website cho các sản phẩm đã ghim (vẫn giữ nguyên 100% tên bạn tự đặt)"
-          >
-            <RefreshCw className={`size-3.5 ${isSyncingPrices ? "animate-spin" : ""}`} />
-            <span>{isSyncingPrices ? "Đang đồng bộ..." : "Đồng bộ giá & kho"}</span>
-          </button>
+          <span className="h-5 w-px bg-border/80 hidden sm:block" aria-hidden="true" />
 
-          <button
-            type="button"
-            onClick={() => {
-              if (confirm("Bạn có chắc chắn muốn nạp lại dữ liệu gốc từ website? Toàn bộ tùy chỉnh tên sẽ được khôi phục theo mặc định.")) {
-                void loadData(true)
-              }
-            }}
-            className="px-3 py-1.5 rounded-lg border border-border bg-card hover:bg-secondary text-xs font-semibold text-muted-foreground hover:text-foreground flex items-center gap-1.5 transition-all shadow-sm"
-            title="Khôi phục lại toàn bộ sản phẩm và tên mặc định từ website"
-          >
-            <RotateCcw className="size-3.5" />
-            <span>Khôi phục gốc</span>
-          </button>
+          {/* Group 2: Data Sync & Reset */}
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={handleSyncLinkedPrices}
+              disabled={isSyncingPrices}
+              className="px-3 py-1.5 rounded-lg border border-primary/40 bg-primary/10 hover:bg-primary/20 text-xs font-semibold text-primary flex items-center gap-1.5 transition-all shadow-sm disabled:opacity-50"
+              title="Đồng bộ ngay giá bán và tồn kho từ website cho các sản phẩm đã ghim (vẫn giữ nguyên 100% tên bạn tự đặt)"
+            >
+              <RefreshCw className={`size-3.5 ${isSyncingPrices ? "animate-spin" : ""}`} />
+              <span>{isSyncingPrices ? "Đang đồng bộ..." : "Đồng bộ giá & kho"}</span>
+            </button>
 
-          <button
-            type="button"
-            onClick={handleCopyChatText}
-            className="px-3 py-1.5 rounded-lg border border-border bg-card hover:bg-secondary text-xs font-semibold text-foreground flex items-center gap-1.5 transition-all shadow-sm"
-            title="Sao chép toàn bộ bảng giá dạng văn bản đẹp để gửi tin nhắn Zalo/Telegram"
-          >
-            {copiedText ? <Check className="size-3.5 text-emerald-400" /> : <FileText className="size-3.5 text-primary" />}
-            <span>{copiedText ? "Đã copy text!" : "Copy Text"}</span>
-          </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (confirm("Bạn có chắc chắn muốn nạp lại dữ liệu gốc từ website? Toàn bộ tùy chỉnh tên sẽ được khôi phục theo mặc định.")) {
+                  void loadData(true)
+                }
+              }}
+              className="px-3 py-1.5 rounded-lg border border-border bg-card hover:bg-secondary text-xs font-semibold text-muted-foreground hover:text-foreground flex items-center gap-1.5 transition-all shadow-sm"
+              title="Khôi phục lại toàn bộ sản phẩm và tên mặc định từ website"
+            >
+              <RotateCcw className="size-3.5" />
+              <span>Khôi phục gốc</span>
+            </button>
+          </div>
 
-          <button
-            type="button"
-            onClick={handleCopyImage}
-            className="px-3 py-1.5 rounded-lg border border-caramel/40 bg-caramel/10 hover:bg-caramel/20 text-xs font-semibold text-caramel flex items-center gap-1.5 transition-all shadow-sm"
-            title="Sao chép ảnh trực tiếp vào Clipboard (nhấn Ctrl+V để dán vào Zalo/Telegram)"
-          >
-            {copiedImage ? <Check className="size-3.5 text-emerald-400" /> : <Copy className="size-3.5" />}
-            <span>{copiedImage ? "Đã copy ảnh!" : "Copy Ảnh"}</span>
-          </button>
+          <span className="h-5 w-px bg-border/80 hidden sm:block" aria-hidden="true" />
 
-          <button
-            type="button"
-            onClick={handleDownloadPng}
-            disabled={isDownloading}
-            className="px-3.5 py-1.5 rounded-lg bg-caramel text-espresso hover:opacity-90 active:scale-95 text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm disabled:opacity-50"
-            title="Xuất file ảnh PNG độ nét cao (2.5x)"
-          >
-            {isDownloading ? <Loader2 className="size-3.5 animate-spin" /> : <Download className="size-3.5" />}
-            <span>{isDownloading ? "Đang xuất..." : "Tải ảnh PNG"}</span>
-          </button>
+          {/* Group 3: Export Menu */}
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={handleCopyChatText}
+              className="px-3 py-1.5 rounded-lg border border-border bg-card hover:bg-secondary text-xs font-semibold text-foreground flex items-center gap-1.5 transition-all shadow-sm"
+              title="Sao chép toàn bộ bảng giá dạng văn bản đẹp để gửi tin nhắn Zalo/Telegram"
+            >
+              {copiedText ? <Check className="size-3.5 text-emerald-400" /> : <FileText className="size-3.5 text-primary" />}
+              <span>{copiedText ? "Đã copy text!" : "Copy Text"}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleCopyImage}
+              className="px-3 py-1.5 rounded-lg border border-caramel/40 bg-caramel/10 hover:bg-caramel/20 text-xs font-semibold text-caramel flex items-center gap-1.5 transition-all shadow-sm"
+              title="Sao chép ảnh trực tiếp vào Clipboard (nhấn Ctrl+V để dán vào Zalo/Telegram)"
+            >
+              {copiedImage ? <Check className="size-3.5 text-emerald-400" /> : <Copy className="size-3.5" />}
+              <span>{copiedImage ? "Đã copy ảnh!" : "Copy Ảnh"}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleDownloadPng}
+              disabled={isDownloading}
+              className="px-3.5 py-1.5 rounded-lg bg-caramel text-espresso hover:opacity-90 active:scale-95 text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm disabled:opacity-50"
+              title="Xuất file ảnh PNG độ nét cao (2.5x)"
+            >
+              {isDownloading ? <Loader2 className="size-3.5 animate-spin" /> : <Download className="size-3.5" />}
+              <span>{isDownloading ? "Đang xuất..." : "Tải ảnh PNG"}</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -824,6 +846,7 @@ export function PriceListClient() {
                     )
 
                     if (editorSearch && filteredItems.length === 0) return null
+                    const isCollapsed = !editorSearch && collapsedGroupIds.has(group.id)
 
                     return (
                       <div
@@ -835,13 +858,30 @@ export function PriceListClient() {
                         }`}
                       >
                         {/* Group Header */}
-                        <div className="flex items-center justify-between p-3 border-b border-border/50 bg-secondary/30 rounded-t-xl">
-                          <div className="flex items-center gap-2.5">
+                        <div
+                          className={`flex items-center justify-between p-3 bg-secondary/30 ${
+                            isCollapsed ? "rounded-xl" : "border-b border-border/50 rounded-t-xl"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <button
+                              type="button"
+                              onClick={() => toggleGroupCollapse(group.id)}
+                              className="p-0.5 rounded text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors shrink-0"
+                              aria-label={isCollapsed ? `Mở rộng nhóm ${group.name}` : `Thu gọn nhóm ${group.name}`}
+                              title={isCollapsed ? "Mở rộng nhóm" : "Thu gọn nhóm"}
+                            >
+                              {isCollapsed ? (
+                                <ChevronRight className="size-4" />
+                              ) : (
+                                <ChevronDown className="size-4" />
+                              )}
+                            </button>
                             <input
                               type="checkbox"
                               checked={group.isEnabled}
                               onChange={() => handleToggleGroup(group.id)}
-                              className="size-4 rounded border-border bg-card text-caramel focus:ring-1 focus:ring-caramel cursor-pointer accent-caramel"
+                              className="size-4 rounded border-border bg-card text-caramel focus:ring-1 focus:ring-caramel cursor-pointer accent-caramel shrink-0"
                               title="Bật/Tắt hiển thị cả nhóm này trên bảng giá"
                             />
                             <input
@@ -853,14 +893,14 @@ export function PriceListClient() {
                                   prev.map((g) => (g.id === group.id ? { ...g, name: val } : g))
                                 )
                               }}
-                              className="font-bold text-xs uppercase bg-transparent text-foreground border-b border-transparent hover:border-border focus:border-primary focus:outline-none px-1 py-0.5"
+                              className="font-bold text-xs uppercase bg-transparent text-foreground border-b border-transparent hover:border-border focus:border-primary focus:outline-none px-1 py-0.5 min-w-0"
                             />
-                            <span className="text-[10px] text-muted-foreground">
+                            <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">
                               ({filteredItems.filter((i) => i.isEnabled).length}/{filteredItems.length})
                             </span>
                           </div>
 
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5 shrink-0">
                             <button
                               type="button"
                               onClick={() => handleAddItem(group.id)}
@@ -882,7 +922,19 @@ export function PriceListClient() {
                         </div>
 
                         {/* Items inside Group */}
+                        {!isCollapsed && (
                         <div className="p-2 space-y-2">
+                          {/* Column labels */}
+                          {filteredItems.length > 0 && (
+                            <div className="flex items-center gap-2 px-2.5 pt-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                              <span className="w-3.5 shrink-0" />
+                              <span className="flex-1 min-w-[130px]">Tên hiển thị</span>
+                              <span className="w-24 hidden sm:block shrink-0">Ghi chú</span>
+                              <span className="w-24 text-right shrink-0">Giá bán</span>
+                              {showStock && <span className="w-14 text-center shrink-0">Kho</span>}
+                              <span className="w-5 shrink-0" />
+                            </div>
+                          )}
                           {filteredItems.map((item) => (
                             <div
                               key={item.id}
@@ -1060,6 +1112,7 @@ export function PriceListClient() {
                             </div>
                           ))}
                         </div>
+                        )}
                       </div>
                     )
                   })}

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { ChevronDown } from "lucide-react"
+import { Plus, Minus } from "lucide-react"
 
 export interface FaqItem {
   q: string
@@ -20,14 +20,14 @@ export function FaqAccordion({ items }: FaqAccordionProps) {
   }
 
   return (
-    <div className="w-full max-w-3xl mx-auto divide-y divide-border rounded-2xl border border-border bg-card overflow-hidden">
+    <div className="w-full border-t border-border divide-y divide-border">
       {items.map((item, idx) => {
         const isOpen = openIndex === idx
         const questionId = `faq-q-${idx}`
         const answerId = `faq-a-${idx}`
 
         return (
-          <div key={idx} className="transition-colors duration-150">
+          <div key={idx}>
             <h3>
               <button
                 type="button"
@@ -35,32 +35,43 @@ export function FaqAccordion({ items }: FaqAccordionProps) {
                 aria-expanded={isOpen}
                 aria-controls={answerId}
                 onClick={() => toggleItem(idx)}
-                className="w-full flex items-center justify-between gap-4 px-5 py-4 text-left text-foreground hover:bg-secondary/60 transition-btn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                className="group w-full flex items-center justify-between gap-6 py-5 text-left text-foreground hover:text-primary transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
               >
-                <span className="text-sm sm:text-[15px] font-semibold leading-snug">
+                <span className="text-[15px] sm:text-base font-semibold leading-snug">
                   {item.q}
                 </span>
 
-                <ChevronDown
-                  className={`size-4 shrink-0 text-muted-foreground transition-transform duration-200 ${
-                    isOpen ? "rotate-180 text-primary" : ""
+                <span
+                  className={`inline-flex size-7 items-center justify-center rounded-lg shrink-0 transition-colors duration-200 ${
+                    isOpen
+                      ? "text-primary bg-primary/10"
+                      : "text-muted-foreground group-hover:text-foreground group-hover:bg-secondary/70"
                   }`}
-                  strokeWidth={2}
                   aria-hidden="true"
-                />
+                >
+                  {isOpen ? (
+                    <Minus className="size-4" strokeWidth={2} />
+                  ) : (
+                    <Plus className="size-4" strokeWidth={2} />
+                  )}
+                </span>
               </button>
             </h3>
 
-            {isOpen && (
-              <div
-                id={answerId}
-                role="region"
-                aria-labelledby={questionId}
-                className="px-5 pb-4 pt-0 text-sm text-muted-foreground leading-relaxed animate-fade-in"
-              >
-                <p>{item.a}</p>
+            <div
+              id={answerId}
+              role="region"
+              aria-labelledby={questionId}
+              aria-hidden={!isOpen}
+              className="accordion-grid"
+              data-open={isOpen ? "true" : "false"}
+            >
+              <div className="accordion-grid-inner">
+                <div className="pb-5 pr-10 text-sm text-muted-foreground leading-relaxed">
+                  <p>{item.a}</p>
+                </div>
               </div>
-            )}
+            </div>
           </div>
         )
       })}

@@ -13,6 +13,7 @@ import {
   ChevronRight,
 } from "lucide-react"
 import { ProductCard, type ProductCardVariant } from "@/components/storefront/ProductCard"
+import { FeaturedBentoShowcase } from "@/components/storefront/FeaturedBentoShowcase"
 import { normalizeVietnamese } from "@/lib/utils"
 
 export type StorefrontVariant = ProductCardVariant
@@ -76,6 +77,8 @@ export function StorefrontCatalog({
   const [liveStockMap, setLiveStockMap] = useState<
     Record<string, { availableStock: number; isPurchasable: boolean }>
   >({})
+  const tabListRef = useRef<HTMLDivElement>(null)
+  const tabIndicatorRef = useRef<HTMLSpanElement>(null)
 
   useEffect(() => {
     setCatalogProducts(products)
@@ -200,7 +203,7 @@ export function StorefrontCatalog({
     }))
   }, [catalogProducts, liveStockMap])
 
-  // Featured Products ("Gói nổi bật" — manually curated by Admin)
+  // Featured Products ("Gói nổi bật" — strictly respects Admin's selection and sortOrder)
   const featuredProducts = useMemo(() => {
     return productsWithLiveStock
       .filter((p) => Boolean(p.isFeatured))
@@ -393,6 +396,33 @@ export function StorefrontCatalog({
   useEffect(() => {
     setCurrentPage(1)
   }, [selectedGroup, searchQuery, priceRange, sortBy])
+
+  // Smooth GPU sliding pill behind active category tab (zero layout shift)
+  useEffect(() => {
+    const listEl = tabListRef.current
+    const indicatorEl = tabIndicatorRef.current
+    if (!listEl || !indicatorEl) return
+
+    const updateIndicator = () => {
+      const activeBtn = listEl.querySelector<HTMLButtonElement>(
+        `[data-category-tab="${CSS.escape(selectedGroup)}"]`
+      )
+      if (!activeBtn) {
+        indicatorEl.style.opacity = "0"
+        return
+      }
+      indicatorEl.style.width = `${activeBtn.offsetWidth}px`
+      indicatorEl.style.transform = `translate3d(${activeBtn.offsetLeft}px, 0, 0)`
+      indicatorEl.style.opacity = "1"
+    }
+
+    const rafId = requestAnimationFrame(updateIndicator)
+    window.addEventListener("resize", updateIndicator, { passive: true })
+    return () => {
+      cancelAnimationFrame(rafId)
+      window.removeEventListener("resize", updateIndicator)
+    }
+  }, [selectedGroup, catalogGroups, productsWithLiveStock.length])
 
   const totalPages = Math.ceil(filteredProducts.length / ITEMS_PER_PAGE) || 1
   const validPage = Math.min(Math.max(1, currentPage), totalPages)
@@ -630,91 +660,10 @@ export function StorefrontCatalog({
   const renderFeaturedSection = () => {
     if (!showFeatured || featuredProducts.length === 0 || hasActiveFilters) return null
     return (
-      <div className="space-y-4">
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div>
-            <h2 className="font-heading font-bold text-xl sm:text-2xl tracking-tight text-foreground">
-              Gói nổi bật
-            </h2>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              Các gói được chọn lọc hiển thị trên trang chủ.
-            </p>
-          </div>
-          <a
-            href="#catalog-heading"
-            onClick={handleScrollToCatalog}
-            className="text-sm font-medium text-primary hover:text-caramel-light transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
-          >
-            Xem tất cả →
-          </a>
-        </div>
-
-        <div
-          ref={featuredCarouselRef}
-          role="region"
-          aria-label="Danh sách gói nổi bật"
-          tabIndex={0}
-          className="flex sm:grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 overflow-x-auto sm:overflow-visible pb-1 sm:pb-0 snap-x snap-mandatory focus:outline-none focus:ring-2 focus:ring-ring rounded-2xl scrollbar-none items-stretch"
-        >
-          {featuredProducts.map((p, idx) => (
-            <div
-              key={`featured-${p.id}`}
-              data-featured-slide
-              data-slide-index={idx}
-              data-product-id={p.id}
-              className="w-full flex-none shrink-0 sm:w-auto sm:flex-initial snap-start snap-always sm:snap-align-none h-full flex flex-col min-w-0"
-            >
-              <ProductCard
-                id={p.id}
-                name={p.name}
-                slug={p.slug}
-                description={p.description}
-                images={p.images}
-                groupId={p.groupId}
-                groupName={p.groupName}
-                deliveryType={p.deliveryType}
-                statusOverride={p.statusOverride}
-                highlights={p.highlights}
-                warrantyTerms={p.warrantyTerms}
-                noticeNotes={p.noticeNotes}
-                variants={p.variants}
-                featured={true}
-              />
-            </div>
-          ))}
-        </div>
-
-        {featuredProducts.length > 1 && (
-          <div className="flex sm:hidden items-center justify-between pt-1">
-            <button
-              type="button"
-              onClick={() => featuredIndex > 0 && scrollFeaturedTo(featuredIndex - 1)}
-              disabled={featuredIndex === 0}
-              aria-label="Xem gói nổi bật trước"
-              className="inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded-xl border border-border bg-card text-foreground hover:bg-secondary disabled:opacity-35 transition-btn"
-            >
-              <ChevronLeft className="size-5" />
-            </button>
-
-            <span className="text-xs font-semibold text-muted-foreground tabular-nums">
-              {featuredIndex + 1} / {featuredProducts.length}
-            </span>
-
-            <button
-              type="button"
-              onClick={() =>
-                featuredIndex < featuredProducts.length - 1 &&
-                scrollFeaturedTo(featuredIndex + 1)
-              }
-              disabled={featuredIndex >= featuredProducts.length - 1}
-              aria-label="Xem gói nổi bật tiếp theo"
-              className="inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded-xl border border-border bg-card text-foreground hover:bg-secondary disabled:opacity-35 transition-btn"
-            >
-              <ChevronRight className="size-5" />
-            </button>
-          </div>
-        )}
-      </div>
+      <FeaturedBentoShowcase
+        products={featuredProducts}
+        onViewAllClick={handleScrollToCatalog}
+      />
     )
   }
 
@@ -877,7 +826,8 @@ export function StorefrontCatalog({
                   id={`${catalogId}-sidebar-sort`}
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as SortOptionKey)}
-                  className="w-full h-11 pl-3 pr-9 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-ring/30 appearance-none cursor-pointer"
+                  style={{ WebkitAppearance: "none", MozAppearance: "none" }}
+                  className="w-full h-10 pl-3 pr-9 rounded-xl bg-background border border-border text-foreground text-sm leading-normal focus:outline-none focus:border-primary focus:ring-2 focus:ring-ring/30 appearance-none bg-none cursor-pointer"
                 >
                   <option value="default">Mặc định</option>
                   <option value="price_asc">Giá: Thấp đến cao</option>
@@ -898,7 +848,7 @@ export function StorefrontCatalog({
                 id={`${catalogId}-search`}
                 type="search"
                 autoComplete="off"
-                placeholder="Tìm sản phẩm, gói dịch vụ (ví dụ: Canva, Claude, YouTube)…"
+                placeholder="Tìm phần mềm, AI, gói nâng cấp..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 aria-label="Tìm kiếm sản phẩm"
@@ -924,106 +874,120 @@ export function StorefrontCatalog({
       ) : (
         /* Home Editorial Flow: 1) Tìm kiếm & danh mục -> 2) Gói nổi bật -> 3) Danh sách sản phẩm */
         <div className="space-y-8">
-          <div className="rounded-2xl border border-border bg-card p-4 space-y-3.5">
-            <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
-              <div className="relative flex-1">
-                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
-                <input
-                  id={`${catalogId}-home-search`}
-                  type="search"
-                  autoComplete="off"
-                  placeholder="Tìm sản phẩm, gói dịch vụ (ví dụ: Canva, ChatGPT, YouTube)…"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  aria-label="Tìm kiếm sản phẩm"
-                  className="w-full h-11 pl-10 pr-10 rounded-xl bg-background border border-border text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:border-primary focus:ring-2 focus:ring-ring/30 transition-btn"
-                />
-                {searchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setSearchQuery("")}
-                    aria-label="Xóa từ khóa tìm kiếm"
-                    className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex size-8 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-btn"
-                  >
-                    <X className="size-4" />
-                  </button>
-                )}
-              </div>
-
-              <div className="grid grid-cols-2 md:flex items-center gap-2.5">
-                <div className="relative">
-                  <select
-                    value={priceRange}
-                    onChange={(e) => setPriceRange(e.target.value as PriceRangeKey)}
-                    aria-label="Lọc theo mức giá"
-                    className="w-full md:w-auto h-11 pl-3 pr-8 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-ring/30 appearance-none cursor-pointer"
-                  >
-                    <option value="all">Tất cả mức giá</option>
-                    <option value="under_50k">Dưới 50.000₫</option>
-                    <option value="50k_100k">50.000₫ – 100.000₫</option>
-                    <option value="100k_200k">100.000₫ – 200.000₫</option>
-                    <option value="above_200k">Trên 200.000₫</option>
-                  </select>
-                  <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
-                </div>
-
-                <div className="relative">
-                  <select
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value as SortOptionKey)}
-                    aria-label="Sắp xếp sản phẩm"
-                    className="w-full md:w-auto h-11 pl-3 pr-8 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-ring/30 appearance-none cursor-pointer"
-                  >
-                    <option value="default">Mặc định</option>
-                    <option value="price_asc">Giá: Thấp → Cao</option>
-                    <option value="price_desc">Giá: Cao → Thấp</option>
-                    <option value="name_asc">Tên: A – Z</option>
-                    <option value="name_desc">Tên: Z – A</option>
-                  </select>
-                  <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
-                </div>
-              </div>
+          <div className="space-y-3">
+            {/* Prominent Search Bar */}
+            <div className="relative w-full">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
+              <input
+                id={`${catalogId}-home-search`}
+                type="search"
+                autoComplete="off"
+                placeholder="Tìm phần mềm, AI, gói nâng cấp..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                aria-label="Tìm kiếm sản phẩm"
+                className="w-full h-11 pl-10 pr-10 rounded-xl bg-card border border-border text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:border-primary focus:ring-2 focus:ring-ring/30 transition-btn"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  aria-label="Xóa từ khóa tìm kiếm"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex size-8 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-btn"
+                >
+                  <X className="size-4" />
+                </button>
+              )}
             </div>
 
-            {/* Category Tabs */}
-            <div
-              role="tablist"
-              aria-label="Danh mục sản phẩm"
-              className="flex items-center gap-2 overflow-x-auto pb-0.5 no-scrollbar"
-            >
-              <button
-                type="button"
-                role="tab"
-                aria-selected={selectedGroup === "all"}
-                onClick={() => setSelectedGroup("all")}
-                className={`min-h-[38px] px-3.5 py-1.5 rounded-xl text-sm font-medium whitespace-nowrap border shrink-0 transition-btn ${
-                  selectedGroup === "all"
-                    ? "bg-primary text-primary-foreground border-primary font-semibold"
-                    : "bg-background text-muted-foreground hover:text-foreground hover:bg-secondary border-border"
-                }`}
-              >
-                Tất cả ({productsWithLiveStock.length})
-              </button>
+            {/* Category Tabs (left) + Price & Sort Controls (right) */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+              {/* Category Strip with smooth sliding active pill + subtle right fade on mobile */}
+              <div className="relative min-w-0 flex-1">
+                <div
+                  ref={tabListRef}
+                  role="tablist"
+                  aria-label="Danh mục sản phẩm"
+                  className="relative flex items-center gap-1.5 overflow-x-auto pb-0.5 pr-6 lg:pr-0 no-scrollbar"
+                >
+                  {/* Sliding Caramel Indicator Pill */}
+                  <span
+                    ref={tabIndicatorRef}
+                    aria-hidden="true"
+                    style={{ opacity: 0 }}
+                    className="pointer-events-none absolute left-0 top-0 h-[36px] rounded-full bg-primary transition-[transform,width,opacity] duration-[210ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
+                  />
 
-              {activeGroups.map((g) => {
-                const isSelected = selectedGroup === g.id
-                return (
                   <button
-                    key={g.id}
                     type="button"
                     role="tab"
-                    aria-selected={isSelected}
-                    onClick={() => setSelectedGroup(g.id)}
-                    className={`min-h-[38px] px-3.5 py-1.5 rounded-xl text-sm font-medium whitespace-nowrap border shrink-0 transition-btn ${
-                      isSelected
-                        ? "bg-primary text-primary-foreground border-primary font-semibold"
-                        : "bg-background text-muted-foreground hover:text-foreground hover:bg-secondary border-border"
+                    data-category-tab="all"
+                    aria-selected={selectedGroup === "all"}
+                    onClick={() => setSelectedGroup("all")}
+                    className={`relative z-10 min-h-[36px] px-3.5 py-1.5 rounded-full text-xs sm:text-sm font-medium whitespace-nowrap border shrink-0 transition-btn ${
+                      selectedGroup === "all"
+                        ? "text-primary-foreground border-transparent font-semibold"
+                        : "bg-card text-muted-foreground hover:text-foreground hover:bg-secondary border-border"
                     }`}
                   >
-                    {g.name} ({g.count})
+                    Tất cả ({productsWithLiveStock.length})
                   </button>
-                )
-              })}
+
+                  {activeGroups.map((g) => {
+                    const isSelected = selectedGroup === g.id
+                    return (
+                      <button
+                        key={g.id}
+                        type="button"
+                        role="tab"
+                        data-category-tab={g.id}
+                        aria-selected={isSelected}
+                        onClick={() => setSelectedGroup(g.id)}
+                        className={`relative z-10 min-h-[36px] px-3.5 py-1.5 rounded-full text-xs sm:text-sm font-medium whitespace-nowrap border shrink-0 transition-btn ${
+                          isSelected
+                            ? "text-primary-foreground border-transparent font-semibold"
+                            : "bg-card text-muted-foreground hover:text-foreground hover:bg-secondary border-border"
+                        }`}
+                      >
+                        {g.name} ({g.count})
+                      </button>
+                    )
+                  })}
+                </div>
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-background to-transparent lg:hidden"
+                />
+              </div>
+
+              {/* Clean Single-Arrow Price & Sort Controls */}
+              <div className="grid grid-cols-2 sm:flex items-center gap-2 shrink-0">
+                <select
+                  value={priceRange}
+                  onChange={(e) => setPriceRange(e.target.value as PriceRangeKey)}
+                  aria-label="Lọc theo mức giá"
+                  className="w-full sm:w-auto h-9 px-3 rounded-xl bg-card border border-border text-foreground text-xs sm:text-sm leading-normal focus:outline-none focus:border-primary focus:ring-2 focus:ring-ring/30 cursor-pointer"
+                >
+                  <option value="all">Giá: Tất cả</option>
+                  <option value="under_50k">Dưới 50.000₫</option>
+                  <option value="50k_100k">50.000₫ – 100.000₫</option>
+                  <option value="100k_200k">100.000₫ – 200.000₫</option>
+                  <option value="above_200k">Trên 200.000₫</option>
+                </select>
+
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as SortOptionKey)}
+                  aria-label="Sắp xếp sản phẩm"
+                  className="w-full sm:w-auto h-9 px-3 rounded-xl bg-card border border-border text-foreground text-xs sm:text-sm leading-normal focus:outline-none focus:border-primary focus:ring-2 focus:ring-ring/30 cursor-pointer"
+                >
+                  <option value="default">Sắp xếp: Mặc định</option>
+                  <option value="price_asc">Giá: Thấp → Cao</option>
+                  <option value="price_desc">Giá: Cao → Thấp</option>
+                  <option value="name_asc">Tên: A – Z</option>
+                  <option value="name_desc">Tên: Z – A</option>
+                </select>
+              </div>
             </div>
           </div>
 
