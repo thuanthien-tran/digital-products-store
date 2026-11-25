@@ -1,28 +1,49 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { formatPrice } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/hooks/use-toast"
-import { 
-  Search, 
-  ExternalLink, 
-  RefreshCw, 
-  Trash2, 
-  ShieldCheck, 
-  Clock, 
-  AlertCircle, 
-  FileText, 
-  Lock, 
-  X, 
+import {
+  Search,
+  ExternalLink,
+  RefreshCw,
+  Trash2,
+  ShieldCheck,
+  Clock,
+  AlertCircle,
+  FileText,
+  Lock,
+  X,
   CheckCircle2,
   Ticket,
   PlusCircle,
   Wallet,
-  Check
+  Check,
+  PackagePlus,
+  Calendar,
 } from "lucide-react"
+
+export interface StockImportItem {
+  id: string
+  importDate: string
+  itemInfo: string
+  quantity: number
+  unitPrice: number
+  totalCents: number
+  note?: string | null
+  createdAt: string
+}
+
+function getLocalDateKey(dateInput: Date | string): string {
+  const d = typeof dateInput === "string" ? new Date(dateInput) : dateInput
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, "0")
+  const day = String(d.getDate()).padStart(2, "0")
+  return `${y}-${m}-${day}`
+}
 
 export interface ProductOptionVariant {
   id: string
@@ -78,13 +99,38 @@ export interface OrderItem {
 export function OrderManagerClient({
   orders,
   products = [],
+  initialStockImports = [],
 }: {
   orders: OrderItem[]
   products?: ProductOption[]
+  initialStockImports?: StockImportItem[]
 }) {
   const router = useRouter()
   const { toast } = useToast()
   const [currentOrders, setCurrentOrders] = useState<OrderItem[]>(orders)
+  const [stockImports, setStockImports] = useState<StockImportItem[]>(initialStockImports)
+  const [activeView, setActiveView] = useState<"orders" | "imports">("orders")
+  const [selectedDate, setSelectedDate] = useState<string>(() => getLocalDateKey(new Date()))
+  const [showAllImportDates, setShowAllImportDates] = useState<boolean>(false)
+  const [deletingImportId, setDeletingImportId] = useState<string | null>(null)
+  const [importModal, setImportModal] = useState<{
+    isOpen: boolean
+    importDate: string
+    itemInfo: string
+    quantity: number
+    unitPrice: string
+    note: string
+    isSubmitting: boolean
+    error?: string
+  }>({
+    isOpen: false,
+    importDate: getLocalDateKey(new Date()),
+    itemInfo: "",
+    quantity: 1,
+    unitPrice: "",
+    note: "",
+    isSubmitting: false,
+  })
   const [search, setSearch] = useState("")
   const [filterStatus, setFilterStatus] = useState("all")
   const [refreshing, setRefreshing] = useState(false)
@@ -434,20 +480,224 @@ export function OrderManagerClient({
     return matchSearch && matchStatus
   })
 
+  // Daily revenue & stock import calculations
+  const revenueSummary = useMemo(() => {
+    const paidOrders = currentOrders.filter(
+      (o) => o.status === "paid" || o.status === "processing"
+    )
+    const totalGrossRevenue = paidOrders.reduce((sum, o) => sum + o.totalCents, 0)
+    const dayGrossRevenue = paidOrders
+      .filter((o) => getLocalDateKey(o.createdAt) === selectedDate)
+      .reduce((sum, o) => sum + o.totalCents, 0)
+    const dayImportTotal = stockImports
+      .filter((s) => s.importDate === selectedDate)
+      .reduce((sum, s) => sum + s.totalCents, 0)
+    const dayNetRevenue = dayGrossRevenue - dayImportTotal
+
+    return {
+      totalGrossRevenue,
+      dayGrossRevenue,
+      dayImportTotal,
+      dayNetRevenue,
+    }
+  }, [currentOrders, stockImports, selectedDate])
+
+  const displayedImports = useMemo(() => {
+    if (showAllImportDates) return stockImports
+    return stockImports.filter((s) => s.importDate === selectedDate)
+  }, [stockImports, selectedDate, showAllImportDates])
+
+  const handleCreateStockImport = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const itemInfo = importModal.itemInfo.trim()
+    const quantity = Math.max(1, parseInt(String(importModal.quantity || 1), 10) || 1)
+    const unitPrice = parseInt(importModal.unitPrice.replace(/\D/g, ""), 10)
+
+    if (!itemInfo) {
+      setImportModal((p) => ({ ...p, error: "Vui lòng nhập thông tin hàng nhập" }))
+      return
+    }
+    if (!unitPrice || unitPrice <= 0) {
+      setImportModal((p) => ({ ...p, error: "Giá nhập phải lớn hơn 0đ" }))
+      return
+    }
+
+    setImportModal((p) => ({ ...p, isSubmitting: true, error: undefined }))
+    try {
+      const res = await fetch("/api/admin/stock-imports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          importDate: importModal.importDate,
+          itemInfo,
+          quantity,
+          unitPrice,
+          note: importModal.note.trim() || undefined,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok || !json.success) {
+        setImportModal((p) => ({
+          ...p,
+          isSubmitting: false,
+          error: json.error || "Không thể lưu phiếu nhập hàng",
+        }))
+        return
+      }
+
+      setStockImports((prev) => [json.item, ...prev])
+      setSelectedDate(json.item.importDate)
+      setImportModal({
+        isOpen: false,
+        importDate: json.item.importDate,
+        itemInfo: "",
+        quantity: 1,
+        unitPrice: "",
+        note: "",
+        isSubmitting: false,
+      })
+      toast({
+        title: "Đã lưu phiếu nhập hàng",
+        description: `${json.item.itemInfo} (-${formatPrice(json.item.totalCents)} vào doanh thu ngày ${json.item.importDate})`,
+      })
+      router.refresh()
+    } catch {
+      setImportModal((p) => ({
+        ...p,
+        isSubmitting: false,
+        error: "Lỗi kết nối máy chủ",
+      }))
+    }
+  }
+
+  const handleDeleteStockImport = async (item: StockImportItem) => {
+    if (!window.confirm(`Xóa phiếu nhập "${item.itemInfo}" (${formatPrice(item.totalCents)})?`)) return
+    setDeletingImportId(item.id)
+    try {
+      const res = await fetch(`/api/admin/stock-imports/${item.id}`, { method: "DELETE" })
+      const json = await res.json()
+      if (res.ok && json.success) {
+        setStockImports((prev) => prev.filter((s) => s.id !== item.id))
+        toast({ title: "Đã xóa phiếu nhập hàng" })
+        router.refresh()
+      } else {
+        toast({ title: "Lỗi", description: json.error || "Xóa thất bại", variant: "destructive" })
+      }
+    } catch {
+      toast({ title: "Lỗi kết nối", variant: "destructive" })
+    } finally {
+      setDeletingImportId(null)
+    }
+  }
+
   return (
     <div className="space-y-4">
-      {/* Search and Filters */}
-      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
-        <div className="flex flex-1 items-center gap-2 max-w-md">
-          <div className="relative flex-1">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-            <Input
-              placeholder="Tìm theo mã đơn hoặc email..."
-              className="pl-10 text-xs"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+      {/* Daily Revenue & Stock Import Summary Strip */}
+      <div className="rounded-2xl border border-border bg-card p-4 space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-3 border-b border-border/70">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Calendar className="size-4 text-primary shrink-0" />
+            <span className="text-xs font-semibold text-foreground">Theo dõi ngày:</span>
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value || getLocalDateKey(new Date()))}
+              aria-label="Chọn ngày xem doanh thu và nhập hàng"
+              className="h-8 px-2.5 rounded-lg border border-border bg-background text-xs font-medium text-foreground focus:outline-none focus:border-primary"
             />
           </div>
+
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setActiveView("orders")}
+              className={`h-8 px-3 rounded-lg text-xs font-semibold border transition-btn cursor-pointer ${
+                activeView === "orders"
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-background text-muted-foreground hover:text-foreground border-border"
+              }`}
+            >
+              Danh sách đơn ({currentOrders.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveView("imports")}
+              className={`h-8 px-3 rounded-lg text-xs font-semibold border transition-btn cursor-pointer ${
+                activeView === "imports"
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-background text-muted-foreground hover:text-foreground border-border"
+              }`}
+            >
+              Sổ nhập hàng ({stockImports.length})
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+          <div className="p-3 rounded-xl border border-border bg-background/60">
+            <span className="text-muted-foreground block">Bán hàng ngày {selectedDate.split("-").reverse().join("/")}</span>
+            <strong className="text-base font-bold text-foreground tabular-nums mt-0.5 block">
+              {formatPrice(revenueSummary.dayGrossRevenue)}
+            </strong>
+          </div>
+          <div className="p-3 rounded-xl border border-amber-500/30 bg-amber-500/5">
+            <span className="text-amber-300/90 block">Chi nhập hàng ngày đó</span>
+            <strong className="text-base font-bold text-amber-300 tabular-nums mt-0.5 block">
+              {revenueSummary.dayImportTotal > 0 ? `-${formatPrice(revenueSummary.dayImportTotal)}` : formatPrice(0)}
+            </strong>
+          </div>
+          <div className="p-3 rounded-xl border border-emerald-500/30 bg-emerald-500/5">
+            <span className="text-emerald-300/90 block">Doanh thu ngày (đã trừ nhập)</span>
+            <strong
+              className={`text-base font-bold tabular-nums mt-0.5 block ${
+                revenueSummary.dayNetRevenue < 0 ? "text-rose-400" : "text-emerald-400"
+              }`}
+            >
+              {revenueSummary.dayNetRevenue < 0
+                ? `-${formatPrice(Math.abs(revenueSummary.dayNetRevenue))}`
+                : formatPrice(revenueSummary.dayNetRevenue)}
+            </strong>
+          </div>
+          <div className="p-3 rounded-xl border border-border bg-background/60">
+            <span className="text-muted-foreground block">Tổng doanh thu (giữ nguyên)</span>
+            <strong className="text-base font-bold text-primary tabular-nums mt-0.5 block">
+              {formatPrice(revenueSummary.totalGrossRevenue)}
+            </strong>
+          </div>
+        </div>
+      </div>
+
+      {/* Search and Filters */}
+      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
+        <div className="flex flex-1 flex-wrap items-center gap-2">
+          {activeView === "orders" && (
+            <div className="relative flex-1 min-w-[200px] max-w-md">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+              <Input
+                placeholder="Tìm theo mã đơn hoặc email..."
+                className="pl-10 text-xs"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+          )}
+
+          <Button
+            size="sm"
+            onClick={() =>
+              setImportModal((prev) => ({
+                ...prev,
+                isOpen: true,
+                importDate: selectedDate,
+                error: undefined,
+              }))
+            }
+            className="text-xs bg-primary hover:bg-caramel-light text-primary-foreground flex items-center gap-1.5 cursor-pointer shrink-0"
+            title="Ghi nhận chi phí nhập hàng theo ngày (trừ vào doanh thu ngày đó)"
+          >
+            <PackagePlus className="size-3.5" />
+            <span>Nhập hàng theo ngày</span>
+          </Button>
 
           <Button
             size="sm"
@@ -471,38 +721,140 @@ export function OrderManagerClient({
             <span>{refreshing ? "Đang đồng bộ..." : "Đồng bộ"}</span>
           </Button>
 
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={cleaningTests}
-            onClick={handleCleanTestOrders}
-            className="text-xs text-rose-400 border-rose-500/30 hover:bg-rose-500/10 flex items-center gap-1.5 cursor-pointer shrink-0"
-            title="Xóa tất cả các đơn hàng test mẫu"
-          >
-            <Trash2 className="size-3.5" />
-            <span>{cleaningTests ? "Đang xóa..." : "Xóa đơn test"}</span>
-          </Button>
+          {activeView === "orders" && (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={cleaningTests}
+              onClick={handleCleanTestOrders}
+              className="text-xs text-rose-400 border-rose-500/30 hover:bg-rose-500/10 flex items-center gap-1.5 cursor-pointer shrink-0"
+              title="Xóa tất cả các đơn hàng test mẫu"
+            >
+              <Trash2 className="size-3.5" />
+              <span>{cleaningTests ? "Đang xóa..." : "Xóa đơn test"}</span>
+            </Button>
+          )}
         </div>
 
-        <div className="flex items-center gap-2">
-          {["all", "pending", "paid", "cancelled"].map((st) => (
+        {activeView === "orders" ? (
+          <div className="flex items-center gap-2">
+            {["all", "pending", "paid", "cancelled"].map((st) => (
+              <button
+                key={st}
+                onClick={() => setFilterStatus(st)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold capitalize transition-all cursor-pointer ${
+                  filterStatus === st
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "bg-card/60 text-muted-foreground hover:bg-card hover:text-foreground border border-border/60"
+                }`}
+              >
+                {st === "all" ? "Tất cả" : st === "pending" ? "Chờ TT" : st === "paid" ? "Đã TT" : "Đã hủy"}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
             <button
-              key={st}
-              onClick={() => setFilterStatus(st)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold capitalize transition-all cursor-pointer ${
-                filterStatus === st
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "bg-card/60 text-muted-foreground hover:bg-card hover:text-foreground border border-border/60"
+              type="button"
+              onClick={() => setShowAllImportDates(false)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-btn cursor-pointer ${
+                !showAllImportDates
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-card text-muted-foreground border-border hover:text-foreground"
               }`}
             >
-              {st === "all" ? "Tất cả" : st === "pending" ? "Chờ TT" : st === "paid" ? "Đã TT" : "Đã hủy"}
+              Chỉ ngày {selectedDate.split("-").reverse().join("/")}
             </button>
-          ))}
-        </div>
+            <button
+              type="button"
+              onClick={() => setShowAllImportDates(true)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-btn cursor-pointer ${
+                showAllImportDates
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-card text-muted-foreground border-border hover:text-foreground"
+              }`}
+            >
+              Tất cả ngày ({stockImports.length})
+            </button>
+          </div>
+        )}
       </div>
 
+      {/* Stock Imports Ledger View */}
+      {activeView === "imports" && (
+        <div className="rounded-2xl border border-border bg-card overflow-hidden">
+          {displayedImports.length === 0 ? (
+            <div className="p-8 text-center text-xs text-muted-foreground space-y-2">
+              <p>Chưa có phiếu nhập hàng nào {showAllImportDates ? "" : `trong ngày ${selectedDate.split("-").reverse().join("/")}`}.</p>
+              <Button
+                size="sm"
+                onClick={() =>
+                  setImportModal((prev) => ({
+                    ...prev,
+                    isOpen: true,
+                    importDate: selectedDate,
+                    error: undefined,
+                  }))
+                }
+                className="text-xs bg-primary text-primary-foreground hover:bg-caramel-light"
+              >
+                <PackagePlus className="size-3.5 mr-1.5" />
+                Thêm phiếu nhập hàng
+              </Button>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left">
+                <thead className="border-b border-border bg-secondary/40 text-muted-foreground">
+                  <tr>
+                    <th className="py-3 px-4 font-semibold">Ngày nhập</th>
+                    <th className="py-3 px-4 font-semibold">Thông tin hàng nhập</th>
+                    <th className="py-3 px-4 font-semibold text-right">SL</th>
+                    <th className="py-3 px-4 font-semibold text-right">Đơn giá</th>
+                    <th className="py-3 px-4 font-semibold text-right">Thành tiền</th>
+                    <th className="py-3 px-4 font-semibold">Ghi chú</th>
+                    <th className="py-3 px-4 font-semibold text-right">Xóa</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/60">
+                  {displayedImports.map((item) => (
+                    <tr key={item.id} className="hover:bg-secondary/30">
+                      <td className="py-3 px-4 font-mono text-muted-foreground whitespace-nowrap">
+                        {item.importDate.split("-").reverse().join("/")}
+                      </td>
+                      <td className="py-3 px-4 font-semibold text-foreground">{item.itemInfo}</td>
+                      <td className="py-3 px-4 text-right tabular-nums">{item.quantity}</td>
+                      <td className="py-3 px-4 text-right tabular-nums text-muted-foreground">
+                        {formatPrice(item.unitPrice)}
+                      </td>
+                      <td className="py-3 px-4 text-right font-bold tabular-nums text-amber-300">
+                        -{formatPrice(item.totalCents)}
+                      </td>
+                      <td className="py-3 px-4 text-muted-foreground max-w-xs truncate">
+                        {item.note || "—"}
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        <button
+                          type="button"
+                          disabled={deletingImportId === item.id}
+                          onClick={() => handleDeleteStockImport(item)}
+                          className="inline-flex size-8 items-center justify-center rounded-lg text-rose-400 hover:bg-rose-500/10 disabled:opacity-40 transition-btn cursor-pointer"
+                          aria-label={`Xóa phiếu nhập ${item.itemInfo}`}
+                        >
+                          <Trash2 className="size-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Orders List */}
-      <div className="space-y-3">
+      <div className={activeView === "orders" ? "space-y-3" : "hidden"}>
         {filteredOrders.length === 0 ? (
           <div className="p-8 text-center text-xs text-muted-foreground rounded-2xl border border-border/80 bg-card/60">
             Không tìm thấy đơn hàng nào phù hợp.
@@ -1339,6 +1691,148 @@ export function OrderManagerClient({
                       <span>Xác nhận &amp; Cộng doanh thu</span>
                     </>
                   )}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Nhập hàng theo ngày */}
+      {importModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-border bg-card shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+              <div className="flex items-center gap-2">
+                <PackagePlus className="size-4 text-primary" />
+                <h2 className="text-sm font-bold text-foreground">Nhập hàng theo ngày</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setImportModal((p) => ({ ...p, isOpen: false }))}
+                className="p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary"
+                aria-label="Đóng"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateStockImport} className="p-5 space-y-4 text-xs">
+              {importModal.error && (
+                <div className="p-3 rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-300 font-medium flex items-center gap-2">
+                  <AlertCircle className="size-4 shrink-0" />
+                  <span>{importModal.error}</span>
+                </div>
+              )}
+
+              <div className="space-y-1">
+                <label htmlFor="import-date" className="font-semibold text-foreground block">
+                  Ngày nhập hàng *
+                </label>
+                <Input
+                  id="import-date"
+                  type="date"
+                  value={importModal.importDate}
+                  onChange={(e) => setImportModal((p) => ({ ...p, importDate: e.target.value }))}
+                  required
+                  className="text-xs h-10"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label htmlFor="import-info" className="font-semibold text-foreground block">
+                  Thông tin hàng nhập *
+                </label>
+                <Input
+                  id="import-info"
+                  placeholder="VD: 50 slot Canva Pro, Nạp ví đại lý FatCat..."
+                  value={importModal.itemInfo}
+                  onChange={(e) => setImportModal((p) => ({ ...p, itemInfo: e.target.value }))}
+                  required
+                  className="text-xs h-10"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label htmlFor="import-qty" className="font-semibold text-foreground block">
+                    Số lượng *
+                  </label>
+                  <Input
+                    id="import-qty"
+                    type="number"
+                    min={1}
+                    value={importModal.quantity}
+                    onChange={(e) =>
+                      setImportModal((p) => ({
+                        ...p,
+                        quantity: Math.max(1, parseInt(e.target.value || "1", 10) || 1),
+                      }))
+                    }
+                    required
+                    className="text-xs h-10 tabular-nums"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label htmlFor="import-price" className="font-semibold text-foreground block">
+                    Đơn giá (VNĐ) *
+                  </label>
+                  <Input
+                    id="import-price"
+                    type="number"
+                    min={1}
+                    placeholder="VD: 20000"
+                    value={importModal.unitPrice}
+                    onChange={(e) => setImportModal((p) => ({ ...p, unitPrice: e.target.value }))}
+                    required
+                    className="text-xs h-10 tabular-nums"
+                  />
+                </div>
+              </div>
+
+              {/* Preview total deduction */}
+              <div className="p-3 rounded-xl border border-amber-500/30 bg-amber-500/5 flex items-center justify-between">
+                <span className="text-muted-foreground">Trừ vào doanh thu ngày {importModal.importDate.split("-").reverse().join("/")}:</span>
+                <strong className="text-sm font-bold text-amber-300 tabular-nums">
+                  -{formatPrice(
+                    Math.max(1, importModal.quantity) *
+                      (parseInt(importModal.unitPrice.replace(/\D/g, ""), 10) || 0)
+                  )}
+                </strong>
+              </div>
+
+              <div className="space-y-1">
+                <label htmlFor="import-note" className="font-semibold text-foreground block">
+                  Ghi chú
+                </label>
+                <Input
+                  id="import-note"
+                  placeholder="VD: Chuyển khoản cho NCC A..."
+                  value={importModal.note}
+                  onChange={(e) => setImportModal((p) => ({ ...p, note: e.target.value }))}
+                  className="text-xs h-10"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={importModal.isSubmitting}
+                  onClick={() => setImportModal((p) => ({ ...p, isOpen: false }))}
+                  className="text-xs cursor-pointer"
+                >
+                  Hủy
+                </Button>
+                <Button
+                  type="submit"
+                  size="sm"
+                  disabled={importModal.isSubmitting}
+                  className="text-xs bg-primary text-primary-foreground hover:bg-caramel-light cursor-pointer"
+                >
+                  {importModal.isSubmitting ? "Đang lưu..." : "Lưu phiếu nhập"}
                 </Button>
               </div>
             </form>

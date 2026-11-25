@@ -1,11 +1,12 @@
-import { prisma } from "@/lib/db"
+import { prisma, ensureDatabaseSchema } from "@/lib/db"
 import { OrderManagerClient } from "./OrderManagerClient"
 
 export const dynamic = "force-dynamic"
 export const revalidate = 0
 
 export default async function AdminOrdersPage() {
-  const [orders, products] = await Promise.all([
+  await ensureDatabaseSchema()
+  const [orders, products, stockImports] = await Promise.all([
     prisma.order.findMany({
       orderBy: { createdAt: "desc" },
       include: {
@@ -45,16 +46,29 @@ export default async function AdminOrdersPage() {
         },
       },
     }),
+    prisma.stockImport.findMany({
+      orderBy: [{ importDate: "desc" }, { createdAt: "desc" }],
+    }),
   ])
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-black tracking-tight text-foreground">Quản Lý Đơn Hàng</h1>
-        <p className="text-xs text-muted-foreground">Theo dõi và xử lý tất cả đơn hàng phát sinh trong hệ thống</p>
+        <p className="text-xs text-muted-foreground">Theo dõi đơn hàng, ghi nhận nhập hàng theo ngày và đối soát doanh thu</p>
       </div>
 
       <OrderManagerClient
+        initialStockImports={stockImports.map((s) => ({
+          id: s.id,
+          importDate: s.importDate,
+          itemInfo: s.itemInfo,
+          quantity: s.quantity,
+          unitPrice: s.unitPrice,
+          totalCents: s.totalCents,
+          note: s.note,
+          createdAt: s.createdAt.toISOString(),
+        }))}
         products={products.map((p) => ({
           id: p.id,
           name: p.name,

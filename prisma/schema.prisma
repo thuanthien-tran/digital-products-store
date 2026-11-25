@@ -440,3 +440,17 @@ model BuffFulfillment {
   @@index([orderId])
   @@index([providerOrderCode])
 }
+
+model StockImport {
+  id         String   @id @default(cuid())
+  importDate String   // Normalized YYYY-MM-DD (local date)
+  itemInfo   String   // Thông tin hàng nhập
+  quantity   Int      @default(1)
+  unitPrice  Int      // Giá nhập đơn vị (VND)
+  totalCents Int      // Tổng tiền nhập = quantity * unitPrice (VND)
+  note       String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([importDate])
+}

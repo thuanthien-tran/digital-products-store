@@ -73,13 +73,24 @@ export interface DashboardVisitorStats {
   showVisitorStats: boolean
 }
 
+export interface DashboardStockImport {
+  id: string
+  importDate: string
+  totalCents: number
+}
+
 interface AdminDashboardClientProps {
   initialOrders: DashboardOrder[]
   initialProviders: DashboardProvider[]
+  initialStockImports?: DashboardStockImport[]
   totalSerials: number
   availableSerials: number
   lowStockVariants: DashboardVariantAlert[]
   visitorStats: DashboardVisitorStats
+}
+
+function toLocalDateKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
 }
 
 type TimeRange = "today" | "yesterday" | "7days" | "30days" | "this_month" | "last_month" | "all"
@@ -87,6 +98,7 @@ type TimeRange = "today" | "yesterday" | "7days" | "30days" | "this_month" | "la
 export function AdminDashboardClient({
   initialOrders,
   initialProviders,
+  initialStockImports = [],
   totalSerials,
   availableSerials,
   lowStockVariants,
@@ -196,18 +208,27 @@ export function AdminDashboardClient({
     })
   }, [initialOrders, rangeBounds])
 
+  // Map daily stock import totals by YYYY-MM-DD
+  const dailyImportMap = useMemo(() => {
+    const map: Record<string, number> = {}
+    for (const imp of initialStockImports) {
+      map[imp.importDate] = (map[imp.importDate] || 0) + imp.totalCents
+    }
+    return map
+  }, [initialStockImports])
+
   // Compute metrics for the active range
   const metrics = useMemo(() => {
     const paidOrders = filteredOrders.filter(
       (o) => o.status === "paid" || o.status === "processing"
     )
 
-    let totalRevenue = 0
+    let grossRevenue = 0
     let totalDiscount = 0
     let totalCost = 0
 
     paidOrders.forEach((order) => {
-      totalRevenue += order.totalCents
+      grossRevenue += order.totalCents
       totalDiscount += order.discountCents || 0
 
       order.items.forEach((item) => {
@@ -216,15 +237,29 @@ export function AdminDashboardClient({
       })
     })
 
-    const totalProfit = Math.max(0, totalRevenue - totalCost)
-    const margin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0
+    // Deduct stock imports ONLY from daily revenue (today / yesterday); total revenue stays normal
+    const isSingleDayView = selectedRange === "today" || selectedRange === "yesterday"
+    let rangeImportTotal = 0
+    for (const imp of initialStockImports) {
+      const impDate = new Date(`${imp.importDate}T12:00:00`)
+      if (impDate >= rangeBounds.start && impDate <= rangeBounds.end) {
+        rangeImportTotal += imp.totalCents
+      }
+    }
+
+    const displayRevenue = isSingleDayView ? grossRevenue - rangeImportTotal : grossRevenue
+    const totalProfit = Math.max(0, grossRevenue - totalCost)
+    const margin = grossRevenue > 0 ? (totalProfit / grossRevenue) * 100 : 0
     const totalOrderCount = filteredOrders.length
     const paidCount = paidOrders.length
     const successRate = totalOrderCount > 0 ? (paidCount / totalOrderCount) * 100 : 0
-    const aov = paidCount > 0 ? Math.round(totalRevenue / paidCount) : 0
+    const aov = paidCount > 0 ? Math.round(grossRevenue / paidCount) : 0
 
     return {
-      revenue: totalRevenue,
+      revenue: displayRevenue,
+      grossRevenue,
+      importCost: rangeImportTotal,
+      isSingleDayView,
       discount: totalDiscount,
       cost: totalCost,
       profit: totalProfit,
@@ -235,7 +270,7 @@ export function AdminDashboardClient({
       aov,
       paidOrders,
     }
-  }, [filteredOrders])
+  }, [filteredOrders, initialStockImports, rangeBounds, selectedRange])
 
   // Group data into chart buckets
   const chartData = useMemo(() => {
@@ -306,10 +341,13 @@ export function AdminDashboardClient({
           }
         })
 
+        const dayImport = dailyImportMap[toLocalDateKey(d)] || 0
+        const netDayRev = Math.max(0, rev - dayImport)
+
         buckets.push({
           label,
           fullDateLabel: d.toLocaleDateString("vi-VN", { weekday: "short", day: "2-digit", month: "2-digit" }),
-          revenue: rev,
+          revenue: netDayRev,
           profit: Math.max(0, rev - cst),
           cost: cst,
           ordersCount: count,
@@ -517,12 +555,18 @@ export function AdminDashboardClient({
             </div>
           </div>
           <div>
-            <p className="text-2xl font-black text-foreground tracking-tight tabular-nums">
-              {formatPrice(metrics.revenue)}
+            <p className={`text-2xl font-black tracking-tight tabular-nums ${metrics.revenue < 0 ? "text-rose-400" : "text-foreground"}`}>
+              {metrics.revenue < 0
+                ? `-${formatPrice(Math.abs(metrics.revenue))}`
+                : formatPrice(metrics.revenue)}
             </p>
             <p className="text-[11px] text-muted-foreground mt-0.5">
               {metrics.paidCount} đơn thành công
-              {metrics.discount > 0 && ` • Giảm: -${formatPrice(metrics.discount)}`}
+              {metrics.isSingleDayView && metrics.importCost > 0
+                ? ` • Nhập hàng: -${formatPrice(metrics.importCost)}`
+                : metrics.discount > 0
+                ? ` • Giảm: -${formatPrice(metrics.discount)}`
+                : ""}
             </p>
           </div>
           <div className="h-1 w-full bg-secondary/50 rounded-full overflow-hidden mt-2">

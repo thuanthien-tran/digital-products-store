@@ -286,6 +286,26 @@ export async function ensureDatabaseSchema(): Promise<void> {
           }
         } catch {}
 
+        // Ensure StockImport table exists for daily stock import tracking
+        try {
+          await prisma.$executeRawUnsafe(`
+            CREATE TABLE IF NOT EXISTS "StockImport" (
+              "id" TEXT NOT NULL PRIMARY KEY,
+              "importDate" TEXT NOT NULL,
+              "itemInfo" TEXT NOT NULL,
+              "quantity" INTEGER NOT NULL DEFAULT 1,
+              "unitPrice" INTEGER NOT NULL,
+              "totalCents" INTEGER NOT NULL,
+              "note" TEXT,
+              "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+          `)
+          await prisma.$executeRawUnsafe(
+            `CREATE INDEX IF NOT EXISTS "StockImport_importDate_idx" ON "StockImport"("importDate");`
+          )
+        } catch {}
+
         globalForPrisma.schemaEnsured = true
       } catch (err) {
         console.error('[AutoMigration] Failed to verify/migrate schema:', err)

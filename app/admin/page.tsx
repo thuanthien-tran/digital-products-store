@@ -1,12 +1,19 @@
-import { prisma } from "@/lib/db"
+import { prisma, ensureDatabaseSchema } from "@/lib/db"
 import { getVisitorStats } from "@/lib/analytics"
-import { AdminDashboardClient, DashboardOrder, DashboardProvider, DashboardVariantAlert } from "./AdminDashboardClient"
+import {
+  AdminDashboardClient,
+  DashboardOrder,
+  DashboardProvider,
+  DashboardVariantAlert,
+  DashboardStockImport,
+} from "./AdminDashboardClient"
 
 export const dynamic = "force-dynamic"
 export const revalidate = 0
 
 export default async function AdminDashboardPage() {
-  const [orders, providers, totalSerials, availableSerials, lowStockVariants, visitorStats] = await Promise.all([
+  await ensureDatabaseSchema()
+  const [orders, providers, totalSerials, availableSerials, lowStockVariants, visitorStats, stockImports] = await Promise.all([
     prisma.order.findMany({
       orderBy: { createdAt: "desc" },
       include: {
@@ -48,6 +55,14 @@ export default async function AdminDashboardPage() {
       take: 20,
     }),
     getVisitorStats(),
+    prisma.stockImport.findMany({
+      orderBy: [{ importDate: "desc" }, { createdAt: "desc" }],
+      select: {
+        id: true,
+        importDate: true,
+        totalCents: true,
+      },
+    }),
   ])
 
   const serializedOrders: DashboardOrder[] = orders.map((o) => ({
@@ -90,10 +105,17 @@ export default async function AdminDashboardPage() {
       availableStock: v._count.serials,
     }))
 
+  const serializedStockImports: DashboardStockImport[] = stockImports.map((s) => ({
+    id: s.id,
+    importDate: s.importDate,
+    totalCents: s.totalCents,
+  }))
+
   return (
     <AdminDashboardClient
       initialOrders={serializedOrders}
       initialProviders={serializedProviders}
+      initialStockImports={serializedStockImports}
       totalSerials={totalSerials}
       availableSerials={availableSerials}
       lowStockVariants={serializedVariants}
