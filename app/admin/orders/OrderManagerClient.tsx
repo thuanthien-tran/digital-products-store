@@ -783,6 +783,9 @@ export function OrderManagerClient({
       {/* Stock Imports Ledger View */}
       {activeView === "imports" && (
         <div className="rounded-2xl border border-border bg-card overflow-hidden">
+          <div className="px-4 py-2.5 border-b border-border bg-background/40 text-xs text-muted-foreground">
+            Ghi nhận chi phí nhập hàng để trừ vào doanh thu ngày tương ứng (không tự động cộng serial vào kho — nạp tài khoản/key tại mục <strong className="text-foreground font-medium">Kho Serials</strong>).
+          </div>
           {displayedImports.length === 0 ? (
             <div className="p-8 text-center text-xs text-muted-foreground space-y-2">
               <p>Chưa có phiếu nhập hàng nào {showAllImportDates ? "" : `trong ngày ${selectedDate.split("-").reverse().join("/")}`}.</p>

@@ -625,20 +625,37 @@ export function CouponsClient() {
                         )}
                       </td>
 
-                      {/* Trạng thái */}
+                      {/* Trạng thái (phân biệt cấu hình bật và hiệu lực thực tế) */}
                       <td className="py-3.5 px-4">
                         {coupon.status === "active" ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                            <span className="size-1.5 rounded-full bg-emerald-400" />
-                            Hoạt động
-                          </span>
+                          isExpired ? (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-xs font-medium bg-rose-500/10 text-rose-300 border border-rose-500/30 whitespace-nowrap">
+                              <span className="size-1.5 rounded-full bg-rose-400" />
+                              Đã bật · Hết hạn
+                            </span>
+                          ) : isNotStarted ? (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-xs font-medium bg-amber-500/10 text-amber-300 border border-amber-500/30 whitespace-nowrap">
+                              <span className="size-1.5 rounded-full bg-amber-400" />
+                              Đã bật · Chưa đến ngày
+                            </span>
+                          ) : coupon.stats.remainingQuota === 0 ? (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-xs font-medium bg-amber-500/10 text-amber-300 border border-amber-500/30 whitespace-nowrap">
+                              <span className="size-1.5 rounded-full bg-amber-400" />
+                              Đã bật · Hết lượt
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-xs font-medium bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 whitespace-nowrap">
+                              <span className="size-1.5 rounded-full bg-emerald-400" />
+                              Đang hiệu lực
+                            </span>
+                          )
                         ) : coupon.status === "paused" ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-xs font-medium bg-amber-500/10 text-amber-300 border border-amber-500/30 whitespace-nowrap">
                             <span className="size-1.5 rounded-full bg-amber-400" />
                             Tạm dừng
                           </span>
                         ) : coupon.status === "draft" ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-500/15 text-slate-400 border border-slate-500/30">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-xs font-medium bg-secondary text-muted-foreground border border-border whitespace-nowrap">
                             Bản nháp
                           </span>
                         ) : (

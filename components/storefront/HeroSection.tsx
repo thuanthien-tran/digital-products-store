@@ -24,6 +24,31 @@ const TRUST_NOTES = [
   },
 ]
 
+function renderHeroTitle(rawTitle: string, titleColor?: string | null, highlightColor?: string | null) {
+  const parts = rawTitle.split(/(\*\*.*?\*\*)/g)
+  const baseColor = titleColor?.trim() || undefined
+  const accentColor = highlightColor?.trim() || undefined
+
+  return parts.map((part, index) => {
+    if (part.startsWith("**") && part.endsWith("**")) {
+      return (
+        <span
+          key={index}
+          style={accentColor ? { color: accentColor } : undefined}
+          className={accentColor ? "inline" : "text-primary inline"}
+        >
+          {part.slice(2, -2)}
+        </span>
+      )
+    }
+    return (
+      <span key={index} style={baseColor ? { color: baseColor } : undefined}>
+        {part}
+      </span>
+    )
+  })
+}
+
 export function HeroSection({ settings }: HeroSectionProps) {
   const heroTitle =
     settings?.heroTitle?.trim() || "Tài khoản và công cụ số cho nhu cầu của bạn."
@@ -55,7 +80,7 @@ export function HeroSection({ settings }: HeroSectionProps) {
         <div className="lg:col-span-7 space-y-4">
           <div className="space-y-2.5">
             <h1 className="font-heading font-bold tracking-tight text-[26px] sm:text-[32px] lg:text-[40px] leading-[1.18] text-foreground">
-              {heroTitle}
+              {renderHeroTitle(heroTitle, settings?.heroTitleColor, settings?.heroHighlightColor)}
             </h1>
             <p className="text-sm sm:text-base text-muted-foreground leading-relaxed max-w-xl">
               {heroSubtitle}

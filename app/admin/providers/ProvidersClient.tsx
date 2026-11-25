@@ -590,9 +590,9 @@ export function ProvidersClient({ initialConnections }: { initialConnections: Pr
                     </span>
                   )}
                   {(!testStates[c.id] || testStates[c.id]?.status === "idle") && (
-                    <span className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground bg-secondary/60 px-2 py-0.5 rounded-full border border-border">
-                      <span className={`size-1.5 rounded-full ${c.isEnabled ? "bg-emerald-400" : "bg-muted-foreground"}`} />
-                      {c.isEnabled ? "Sẵn sàng (Chưa kiểm tra)" : "Đang tắt"}
+                    <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground bg-secondary px-2.5 py-0.5 rounded-lg border border-border">
+                      <span className="size-1.5 rounded-full bg-muted-foreground/70" />
+                      {c.isEnabled ? "Chưa kiểm tra" : "Đang tắt"}
                     </span>
                   )}
                 </div>

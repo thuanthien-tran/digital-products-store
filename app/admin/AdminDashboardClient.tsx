@@ -237,7 +237,7 @@ export function AdminDashboardClient({
       })
     })
 
-    // Deduct stock imports ONLY from daily revenue (today / yesterday); total revenue stays normal
+    // Calculate stock import cost within the selected date range
     const isSingleDayView = selectedRange === "today" || selectedRange === "yesterday"
     let rangeImportTotal = 0
     for (const imp of initialStockImports) {
@@ -247,8 +247,9 @@ export function AdminDashboardClient({
       }
     }
 
-    const displayRevenue = isSingleDayView ? grossRevenue - rangeImportTotal : grossRevenue
-    const totalProfit = Math.max(0, grossRevenue - totalCost)
+    // Doanh Thu Bán Ra = tổng tiền bán hàng thu từ khách (giữ nguyên, không trừ nhập hàng)
+    // Thực Nhận (Tiền Lời) = Doanh Thu Bán Ra - Vốn đại lý - Tiền nhập hàng trong kỳ
+    const totalProfit = grossRevenue - totalCost - rangeImportTotal
     const margin = grossRevenue > 0 ? (totalProfit / grossRevenue) * 100 : 0
     const totalOrderCount = filteredOrders.length
     const paidCount = paidOrders.length
@@ -256,7 +257,7 @@ export function AdminDashboardClient({
     const aov = paidCount > 0 ? Math.round(grossRevenue / paidCount) : 0
 
     return {
-      revenue: displayRevenue,
+      revenue: grossRevenue,
       grossRevenue,
       importCost: rangeImportTotal,
       isSingleDayView,
@@ -342,14 +343,13 @@ export function AdminDashboardClient({
         })
 
         const dayImport = dailyImportMap[toLocalDateKey(d)] || 0
-        const netDayRev = Math.max(0, rev - dayImport)
 
         buckets.push({
           label,
           fullDateLabel: d.toLocaleDateString("vi-VN", { weekday: "short", day: "2-digit", month: "2-digit" }),
-          revenue: netDayRev,
-          profit: Math.max(0, rev - cst),
-          cost: cst,
+          revenue: rev,
+          profit: Math.max(0, rev - cst - dayImport),
+          cost: cst + dayImport,
           ordersCount: count,
         })
       }
@@ -555,18 +555,12 @@ export function AdminDashboardClient({
             </div>
           </div>
           <div>
-            <p className={`text-2xl font-black tracking-tight tabular-nums ${metrics.revenue < 0 ? "text-rose-400" : "text-foreground"}`}>
-              {metrics.revenue < 0
-                ? `-${formatPrice(Math.abs(metrics.revenue))}`
-                : formatPrice(metrics.revenue)}
+            <p className="text-2xl font-black tracking-tight tabular-nums text-foreground">
+              {formatPrice(metrics.revenue)}
             </p>
             <p className="text-[11px] text-muted-foreground mt-0.5">
               {metrics.paidCount} đơn thành công
-              {metrics.isSingleDayView && metrics.importCost > 0
-                ? ` • Nhập hàng: -${formatPrice(metrics.importCost)}`
-                : metrics.discount > 0
-                ? ` • Giảm: -${formatPrice(metrics.discount)}`
-                : ""}
+              {metrics.discount > 0 ? ` • Giảm: -${formatPrice(metrics.discount)}` : ""}
             </p>
           </div>
           <div className="h-1 w-full bg-secondary/50 rounded-full overflow-hidden mt-2">
@@ -574,33 +568,43 @@ export function AdminDashboardClient({
           </div>
         </div>
 
-        {/* CARD 2: THỰC NHẬN (TIỀN LỜI) */}
-        <div className="rounded-2xl border border-border/80 bg-card/60 p-5 space-y-3 backdrop-blur shadow-sm relative overflow-hidden group hover:border-emerald-500/30 transition-all ring-1 ring-emerald-500/10">
+        {/* CARD 2: THỰC NHẬN (SAU VỐN ĐẠI LÝ & NHẬP HÀNG) */}
+        <div className="rounded-2xl border border-border bg-card p-5 space-y-3 relative overflow-hidden">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-emerald-400 flex items-center gap-1.5">
               <span>Thực Nhận (Tiền Lời)</span>
-              <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/15 border border-emerald-500/20 text-emerald-300 font-bold">
-                Lãi ròng
+              <span className="text-[11px] px-1.5 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/25 text-emerald-300 font-medium">
+                Sau chi phí
               </span>
             </span>
-            <div className="p-2 rounded-xl border bg-emerald-500/20 border-emerald-500/30 text-emerald-300">
+            <div className="p-2 rounded-xl border bg-emerald-500/15 border-emerald-500/25 text-emerald-300">
               <TrendingUp className="size-4" />
             </div>
           </div>
           <div>
-            <p className="text-2xl font-black text-emerald-400 tracking-tight tabular-nums">
-              {formatPrice(metrics.profit)}
+            <p className={`text-2xl font-black tracking-tight tabular-nums ${metrics.profit < 0 ? "text-rose-400" : "text-emerald-400"}`}>
+              {metrics.profit < 0
+                ? `-${formatPrice(Math.abs(metrics.profit))}`
+                : formatPrice(metrics.profit)}
             </p>
-            <div className="flex items-center gap-2 text-[11px] text-muted-foreground mt-0.5">
+            <div className="flex items-center flex-wrap gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground mt-0.5">
               <span>Vốn đại lý: {formatPrice(metrics.cost)}</span>
+              {metrics.importCost > 0 && (
+                <>
+                  <span>•</span>
+                  <span className="text-amber-300 font-medium">Nhập hàng: -{formatPrice(metrics.importCost)}</span>
+                </>
+              )}
               <span>•</span>
-              <span className="font-semibold text-emerald-400">Biên lãi: {metrics.margin.toFixed(1)}%</span>
+              <span className={`font-semibold ${metrics.margin < 0 ? "text-rose-400" : "text-emerald-400"}`}>
+                Biên lãi: {metrics.margin.toFixed(1)}%
+              </span>
             </div>
           </div>
           <div className="h-1 w-full bg-secondary/50 rounded-full overflow-hidden mt-2">
             <div
-              className="h-full bg-emerald-400 rounded-full transition-all duration-500"
-              style={{ width: `${Math.min(100, Math.max(5, metrics.margin))}%` }}
+              className={`h-full rounded-full transition-all duration-500 ${metrics.profit < 0 ? "bg-rose-400" : "bg-emerald-400"}`}
+              style={{ width: `${Math.min(100, Math.max(5, Math.max(0, metrics.margin)))}%` }}
             />
           </div>
         </div>
@@ -771,95 +775,101 @@ export function AdminDashboardClient({
         </div>
       </div>
 
-      {/* TREND CHART (Doanh thu & Tiền lời theo ngày / tuần / tháng) */}
-      <div className="rounded-2xl border border-border/80 bg-card/60 p-5 backdrop-blur shadow-sm space-y-4">
+      {/* TREND CHART (Doanh thu & Chênh lệch theo ngày / tuần / tháng) */}
+      <div className="rounded-2xl border border-border bg-card p-5 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
+            <h2 className="text-[15px] font-bold text-foreground flex items-center gap-2">
               <TrendingUp className="size-4 text-emerald-400" />
-              <span>Biểu Đồ Xu Hướng Doanh Thu &amp; Tiền Lời</span>
+              <span>Xu hướng doanh thu &amp; chênh lệch</span>
               <span className="text-xs text-muted-foreground font-normal">({rangeBounds.label})</span>
             </h2>
-            <p className="text-[11px] text-muted-foreground">
-              So sánh tương quan giữa Doanh thu bán ra (cột xám) và Tiền lời thực nhận (cột xanh)
+            <p className="text-xs text-muted-foreground mt-0.5">
+              So sánh doanh thu bán ra (cột caramel) và chênh lệch sau vốn đại lý (cột xanh lá). Chạm hoặc focus vào cột để xem chi tiết.
             </p>
           </div>
 
           {/* Legend */}
           <div className="flex items-center gap-4 text-xs">
             <div className="flex items-center gap-1.5">
-              <span className="size-2.5 rounded-sm bg-primary/70" />
+              <span className="size-2.5 rounded-sm bg-primary" />
               <span className="text-muted-foreground">Doanh thu</span>
             </div>
             <div className="flex items-center gap-1.5">
               <span className="size-2.5 rounded-sm bg-emerald-400" />
-              <span className="text-emerald-400 font-semibold">Thực nhận (Lời)</span>
+              <span className="text-emerald-400 font-medium">Chênh lệch vốn đại lý</span>
             </div>
           </div>
         </div>
 
         {/* Visual Chart Bars Container */}
         <div className="pt-6 pb-2">
-          {chartData.buckets.length === 0 || chartData.maxVal <= 1000 ? (
-            <div className="py-12 text-center text-xs text-muted-foreground">
-              Chưa có dữ liệu đơn hàng trong khoảng thời gian {rangeBounds.label.toLowerCase()}.
+          {chartData.buckets.length === 0 || chartData.maxVal <= 0 ? (
+            <div className="py-12 text-center text-xs text-muted-foreground rounded-xl border border-dashed border-border bg-background/40">
+              Chưa có dữ liệu đơn hàng đã thanh toán trong khoảng thời gian {rangeBounds.label.toLowerCase()}.
             </div>
           ) : (
             <div className="space-y-2">
               {/* Bars Row */}
-              <div className="h-48 w-full flex items-end gap-1.5 sm:gap-3 px-2 border-b border-border/60">
+              <div className="h-48 w-full flex items-end gap-1.5 sm:gap-3 px-2 border-b border-border">
                 {chartData.buckets.map((b, idx) => {
-                  const revHeight = Math.max(4, Math.round((b.revenue / chartData.maxVal) * 100))
-                  const profitHeight = Math.max(2, Math.round((b.profit / chartData.maxVal) * 100))
-                  const isHovered = hoveredBucketIndex === idx
+                  const revHeight = b.revenue > 0 ? Math.max(4, Math.round((b.revenue / chartData.maxVal) * 100)) : 0
+                  const profitHeight = b.profit > 0 ? Math.max(3, Math.round((b.profit / chartData.maxVal) * 100)) : 0
+                  const isActive = hoveredBucketIndex === idx
 
                   return (
                     <div
                       key={idx}
-                      className="flex-1 h-full flex flex-col justify-end items-center relative group cursor-pointer"
+                      tabIndex={0}
+                      role="button"
+                      aria-label={`${b.fullDateLabel}: Doanh thu ${formatPrice(b.revenue)}, chênh lệch ${formatPrice(b.profit)}, ${b.ordersCount} đơn`}
+                      className="flex-1 h-full flex flex-col justify-end items-center relative group cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-t-md"
                       onMouseEnter={() => setHoveredBucketIndex(idx)}
                       onMouseLeave={() => setHoveredBucketIndex(null)}
+                      onFocus={() => setHoveredBucketIndex(idx)}
+                      onBlur={() => setHoveredBucketIndex(null)}
+                      onClick={() => setHoveredBucketIndex((prev) => (prev === idx ? null : idx))}
                     >
-                      {/* Tooltip on hover */}
-                      {isHovered && (
-                        <div className="absolute bottom-full mb-2 z-30 pointer-events-none whitespace-nowrap rounded-xl border border-border bg-popover/95 p-2.5 text-xs shadow-xl backdrop-blur">
-                          <p className="font-bold text-foreground border-b border-border/50 pb-1 mb-1">
+                      {/* Tooltip on hover / focus / tap */}
+                      {isActive && (
+                        <div className="absolute bottom-full mb-2 z-30 pointer-events-none whitespace-nowrap rounded-xl border border-border bg-popover p-2.5 text-xs shadow-lg">
+                          <p className="font-semibold text-foreground border-b border-border pb-1 mb-1">
                             {b.fullDateLabel}
                           </p>
-                          <div className="space-y-0.5 text-[11px]">
+                          <div className="space-y-0.5 text-xs">
                             <div className="flex items-center justify-between gap-3">
                               <span className="text-muted-foreground">Doanh thu:</span>
-                              <span className="font-bold text-foreground">{formatPrice(b.revenue)}</span>
+                              <span className="font-semibold text-foreground tabular-nums">{formatPrice(b.revenue)}</span>
                             </div>
                             <div className="flex items-center justify-between gap-3">
                               <span className="text-muted-foreground">Vốn đại lý:</span>
-                              <span className="text-foreground">{formatPrice(b.cost)}</span>
+                              <span className="text-foreground tabular-nums">{formatPrice(b.cost)}</span>
                             </div>
-                            <div className="flex items-center justify-between gap-3 text-emerald-400 font-bold">
-                              <span>Thực nhận (Lời):</span>
-                              <span>+{formatPrice(b.profit)}</span>
+                            <div className="flex items-center justify-between gap-3 text-emerald-400 font-semibold">
+                              <span>Chênh lệch:</span>
+                              <span className="tabular-nums">+{formatPrice(b.profit)}</span>
                             </div>
-                            <div className="flex items-center justify-between gap-3 text-muted-foreground text-[10px] pt-1 border-t border-border/40">
+                            <div className="flex items-center justify-between gap-3 text-muted-foreground text-[11px] pt-1 border-t border-border/60">
                               <span>Số đơn:</span>
-                              <span>{b.ordersCount} đơn</span>
+                              <span className="tabular-nums">{b.ordersCount} đơn</span>
                             </div>
                           </div>
                         </div>
                       )}
 
-                      {/* Bar Pair */}
-                      <div className="w-full flex items-end justify-center gap-0.5 sm:gap-1 max-w-[36px]">
+                      {/* Bar Pair (h-full required so percentage bar heights resolve against the 192px chart area!) */}
+                      <div className="w-full h-full flex items-end justify-center gap-0.5 sm:gap-1 max-w-[36px]">
                         {/* Revenue Bar */}
                         <div
-                          className={`w-1/2 rounded-t-sm transition-all duration-300 ${
-                            isHovered ? "bg-primary" : "bg-primary/50 group-hover:bg-primary/80"
+                          className={`w-1/2 rounded-t-sm transition-colors duration-150 ${
+                            isActive ? "bg-primary" : "bg-primary/60 group-hover:bg-primary/85"
                           }`}
                           style={{ height: `${revHeight}%` }}
                         />
                         {/* Profit Bar */}
                         <div
-                          className={`w-1/2 rounded-t-sm transition-all duration-300 ${
-                            isHovered ? "bg-emerald-400" : "bg-emerald-500/80 group-hover:bg-emerald-400"
+                          className={`w-1/2 rounded-t-sm transition-colors duration-150 ${
+                            isActive ? "bg-emerald-400" : "bg-emerald-500/75 group-hover:bg-emerald-400"
                           }`}
                           style={{ height: `${profitHeight}%` }}
                         />
