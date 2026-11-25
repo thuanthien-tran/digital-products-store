@@ -150,7 +150,7 @@ function CompactThumb({
 
   return (
     <div
-      className={`${sizeClass} shrink-0 rounded-xl border overflow-hidden flex items-center justify-center ${surfaceClass}`}
+      className={`relative ${sizeClass} shrink-0 rounded-xl border overflow-hidden flex items-center justify-center ${surfaceClass}`}
     >
       {imageUrl && !failed ? (
         // eslint-disable-next-line @next/next/no-img-element
@@ -159,11 +159,12 @@ function CompactThumb({
           alt=""
           onError={() => setFailed(true)}
           loading="lazy"
-          className="w-full h-full object-cover"
+          className="w-full h-full object-cover transition-transform duration-[180ms] ease-out group-hover:scale-[1.03]"
         />
       ) : (
         <BrandIcon name={name} className="size-6 text-muted-foreground" />
       )}
+      <div aria-hidden="true" className="card-media-sheen" />
     </div>
   )
 }
@@ -171,6 +172,7 @@ function CompactThumb({
 function FlagshipCard({ product }: { product: StorefrontProduct }) {
   const cardRef = useRef<HTMLElement>(null)
   const spotlightRef = useRef<HTMLDivElement>(null)
+  const borderGlowRef = useRef<HTMLDivElement>(null)
   const [hasEntered, setHasEntered] = useState(false)
 
   // One-time sheen trigger when card enters viewport (never repeats on scroll)
@@ -193,10 +195,11 @@ function FlagshipCard({ product }: { product: StorefrontProduct }) {
     return () => observer.disconnect()
   }, [])
 
-  // Desktop-only (pointer: fine) soft cursor spotlight using direct DOM CSS variables (zero React state updates)
+  // Desktop-only (pointer: fine) 3D micro-tilt + border glow + cursor spotlight (zero React state)
   useEffect(() => {
     const card = cardRef.current
     const spot = spotlightRef.current
+    const borderGlow = borderGlowRef.current
     if (!card || !spot) return
 
     const supportsFinePointer = window.matchMedia("(pointer: fine)").matches
@@ -206,12 +209,24 @@ function FlagshipCard({ product }: { product: StorefrontProduct }) {
     let rafId: number | null = null
     let lastX = 0
     let lastY = 0
+    let lastW = 1
+    let lastH = 1
 
-    const updateSpot = () => {
+    const updateHoverFx = () => {
       rafId = null
+      const relX = (lastX / lastW - 0.5) * 2
+      const relY = (lastY / lastH - 0.5) * 2
+      const rotateY = (relX * 2.4).toFixed(2)
+      const rotateX = (-relY * 2.2).toFixed(2)
+
+      card.style.setProperty("--card-x", `${lastX}px`)
+      card.style.setProperty("--card-y", `${lastY}px`)
+      card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) translate3d(0, -4px, 0)`
+
       spot.style.setProperty("--spot-x", `${lastX}px`)
       spot.style.setProperty("--spot-y", `${lastY}px`)
       spot.style.opacity = "1"
+      if (borderGlow) borderGlow.style.opacity = "1"
     }
 
     const onPointerMove = (e: PointerEvent) => {
@@ -219,8 +234,10 @@ function FlagshipCard({ product }: { product: StorefrontProduct }) {
       const rect = card.getBoundingClientRect()
       lastX = e.clientX - rect.left
       lastY = e.clientY - rect.top
+      lastW = rect.width || 1
+      lastH = rect.height || 1
       if (rafId === null) {
-        rafId = requestAnimationFrame(updateSpot)
+        rafId = requestAnimationFrame(updateHoverFx)
       }
     }
 
@@ -229,7 +246,9 @@ function FlagshipCard({ product }: { product: StorefrontProduct }) {
         cancelAnimationFrame(rafId)
         rafId = null
       }
+      card.style.transform = ""
       spot.style.opacity = "0"
+      if (borderGlow) borderGlow.style.opacity = "0"
     }
 
     card.addEventListener("pointermove", onPointerMove, { passive: true })
@@ -239,6 +258,7 @@ function FlagshipCard({ product }: { product: StorefrontProduct }) {
       card.removeEventListener("pointermove", onPointerMove)
       card.removeEventListener("pointerleave", onPointerLeave)
       if (rafId !== null) cancelAnimationFrame(rafId)
+      card.style.transform = ""
     }
   }, [])
 
@@ -255,27 +275,34 @@ function FlagshipCard({ product }: { product: StorefrontProduct }) {
   return (
     <article
       ref={cardRef}
-      className="relative h-full flex flex-col justify-between rounded-2xl border border-[#E6A66F]/35 bg-gradient-to-br from-[#2E2219] via-[#201B18] to-[#16171A] p-5 sm:p-6 transition-card hover:-translate-y-[3px] hover:border-[#E6A66F]/75 shadow-[0_12px_30px_-18px_rgba(230,166,111,0.2)] hover:shadow-[0_16px_38px_-16px_rgba(230,166,111,0.34)] overflow-hidden"
+      className="group relative h-full flex flex-col justify-between rounded-2xl border border-[#E6A66F]/35 bg-gradient-to-br from-[#2E2219] via-[#201B18] to-[#16171A] p-5 sm:p-6 transition-card hover:border-[#E6A66F]/75 shadow-[0_12px_30px_-18px_rgba(230,166,111,0.2)] hover:shadow-[0_20px_42px_-16px_rgba(230,166,111,0.36)]"
     >
-      {/* One-time soft ivory sheen sweep on viewport entry */}
-      {hasEntered && (
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-y-0 -left-1/3 w-1/3 bg-gradient-to-r from-transparent via-[#FFF5EA]/14 to-transparent featured-sheen-once"
-        />
-      )}
-
-      {/* Desktop-only subtle cursor-following light spot (zero React re-renders) */}
+      {/* 1.5px Cursor-Tracking Caramel Border Glow Ring */}
       <div
-        ref={spotlightRef}
+        ref={borderGlowRef}
         aria-hidden="true"
-        style={{
-          opacity: 0,
-          background:
-            "radial-gradient(280px circle at var(--spot-x, 50%) var(--spot-y, 50%), rgba(240, 184, 130, 0.22), rgba(230, 166, 111, 0.06) 45%, transparent 72%)",
-        }}
-        className="pointer-events-none absolute inset-0 transition-opacity duration-200"
+        style={{ opacity: 0 }}
+        className="card-border-glow z-20"
       />
+
+      {/* Clipped Inner Lighting Layer */}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-2xl overflow-hidden">
+        {/* One-time soft ivory sheen sweep on viewport entry */}
+        {hasEntered && (
+          <div className="absolute inset-y-0 -left-1/3 w-1/3 bg-gradient-to-r from-transparent via-[#FFF5EA]/14 to-transparent featured-sheen-once" />
+        )}
+
+        {/* Desktop-only subtle cursor-following light spot (zero React re-renders) */}
+        <div
+          ref={spotlightRef}
+          style={{
+            opacity: 0,
+            background:
+              "radial-gradient(300px circle at var(--spot-x, 50%) var(--spot-y, 50%), rgba(242, 188, 142, 0.24), rgba(230, 166, 111, 0.06) 45%, transparent 72%)",
+          }}
+          className="absolute inset-0 transition-opacity duration-200"
+        />
+      </div>
 
       <div className="relative z-10 space-y-4">
         {/* Top Row: Single CAPYGO đề xuất label + Stock Status */}
@@ -402,6 +429,38 @@ function FlagshipCard({ product }: { product: StorefrontProduct }) {
 }
 
 function SecondaryFeaturedCard({ product }: { product: StorefrontProduct }) {
+  const cardRef = useRef<HTMLElement>(null)
+  const spotlightRef = useRef<HTMLDivElement>(null)
+  const borderGlowRef = useRef<HTMLDivElement>(null)
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLElement>) => {
+    if (e.pointerType !== "mouse" || !cardRef.current) return
+    if (typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      return
+    }
+    const card = cardRef.current
+    const rect = card.getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
+    const relX = (x / rect.width - 0.5) * 2
+    const relY = (y / rect.height - 0.5) * 2
+    const rotateY = (relX * 3.0).toFixed(2)
+    const rotateX = (-relY * 2.6).toFixed(2)
+
+    card.style.setProperty("--card-x", `${x}px`)
+    card.style.setProperty("--card-y", `${y}px`)
+    card.style.transform = `perspective(900px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) translate3d(0, -4px, 0)`
+
+    if (spotlightRef.current) spotlightRef.current.style.opacity = "1"
+    if (borderGlowRef.current) borderGlowRef.current.style.opacity = "1"
+  }
+
+  const handlePointerLeave = () => {
+    if (cardRef.current) cardRef.current.style.transform = ""
+    if (spotlightRef.current) spotlightRef.current.style.opacity = "0"
+    if (borderGlowRef.current) borderGlowRef.current.style.opacity = "0"
+  }
+
   const pricing = calculateProductPricing(product.variants, product.statusOverride)
   const hasDistinctPrices = new Set(product.variants.map((v) => v.priceCents)).size > 1
   const isContactOnly = product.deliveryType === "contact"
@@ -416,8 +475,34 @@ function SecondaryFeaturedCard({ product }: { product: StorefrontProduct }) {
     .join(" · ")
 
   return (
-    <article className="flex-1 flex flex-col justify-between rounded-2xl border border-border bg-card p-4 transition-card hover:-translate-y-0.5 hover:border-border/90">
-      <div className="flex items-start gap-3">
+    <article
+      ref={cardRef}
+      onPointerMove={handlePointerMove}
+      onPointerLeave={handlePointerLeave}
+      className="group relative flex-1 flex flex-col justify-between rounded-2xl border border-border bg-card p-4 transition-card hover:border-primary/40 hover:shadow-[0_18px_40px_-18px_rgba(230,166,111,0.28)]"
+    >
+      {/* 1.5px Cursor-Tracking Caramel Border Glow Ring */}
+      <div
+        ref={borderGlowRef}
+        aria-hidden="true"
+        style={{ opacity: 0 }}
+        className="card-border-glow z-20"
+      />
+
+      {/* Volumetric Inner Caramel Spotlight */}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-2xl overflow-hidden">
+        <div
+          ref={spotlightRef}
+          style={{
+            opacity: 0,
+            background:
+              "radial-gradient(280px circle at var(--card-x, 50%) var(--card-y, 50%), rgba(242, 188, 142, 0.20), rgba(230, 166, 111, 0.05) 45%, transparent 72%)",
+          }}
+          className="absolute inset-0 transition-opacity duration-200"
+        />
+      </div>
+
+      <div className="relative z-10 flex items-start gap-3">
         <Link
           href={`/product/${product.slug}`}
           tabIndex={-1}
@@ -466,7 +551,7 @@ function SecondaryFeaturedCard({ product }: { product: StorefrontProduct }) {
       </div>
 
       {/* Footer: Calm dark secondary card (never competes with primary caramel card) */}
-      <div className="pt-3 mt-3 border-t border-border/60 flex items-center justify-between gap-3">
+      <div className="relative z-10 pt-3 mt-3 border-t border-border/60 flex items-center justify-between gap-3">
         <div className="flex items-baseline gap-1.5 tabular-nums min-w-0">
           {hasDistinctPrices && (
             <span className="text-[11px] text-muted-foreground">Từ</span>

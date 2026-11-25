@@ -1,10 +1,11 @@
 import Link from "next/link"
-import { Layers, Mail, QrCode, CheckCircle2, ArrowRight, MessageCircle, Search } from "lucide-react"
+import { MessageCircle, Search } from "lucide-react"
 import { getStoreData } from "@/lib/store-data"
 import { Header } from "@/components/storefront/Header"
 import { Footer } from "@/components/storefront/Footer"
 import { HeroSection } from "@/components/storefront/HeroSection"
 import { StorefrontCatalog } from "@/components/storefront/StorefrontCatalog"
+import { HowItWorksSection } from "@/components/storefront/HowItWorksSection"
 import { ZaloWidget } from "@/components/storefront/ZaloWidget"
 import { FaqAccordion } from "@/components/storefront/FaqAccordion"
 
@@ -24,109 +25,14 @@ export default async function HomePage() {
         {/* 2. Featured Packages + Search, Category Filter & Product List */}
         <StorefrontCatalog groups={groups} products={products} />
 
-        {/* 3. How It Works (Connected Editorial Stepper — 4 clear steps) */}
-        <section id="how" className="space-y-5 pt-8 border-t border-border scroll-mt-20">
-          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
-            <div className="space-y-1">
-              <h2 className="font-heading font-bold text-xl sm:text-2xl tracking-tight text-foreground">
-                Hướng dẫn mua hàng
-              </h2>
-              <p className="text-sm text-muted-foreground">
-                Quy trình đặt hàng và nhận thông tin sản phẩm tại CAPYGO.
-              </p>
-            </div>
-            <Link
-              href="/lookup"
-              className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-muted-foreground hover:text-primary transition-colors w-fit"
-            >
-              <span>Tra cứu đơn đã mua</span>
-              <ArrowRight className="size-3.5" />
-            </Link>
-          </div>
+        {/* 3. How It Works (Interactive 4-Step Pipeline with Travelling Light) */}
+        <HowItWorksSection />
 
-          <div className="rounded-2xl border border-border bg-card p-5 sm:p-7">
-            <ol className="relative grid gap-6 lg:grid-cols-4 lg:gap-0">
-              {/* Desktop horizontal connector rail aligned with step icon centers */}
-              <div
-                aria-hidden="true"
-                className="hidden lg:block absolute top-5 left-[12.5%] right-[12.5%] h-px bg-gradient-to-r from-primary/40 via-border to-primary/40"
-              />
-
-              {[
-                {
-                  step: "01",
-                  icon: Layers,
-                  title: "Chọn gói phù hợp",
-                  desc: "Xem rõ hình thức sử dụng (chính chủ, slot, cấp sẵn), thời hạn và điều kiện bảo hành.",
-                },
-                {
-                  step: "02",
-                  icon: Mail,
-                  title: "Nhập thông tin nhận đơn",
-                  desc: "Điền email nhận đơn hàng (kèm mã mời nếu mua gói nạp token).",
-                },
-                {
-                  step: "03",
-                  icon: QrCode,
-                  title: "Chuyển khoản VietQR",
-                  desc: "Quét mã VietQR hoặc chuyển khoản đúng số tiền và nội dung mã đơn.",
-                },
-                {
-                  step: "04",
-                  icon: CheckCircle2,
-                  title: "Nhận trong đơn hàng",
-                  desc: "Thông tin bàn giao hiển thị trực tiếp trên trang đơn hàng sau khi đối soát.",
-                },
-              ].map(({ step, icon: Icon, title, desc }, idx) => (
-                <li
-                  key={step}
-                  className={`relative flex lg:flex-col items-start gap-4 lg:gap-4 ${
-                    idx > 0 ? "lg:pl-6" : ""
-                  } ${idx < 3 ? "lg:pr-6" : ""}`}
-                >
-                  {/* Mobile vertical connector between steps */}
-                  {idx < 3 && (
-                    <span
-                      aria-hidden="true"
-                      className="lg:hidden absolute left-5 top-11 -bottom-5 w-px bg-border"
-                    />
-                  )}
-
-                  {/* Step Node: Crisp Icon + Mono Index */}
-                  <div className="relative z-10 flex items-center gap-2.5 shrink-0 bg-card lg:pr-3">
-                    <div className="size-10 rounded-xl bg-background border border-primary/35 flex items-center justify-center text-primary">
-                      <Icon className="size-4" strokeWidth={2} />
-                    </div>
-                    <span className="font-mono text-xs font-semibold text-primary/90 tracking-wider lg:hidden">
-                      {step}
-                    </span>
-                  </div>
-
-                  {/* Step Copy */}
-                  <div className="space-y-1.5 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="hidden lg:inline-block font-mono text-[11px] font-semibold text-primary/85 tracking-wider">
-                        {step}
-                      </span>
-                      <h3 className="font-semibold text-[15px] text-foreground leading-snug">
-                        {title}
-                      </h3>
-                    </div>
-                    <p className="text-[13px] text-muted-foreground leading-relaxed">
-                      {desc}
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ol>
-          </div>
-        </section>
-
-        {/* 4. FAQ Section (2-Column Editorial Split aligned with page grid) */}
+        {/* 4. FAQ Section (2-Column Editorial Split from md+ screens) */}
         <section id="faq" className="pt-8 border-t border-border scroll-mt-20">
-          <div className="grid gap-6 lg:grid-cols-12 items-start">
-            {/* Left: Heading + Borderless Support Actions */}
-            <div className="lg:col-span-4 space-y-5">
+          <div className="grid gap-6 md:grid-cols-12 items-start">
+            {/* Left: Heading + Clean Support Actions */}
+            <div className="md:col-span-4 space-y-4 md:sticky md:top-24">
               <div className="space-y-1.5">
                 <h2 className="font-heading font-bold text-xl sm:text-2xl tracking-tight text-foreground">
                   Câu hỏi thường gặp
@@ -136,9 +42,9 @@ export default async function HomePage() {
                 </p>
               </div>
 
-              <div className="pt-4 border-t border-border/70 space-y-3">
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  Chưa thấy câu trả lời bạn cần? Nhắn Zalo hoặc kiểm tra nhanh tình trạng đơn hàng.
+              <div className="space-y-2.5 pt-1">
+                <p className="text-xs text-muted-foreground/85 leading-relaxed">
+                  Cần hỗ trợ trực tiếp hoặc kiểm tra nhanh tình trạng đơn hàng?
                 </p>
 
                 <div className="flex flex-wrap items-center gap-2">
@@ -146,14 +52,14 @@ export default async function HomePage() {
                     href={`https://zalo.me/${(process.env.NEXT_PUBLIC_ZALO_PHONE_1 || "0356970964").replace(/\D/g, "")}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center justify-center gap-1.5 h-9 px-3.5 rounded-xl bg-primary text-primary-foreground hover:bg-caramel-light text-xs font-semibold transition-btn"
+                    className="inline-flex items-center justify-center gap-1.5 h-9 px-4 rounded-full bg-primary text-primary-foreground hover:bg-caramel-light active:scale-[0.97] text-xs font-semibold transition-btn"
                   >
                     <MessageCircle className="size-3.5" />
                     <span>Nhắn Zalo hỗ trợ</span>
                   </a>
                   <Link
                     href="/lookup"
-                    className="inline-flex items-center justify-center gap-1.5 h-9 px-3.5 rounded-xl border border-border bg-transparent hover:bg-secondary text-foreground text-xs font-medium transition-btn"
+                    className="inline-flex items-center justify-center gap-1.5 h-9 px-4 rounded-full border border-border bg-card/70 hover:bg-secondary hover:border-primary/40 active:scale-[0.97] text-foreground text-xs font-medium transition-btn"
                   >
                     <Search className="size-3.5 text-muted-foreground" />
                     <span>Tra cứu đơn</span>
@@ -162,8 +68,8 @@ export default async function HomePage() {
               </div>
             </div>
 
-            {/* Right: Full-width Structured Accordion */}
-            <div className="lg:col-span-8">
+            {/* Right: Luminous Editorial Accordion */}
+            <div className="md:col-span-8">
               <FaqAccordion
                 items={[
                   {

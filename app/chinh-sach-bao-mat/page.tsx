@@ -63,8 +63,6 @@ export default async function PrivacyPolicyPage() {
             <ul className="list-disc pl-5 space-y-1.5">
               <li><strong>Tên dịch vụ:</strong> {settings.siteName} (Hệ thống cung cấp sản phẩm và tài khoản số)</li>
               <li><strong>Hotline / Zalo hỗ trợ:</strong> 0356970964</li>
-              <li><strong>Email tiếp nhận yêu cầu về dữ liệu:</strong> support@capygo.id.vn</li>
-              <li><strong>Địa chỉ hoạt động:</strong> Thành phố Hồ Chí Minh, Việt Nam</li>
             </ul>
           </section>
 

@@ -265,7 +265,42 @@ export function ProductCard({
   const [popoverOpen, setPopoverOpen] = useState(false)
   const popoverRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
+  const cardRef = useRef<HTMLElement>(null)
+  const spotlightRef = useRef<HTMLDivElement>(null)
+  const borderGlowRef = useRef<HTMLDivElement>(null)
   const popoverId = useId()
+
+  const handleCardPointerMove = (e: React.PointerEvent<HTMLElement>) => {
+    if (e.pointerType !== "mouse" || !cardRef.current) return
+    if (typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      return
+    }
+    const card = cardRef.current
+    const rect = card.getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
+
+    // Subtle 3D perspective micro-tilt (±3deg max) + smooth elevation
+    const relX = (x / rect.width - 0.5) * 2
+    const relY = (y / rect.height - 0.5) * 2
+    const rotateY = (relX * 3.2).toFixed(2)
+    const rotateX = (-relY * 2.8).toFixed(2)
+
+    card.style.setProperty("--card-x", `${x}px`)
+    card.style.setProperty("--card-y", `${y}px`)
+    card.style.transform = `perspective(900px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) translate3d(0, -4px, 0)`
+
+    if (spotlightRef.current) spotlightRef.current.style.opacity = "1"
+    if (borderGlowRef.current) borderGlowRef.current.style.opacity = "1"
+  }
+
+  const handleCardPointerLeave = () => {
+    if (cardRef.current) {
+      cardRef.current.style.transform = ""
+    }
+    if (spotlightRef.current) spotlightRef.current.style.opacity = "0"
+    if (borderGlowRef.current) borderGlowRef.current.style.opacity = "0"
+  }
 
   const pricing = calculateProductPricing(variants, statusOverride)
   const categoryAccent = getCategoryAccent(groupName)
@@ -333,14 +368,40 @@ export function ProductCard({
 
   return (
     <article
-      className={`group relative flex flex-col justify-between h-full rounded-2xl border bg-card transition-card hover:-translate-y-0.5 ${
+      ref={cardRef}
+      onPointerMove={handleCardPointerMove}
+      onPointerLeave={handleCardPointerLeave}
+      className={`group relative flex flex-col justify-between h-full rounded-2xl border bg-card transition-card ${
         pricing.isOutOfStock && !isContactOnly
           ? "border-border/80 opacity-90 hover:border-border"
           : featured
-          ? "border-primary/45 hover:border-primary/80 shadow-[0_8px_28px_-12px_rgba(230,166,111,0.22)]"
-          : "border-border hover:border-primary/45"
+          ? "border-primary/45 hover:border-primary/80 shadow-[0_8px_28px_-12px_rgba(230,166,111,0.22)] hover:shadow-[0_20px_42px_-16px_rgba(230,166,111,0.34)]"
+          : "border-border hover:border-primary/40 hover:shadow-[0_18px_40px_-18px_rgba(230,166,111,0.28)]"
       } ${className}`}
     >
+      {/* 1px Cursor-Tracking Caramel Border Glow Ring (desktop pointer: fine) */}
+      <div
+        ref={borderGlowRef}
+        aria-hidden="true"
+        style={{ opacity: 0 }}
+        className="card-border-glow z-20"
+      />
+
+      {/* Volumetric Inner Caramel Spotlight (clipped to card radius without clipping popovers) */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 rounded-2xl overflow-hidden"
+      >
+        <div
+          ref={spotlightRef}
+          style={{
+            opacity: 0,
+            background:
+              "radial-gradient(300px circle at var(--card-x, 50%) var(--card-y, 50%), rgba(242, 188, 142, 0.22), rgba(230, 166, 111, 0.06) 45%, transparent 72%)",
+          }}
+          className="absolute inset-0 transition-opacity duration-200"
+        />
+      </div>
       {/* Top Section */}
       <div className="flex flex-col flex-1">
         {/* 1. Unified 16:9 Full-Bleed Media Frame */}
@@ -377,6 +438,9 @@ export function ProductCard({
                 </div>
               )}
             </Link>
+
+            {/* Diagonal Glass Sheen Sweep on Hover */}
+            <div aria-hidden="true" className="card-media-sheen" />
 
             {/* Subtle Category Label (top-left) */}
             <span
@@ -557,7 +621,10 @@ export function ProductCard({
           >
             <Link href={`/product/${slug}`}>
               <span>Chọn gói</span>
-              <ArrowRight className="size-3.5" strokeWidth={2.2} />
+              <ArrowRight
+                className="size-3.5 transition-transform duration-[150ms] ease-out group-hover:translate-x-[3px]"
+                strokeWidth={2.2}
+              />
             </Link>
           </Button>
         )}

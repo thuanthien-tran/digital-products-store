@@ -79,6 +79,28 @@ export function StorefrontCatalog({
   >({})
   const tabListRef = useRef<HTMLDivElement>(null)
   const tabIndicatorRef = useRef<HTMLSpanElement>(null)
+  const searchInputRef = useRef<HTMLInputElement>(null)
+
+  // Press "/" anywhere (outside inputs) to jump straight to search
+  useEffect(() => {
+    const handleSlashShortcut = (e: KeyboardEvent) => {
+      if (e.key !== "/" || e.metaKey || e.ctrlKey || e.altKey) return
+      const target = e.target as HTMLElement | null
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT" ||
+          target.isContentEditable)
+      ) {
+        return
+      }
+      e.preventDefault()
+      searchInputRef.current?.focus()
+    }
+    window.addEventListener("keydown", handleSlashShortcut)
+    return () => window.removeEventListener("keydown", handleSlashShortcut)
+  }, [])
 
   useEffect(() => {
     setCatalogProducts(products)
@@ -414,6 +436,16 @@ export function StorefrontCatalog({
       indicatorEl.style.width = `${activeBtn.offsetWidth}px`
       indicatorEl.style.transform = `translate3d(${activeBtn.offsetLeft}px, 0, 0)`
       indicatorEl.style.opacity = "1"
+
+      // Auto-center active category tab on mobile when strip overflows horizontally
+      if (listEl.scrollWidth > listEl.clientWidth + 4) {
+        const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        activeBtn.scrollIntoView({
+          behavior: prefersReduced ? "auto" : "smooth",
+          inline: "center",
+          block: "nearest",
+        })
+      }
     }
 
     const rafId = requestAnimationFrame(updateIndicator)
@@ -475,7 +507,10 @@ export function StorefrontCatalog({
     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-sm">
       <p className="text-muted-foreground">
         Hiển thị{" "}
-        <strong className="font-semibold text-foreground tabular-nums">
+        <strong
+          key={filteredProducts.length}
+          className="inline-block font-semibold text-foreground tabular-nums animate-price-flash"
+        >
           {filteredProducts.length}
         </strong>{" "}
         sản phẩm
@@ -490,13 +525,13 @@ export function StorefrontCatalog({
       {hasActiveFilters && (
         <div className="flex items-center gap-2 flex-wrap">
           {trimmedQuery && (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-secondary text-foreground border border-border">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-secondary text-foreground border border-border animate-chip-in">
               <span>“{trimmedQuery}”</span>
               <button
                 type="button"
                 onClick={() => setSearchQuery("")}
                 aria-label="Xóa từ khóa tìm kiếm"
-                className="text-muted-foreground hover:text-foreground"
+                className="text-muted-foreground hover:text-foreground transition-colors duration-150"
               >
                 <X className="size-3.5" />
               </button>
@@ -504,13 +539,13 @@ export function StorefrontCatalog({
           )}
 
           {priceRange !== "all" && (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-secondary text-foreground border border-border">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-secondary text-foreground border border-border animate-chip-in">
               <span>{priceRangeLabels[priceRange]}</span>
               <button
                 type="button"
                 onClick={() => setPriceRange("all")}
                 aria-label="Bỏ lọc giá"
-                className="text-muted-foreground hover:text-foreground"
+                className="text-muted-foreground hover:text-foreground transition-colors duration-150"
               >
                 <X className="size-3.5" />
               </button>
@@ -518,13 +553,13 @@ export function StorefrontCatalog({
           )}
 
           {sortBy !== "default" && (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-secondary text-foreground border border-border">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-secondary text-foreground border border-border animate-chip-in">
               <span>{sortOptionLabels[sortBy]}</span>
               <button
                 type="button"
                 onClick={() => setSortBy("default")}
                 aria-label="Đặt lại sắp xếp"
-                className="text-muted-foreground hover:text-foreground"
+                className="text-muted-foreground hover:text-foreground transition-colors duration-150"
               >
                 <X className="size-3.5" />
               </button>
@@ -576,8 +611,11 @@ export function StorefrontCatalog({
 
     return (
       <div className="space-y-6">
-        {/* Responsive Grid: 1 col on narrow mobile so prices/conditions stay crisp, 2 cols sm, 3 cols lg */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 items-stretch">
+        {/* Responsive Grid with fast 180ms crossfade on category/filter/page switch */}
+        <div
+          key={`${selectedGroup}-${priceRange}-${sortBy}-${validPage}`}
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 items-stretch animate-grid-switch"
+        >
           {paginatedProducts.map((p) => (
             <div key={`${selectedGroup}-${p.id}`} className="h-full flex flex-col min-w-0">
               <ProductCard
@@ -599,26 +637,27 @@ export function StorefrontCatalog({
           ))}
         </div>
 
-        {/* Pagination */}
+        {/* Pagination — Clean Floating Bubble Buttons (no outer dock container) */}
         {totalPages > 1 && (
           <nav
-            className="flex items-center justify-center pt-5 border-t border-border"
+            className="flex items-center justify-center pt-6 border-t border-border"
             aria-label="Phân trang danh mục sản phẩm"
           >
-            <div className="flex items-center gap-1.5 flex-wrap justify-center">
-              <Button
-                variant="outline"
-                size="sm"
+            <div className="inline-flex items-center gap-2 flex-wrap justify-center">
+              <button
+                type="button"
                 onClick={() => handlePageChange(validPage - 1)}
                 disabled={validPage <= 1}
-                className="h-10 px-3 rounded-xl text-xs font-medium border-border hover:bg-secondary disabled:opacity-35"
+                className="group/prev inline-flex items-center justify-center h-10 px-3.5 rounded-full text-xs font-medium border border-border bg-card text-foreground hover:border-primary/60 hover:text-primary disabled:opacity-35 disabled:cursor-not-allowed pagination-bubble cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 aria-label="Trang trước"
               >
-                <ChevronLeft className="size-4 sm:mr-1" />
+                <span aria-hidden="true" className="micro-bubble-a" />
+                <span aria-hidden="true" className="micro-bubble-b" />
+                <ChevronLeft className="size-4 sm:mr-1 transition-transform duration-150 group-hover/prev:-translate-x-0.5" />
                 <span className="hidden sm:inline">Trước</span>
-              </Button>
+              </button>
 
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-2">
                 {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
                   const isActive = page === validPage
                   return (
@@ -627,29 +666,32 @@ export function StorefrontCatalog({
                       type="button"
                       onClick={() => handlePageChange(page)}
                       aria-current={isActive ? "page" : undefined}
-                      className={`size-10 rounded-xl text-sm font-semibold transition-btn flex items-center justify-center border ${
+                      className={`size-10 rounded-full text-sm font-semibold flex items-center justify-center border cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                         isActive
-                          ? "bg-primary text-primary-foreground border-primary"
-                          : "bg-card text-muted-foreground hover:text-foreground hover:bg-secondary border-border"
+                          ? "text-[#251A14] border-[#FCE0C2]/80 font-bold pagination-bubble-active"
+                          : "bg-card text-muted-foreground hover:text-foreground hover:border-primary/60 hover:bg-secondary border-border pagination-bubble"
                       }`}
                     >
-                      {page}
+                      <span aria-hidden="true" className="micro-bubble-a" />
+                      <span aria-hidden="true" className="micro-bubble-b" />
+                      <span>{page}</span>
                     </button>
                   )
                 })}
               </div>
 
-              <Button
-                variant="outline"
-                size="sm"
+              <button
+                type="button"
                 onClick={() => handlePageChange(validPage + 1)}
                 disabled={validPage >= totalPages}
-                className="h-10 px-3 rounded-xl text-xs font-medium border-border hover:bg-secondary disabled:opacity-35"
+                className="group/next inline-flex items-center justify-center h-10 px-3.5 rounded-full text-xs font-semibold border border-border bg-card text-foreground hover:border-primary/60 hover:text-primary disabled:opacity-35 disabled:cursor-not-allowed pagination-bubble cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 aria-label="Trang sau"
               >
+                <span aria-hidden="true" className="micro-bubble-a" />
+                <span aria-hidden="true" className="micro-bubble-b" />
                 <span className="hidden sm:inline">Sau</span>
-                <ChevronRight className="size-4 sm:ml-1" />
-              </Button>
+                <ChevronRight className="size-4 sm:ml-1 transition-transform duration-150 group-hover/next:translate-x-0.5" />
+              </button>
             </div>
           </nav>
         )}
@@ -708,14 +750,14 @@ export function StorefrontCatalog({
             </button>
           </div>
 
-          {/* Sidebar Filters (desktop sticky, collapsible on mobile — 1 DOM tree, no duplicate IDs) */}
+          {/* Sidebar Filters (Linear-style sleek sticky sidebar, collapsible on mobile) */}
           <aside
             id={`${catalogId}-sidebar-filters`}
-            className={`w-full lg:w-64 shrink-0 lg:sticky lg:top-20 self-start space-y-5 rounded-2xl border border-border bg-card p-4 sm:p-5 ${
+            className={`w-full lg:w-64 shrink-0 lg:sticky lg:top-20 self-start space-y-5 rounded-2xl border border-border/80 bg-card/85 backdrop-blur-sm p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] ${
               isMobileFilterOpen ? "block" : "hidden lg:block"
             }`}
           >
-            <div className="flex items-center justify-between pb-3 border-b border-border">
+            <div className="flex items-center justify-between pb-3 border-b border-border/70">
               <h3 className="font-semibold text-sm text-foreground flex items-center gap-2">
                 <SlidersHorizontal className="size-4 text-primary" />
                 <span>Bộ lọc</span>
@@ -724,7 +766,7 @@ export function StorefrontCatalog({
                 <button
                   type="button"
                   onClick={handleResetFilters}
-                  className="text-xs font-medium text-primary hover:underline"
+                  className="text-xs font-semibold text-primary hover:text-caramel-light transition-colors cursor-pointer"
                 >
                   Đặt lại
                 </button>
@@ -732,25 +774,41 @@ export function StorefrontCatalog({
             </div>
 
             {/* Categories */}
-            <div className="space-y-2">
-              <span className="text-xs font-semibold text-muted-foreground block">
+            <div className="space-y-1.5">
+              <span className="px-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/75 block">
                 Danh mục
               </span>
-              <div className="space-y-1">
+              <div className="space-y-0.5">
                 <button
                   type="button"
                   onClick={() => {
                     setSelectedGroup("all")
                     setIsMobileFilterOpen(false)
                   }}
-                  className={`w-full min-h-[40px] flex items-center justify-between px-3 py-2 rounded-xl text-sm transition-btn ${
+                  className={`group/item relative w-full min-h-[38px] flex items-center justify-between px-3 py-1.5 rounded-xl text-[13px] transition-ui cursor-pointer ${
                     selectedGroup === "all"
-                      ? "bg-primary/15 text-primary border border-primary/35 font-semibold"
-                      : "text-muted-foreground hover:text-foreground hover:bg-secondary border border-transparent"
+                      ? "bg-primary/14 text-primary font-semibold"
+                      : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
                   }`}
                 >
-                  <span>Tất cả</span>
-                  <span className="text-xs tabular-nums">{productsWithLiveStock.length}</span>
+                  {selectedGroup === "all" && (
+                    <span
+                      aria-hidden="true"
+                      className="absolute left-0 top-2 bottom-2 w-[2.5px] rounded-full bg-primary"
+                    />
+                  )}
+                  <span className="transition-transform duration-150 group-hover/item:translate-x-0.5">
+                    Tất cả
+                  </span>
+                  <span
+                    className={`px-1.5 py-0.5 rounded-md text-[11px] tabular-nums ${
+                      selectedGroup === "all"
+                        ? "bg-primary/20 text-primary font-semibold"
+                        : "text-muted-foreground/75"
+                    }`}
+                  >
+                    {productsWithLiveStock.length}
+                  </span>
                 </button>
                 {activeGroups.map((g) => {
                   const isSelected = selectedGroup === g.id
@@ -762,14 +820,30 @@ export function StorefrontCatalog({
                         setSelectedGroup(g.id)
                         setIsMobileFilterOpen(false)
                       }}
-                      className={`w-full min-h-[40px] flex items-center justify-between px-3 py-2 rounded-xl text-sm transition-btn ${
+                      className={`group/item relative w-full min-h-[38px] flex items-center justify-between px-3 py-1.5 rounded-xl text-[13px] transition-ui cursor-pointer ${
                         isSelected
-                          ? "bg-primary/15 text-primary border border-primary/35 font-semibold"
-                          : "text-muted-foreground hover:text-foreground hover:bg-secondary border border-transparent"
+                          ? "bg-primary/14 text-primary font-semibold"
+                          : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
                       }`}
                     >
-                      <span className="truncate pr-2 text-left">{g.name}</span>
-                      <span className="text-xs tabular-nums shrink-0">{g.count}</span>
+                      {isSelected && (
+                        <span
+                          aria-hidden="true"
+                          className="absolute left-0 top-2 bottom-2 w-[2.5px] rounded-full bg-primary"
+                        />
+                      )}
+                      <span className="truncate pr-2 text-left transition-transform duration-150 group-hover/item:translate-x-0.5">
+                        {g.name}
+                      </span>
+                      <span
+                        className={`px-1.5 py-0.5 rounded-md text-[11px] tabular-nums shrink-0 ${
+                          isSelected
+                            ? "bg-primary/20 text-primary font-semibold"
+                            : "text-muted-foreground/75"
+                        }`}
+                      >
+                        {g.count}
+                      </span>
                     </button>
                   )
                 })}
@@ -777,11 +851,11 @@ export function StorefrontCatalog({
             </div>
 
             {/* Price Range */}
-            <div className="space-y-2 pt-3 border-t border-border">
-              <span className="text-xs font-semibold text-muted-foreground block">
+            <div className="space-y-1.5 pt-3.5 border-t border-border/70">
+              <span className="px-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/75 block">
                 Khoảng giá
               </span>
-              <div className="space-y-1">
+              <div className="space-y-0.5">
                 {(
                   [
                     { key: "all", label: "Tất cả mức giá" },
@@ -800,13 +874,23 @@ export function StorefrontCatalog({
                         setPriceRange(opt.key)
                         setIsMobileFilterOpen(false)
                       }}
-                      className={`w-full min-h-[38px] flex items-center justify-between px-3 py-1.5 rounded-xl text-sm transition-btn ${
+                      className={`group/item relative w-full min-h-[36px] flex items-center gap-2.5 px-3 py-1.5 rounded-xl text-[13px] transition-ui cursor-pointer ${
                         isSelected
-                          ? "bg-primary/15 text-primary border border-primary/35 font-semibold"
-                          : "text-muted-foreground hover:text-foreground hover:bg-secondary border border-transparent"
+                          ? "bg-primary/14 text-primary font-semibold"
+                          : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
                       }`}
                     >
-                      <span>{opt.label}</span>
+                      <span
+                        aria-hidden="true"
+                        className={`size-1.5 rounded-full shrink-0 transition-colors duration-150 ${
+                          isSelected
+                            ? "bg-primary shadow-[0_0_8px_rgba(230,166,111,0.8)]"
+                            : "bg-border group-hover/item:bg-muted-foreground"
+                        }`}
+                      />
+                      <span className="transition-transform duration-150 group-hover/item:translate-x-0.5">
+                        {opt.label}
+                      </span>
                     </button>
                   )
                 })}
@@ -814,56 +898,97 @@ export function StorefrontCatalog({
             </div>
 
             {/* Sort */}
-            <div className="space-y-2 pt-3 border-t border-border">
+            <div className="space-y-2 pt-3.5 border-t border-border/70">
               <label
                 htmlFor={`${catalogId}-sidebar-sort`}
-                className="text-xs font-semibold text-muted-foreground block"
+                className="px-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/75 block"
               >
                 Sắp xếp
               </label>
-              <div className="relative">
-                <select
-                  id={`${catalogId}-sidebar-sort`}
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as SortOptionKey)}
-                  style={{ WebkitAppearance: "none", MozAppearance: "none" }}
-                  className="w-full h-10 pl-3 pr-9 rounded-xl bg-background border border-border text-foreground text-sm leading-normal focus:outline-none focus:border-primary focus:ring-2 focus:ring-ring/30 appearance-none bg-none cursor-pointer"
-                >
-                  <option value="default">Mặc định</option>
-                  <option value="price_asc">Giá: Thấp đến cao</option>
-                  <option value="price_desc">Giá: Cao đến thấp</option>
-                  <option value="name_asc">Tên: A – Z</option>
-                  <option value="name_desc">Tên: Z – A</option>
-                </select>
-                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
-              </div>
+              <select
+                id={`${catalogId}-sidebar-sort`}
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as SortOptionKey)}
+                className="w-full h-10 px-3 rounded-xl bg-background/85 border border-border hover:border-primary/45 text-foreground text-[13px] leading-normal focus:outline-none focus:border-primary focus:ring-2 focus:ring-ring/30 transition-btn cursor-pointer"
+              >
+                <option value="default">Mặc định</option>
+                <option value="price_asc">Giá: Thấp → Cao</option>
+                <option value="price_desc">Giá: Cao → Thấp</option>
+                <option value="name_asc">Tên: A – Z</option>
+                <option value="name_desc">Tên: Z – A</option>
+              </select>
             </div>
           </aside>
 
-          {/* Right: Search + Results + Grid */}
+          {/* Right: Command-Style Luminous Search + Results + Grid */}
           <div className="flex-1 min-w-0 space-y-5 w-full">
-            <div className="relative w-full">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
+            <div className="group relative flex items-center w-full h-12 rounded-2xl bg-card/90 border border-border/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] hover:border-border focus-within:border-primary/65 focus-within:bg-card focus-within:shadow-[0_0_0_3px_rgba(230,166,111,0.14),0_12px_28px_-14px_rgba(230,166,111,0.35)] transition-[border-color,background-color,box-shadow] duration-200">
+              <div className="pl-4 pr-2.5 flex items-center pointer-events-none">
+                <Search className="size-[18px] text-muted-foreground group-focus-within:text-primary group-focus-within:scale-105 transition-[color,transform] duration-150" />
+              </div>
+
               <input
+                ref={searchInputRef}
                 id={`${catalogId}-search`}
                 type="search"
                 autoComplete="off"
                 placeholder="Tìm phần mềm, AI, gói nâng cấp..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    if (searchQuery) setSearchQuery("")
+                    else e.currentTarget.blur()
+                  }
+                }}
                 aria-label="Tìm kiếm sản phẩm"
-                className="w-full h-12 pl-10 pr-10 rounded-xl bg-card border border-border text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:border-primary focus:ring-2 focus:ring-ring/30 transition-btn"
+                className="flex-1 min-w-0 h-full bg-transparent text-foreground text-sm sm:text-[15px] placeholder:text-muted-foreground/80 focus:outline-none pr-3 [&::-webkit-search-cancel-button]:hidden"
               />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery("")}
-                  aria-label="Xóa từ khóa tìm kiếm"
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 inline-flex size-8 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-btn"
-                >
-                  <X className="size-4" />
-                </button>
-              )}
+
+              <div className="pr-2.5 flex items-center gap-1.5 shrink-0">
+                {searchQuery ? (
+                  <>
+                    <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium tabular-nums bg-primary/15 text-primary border border-primary/25 animate-chip-in">
+                      {filteredProducts.length} kết quả
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSearchQuery("")
+                        searchInputRef.current?.focus()
+                      }}
+                      aria-label="Xóa từ khóa tìm kiếm"
+                      className="inline-flex size-8 items-center justify-center rounded-xl text-muted-foreground hover:text-foreground hover:bg-secondary active:scale-95 transition-btn animate-chip-in cursor-pointer"
+                    >
+                      <X className="size-4" />
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <div className="hidden md:flex items-center gap-1 mr-1">
+                      {["ChatGPT", "YouTube", "Canva", "Claude"].map((kw) => (
+                        <button
+                          key={kw}
+                          type="button"
+                          onClick={() => {
+                            setSearchQuery(kw)
+                            searchInputRef.current?.focus()
+                          }}
+                          className="px-2.5 py-1 rounded-full text-[11px] font-medium text-muted-foreground bg-background/70 border border-border/70 hover:text-primary hover:border-primary/40 hover:bg-primary/10 active:scale-95 transition-btn cursor-pointer"
+                        >
+                          {kw}
+                        </button>
+                      ))}
+                    </div>
+                    <kbd
+                      title="Nhấn phím / để tìm nhanh"
+                      className="hidden sm:inline-flex items-center justify-center h-6 min-w-6 px-1.5 rounded-md border border-border/90 bg-background/90 text-[11px] font-mono font-semibold text-muted-foreground/80 select-none"
+                    >
+                      /
+                    </kbd>
+                  </>
+                )}
+              </div>
             </div>
 
             {renderResultSummary()}
@@ -875,29 +1000,75 @@ export function StorefrontCatalog({
         /* Home Editorial Flow: 1) Tìm kiếm & danh mục -> 2) Gói nổi bật -> 3) Danh sách sản phẩm */
         <div className="space-y-8">
           <div className="space-y-3">
-            {/* Prominent Search Bar */}
-            <div className="relative w-full">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
+            {/* Command-Style Luminous Search Bar (supports "/" keyboard shortcut) */}
+            <div className="group relative flex items-center w-full h-12 rounded-2xl bg-card/90 border border-border/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] hover:border-border focus-within:border-primary/65 focus-within:bg-card focus-within:shadow-[0_0_0_3px_rgba(230,166,111,0.14),0_12px_28px_-14px_rgba(230,166,111,0.35)] transition-[border-color,background-color,box-shadow] duration-200">
+              <div className="pl-4 pr-2.5 flex items-center pointer-events-none">
+                <Search className="size-[18px] text-muted-foreground group-focus-within:text-primary group-focus-within:scale-105 transition-[color,transform] duration-150" />
+              </div>
+
               <input
+                ref={searchInputRef}
                 id={`${catalogId}-home-search`}
                 type="search"
                 autoComplete="off"
                 placeholder="Tìm phần mềm, AI, gói nâng cấp..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    if (searchQuery) setSearchQuery("")
+                    else e.currentTarget.blur()
+                  }
+                }}
                 aria-label="Tìm kiếm sản phẩm"
-                className="w-full h-11 pl-10 pr-10 rounded-xl bg-card border border-border text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:border-primary focus:ring-2 focus:ring-ring/30 transition-btn"
+                className="flex-1 min-w-0 h-full bg-transparent text-foreground text-sm sm:text-[15px] placeholder:text-muted-foreground/80 focus:outline-none pr-3 [&::-webkit-search-cancel-button]:hidden"
               />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery("")}
-                  aria-label="Xóa từ khóa tìm kiếm"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex size-8 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-btn"
-                >
-                  <X className="size-4" />
-                </button>
-              )}
+
+              {/* Right slot: Live count + Clear when typing, or quick keywords + "/" keycap when empty */}
+              <div className="pr-2.5 flex items-center gap-1.5 shrink-0">
+                {searchQuery ? (
+                  <>
+                    <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium tabular-nums bg-primary/15 text-primary border border-primary/25 animate-chip-in">
+                      {filteredProducts.length} kết quả
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSearchQuery("")
+                        searchInputRef.current?.focus()
+                      }}
+                      aria-label="Xóa từ khóa tìm kiếm"
+                      className="inline-flex size-8 items-center justify-center rounded-xl text-muted-foreground hover:text-foreground hover:bg-secondary active:scale-95 transition-btn animate-chip-in cursor-pointer"
+                    >
+                      <X className="size-4" />
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <div className="hidden md:flex items-center gap-1 mr-1">
+                      {["ChatGPT", "YouTube", "Canva", "Claude"].map((kw) => (
+                        <button
+                          key={kw}
+                          type="button"
+                          onClick={() => {
+                            setSearchQuery(kw)
+                            searchInputRef.current?.focus()
+                          }}
+                          className="px-2.5 py-1 rounded-full text-[11px] font-medium text-muted-foreground bg-background/70 border border-border/70 hover:text-primary hover:border-primary/40 hover:bg-primary/10 active:scale-95 transition-btn cursor-pointer"
+                        >
+                          {kw}
+                        </button>
+                      ))}
+                    </div>
+                    <kbd
+                      title="Nhấn phím / để tìm nhanh"
+                      className="hidden sm:inline-flex items-center justify-center h-6 min-w-6 px-1.5 rounded-md border border-border/90 bg-background/90 text-[11px] font-mono font-semibold text-muted-foreground/80 select-none"
+                    >
+                      /
+                    </kbd>
+                  </>
+                )}
+              </div>
             </div>
 
             {/* Category Tabs (left) + Price & Sort Controls (right) */}
@@ -915,7 +1086,7 @@ export function StorefrontCatalog({
                     ref={tabIndicatorRef}
                     aria-hidden="true"
                     style={{ opacity: 0 }}
-                    className="pointer-events-none absolute left-0 top-0 h-[36px] rounded-full bg-primary transition-[transform,width,opacity] duration-[210ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
+                    className="pointer-events-none absolute left-0 top-0 h-[36px] rounded-full bg-primary shadow-[0_4px_14px_-4px_rgba(230,166,111,0.45)] transition-[transform,width,opacity] duration-[210ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
                   />
 
                   <button
@@ -924,7 +1095,7 @@ export function StorefrontCatalog({
                     data-category-tab="all"
                     aria-selected={selectedGroup === "all"}
                     onClick={() => setSelectedGroup("all")}
-                    className={`relative z-10 min-h-[36px] px-3.5 py-1.5 rounded-full text-xs sm:text-sm font-medium whitespace-nowrap border shrink-0 transition-btn ${
+                    className={`relative z-10 min-h-[36px] px-3.5 py-1.5 rounded-full text-xs sm:text-sm font-medium whitespace-nowrap border shrink-0 active:scale-[0.97] transition-btn ${
                       selectedGroup === "all"
                         ? "text-primary-foreground border-transparent font-semibold"
                         : "bg-card text-muted-foreground hover:text-foreground hover:bg-secondary border-border"
@@ -943,7 +1114,7 @@ export function StorefrontCatalog({
                         data-category-tab={g.id}
                         aria-selected={isSelected}
                         onClick={() => setSelectedGroup(g.id)}
-                        className={`relative z-10 min-h-[36px] px-3.5 py-1.5 rounded-full text-xs sm:text-sm font-medium whitespace-nowrap border shrink-0 transition-btn ${
+                        className={`relative z-10 min-h-[36px] px-3.5 py-1.5 rounded-full text-xs sm:text-sm font-medium whitespace-nowrap border shrink-0 active:scale-[0.97] transition-btn ${
                           isSelected
                             ? "text-primary-foreground border-transparent font-semibold"
                             : "bg-card text-muted-foreground hover:text-foreground hover:bg-secondary border-border"
@@ -960,13 +1131,13 @@ export function StorefrontCatalog({
                 />
               </div>
 
-              {/* Clean Single-Arrow Price & Sort Controls */}
+              {/* Clean Single-Arrow Price & Sort Controls (harmonized pill radius) */}
               <div className="grid grid-cols-2 sm:flex items-center gap-2 shrink-0">
                 <select
                   value={priceRange}
                   onChange={(e) => setPriceRange(e.target.value as PriceRangeKey)}
                   aria-label="Lọc theo mức giá"
-                  className="w-full sm:w-auto h-9 px-3 rounded-xl bg-card border border-border text-foreground text-xs sm:text-sm leading-normal focus:outline-none focus:border-primary focus:ring-2 focus:ring-ring/30 cursor-pointer"
+                  className="w-full sm:w-auto h-9 px-3.5 rounded-full bg-card border border-border hover:border-primary/45 text-foreground text-xs sm:text-sm leading-normal focus:outline-none focus:border-primary focus:ring-2 focus:ring-ring/30 transition-btn cursor-pointer"
                 >
                   <option value="all">Giá: Tất cả</option>
                   <option value="under_50k">Dưới 50.000₫</option>
@@ -979,7 +1150,7 @@ export function StorefrontCatalog({
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as SortOptionKey)}
                   aria-label="Sắp xếp sản phẩm"
-                  className="w-full sm:w-auto h-9 px-3 rounded-xl bg-card border border-border text-foreground text-xs sm:text-sm leading-normal focus:outline-none focus:border-primary focus:ring-2 focus:ring-ring/30 cursor-pointer"
+                  className="w-full sm:w-auto h-9 px-3.5 rounded-full bg-card border border-border hover:border-primary/45 text-foreground text-xs sm:text-sm leading-normal focus:outline-none focus:border-primary focus:ring-2 focus:ring-ring/30 transition-btn cursor-pointer"
                 >
                   <option value="default">Sắp xếp: Mặc định</option>
                   <option value="price_asc">Giá: Thấp → Cao</option>

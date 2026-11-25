@@ -239,6 +239,249 @@ h1, h2, h3, h4, h5, h6 {
   animation: price-update-flash var(--motion-ui) var(--ease-out-soft) both;
 }
 
+/* Fast subtle grid crossfade when switching category/filter/page (no card stagger) */
+@keyframes catalog-grid-switch {
+  0% {
+    opacity: 0.72;
+    transform: translate3d(0, 4px, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.animate-grid-switch {
+  animation: catalog-grid-switch 180ms var(--ease-out-soft) both;
+}
+
+@keyframes filter-chip-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-chip-in {
+  animation: filter-chip-in var(--motion-fast) var(--ease-out-soft) both;
+}
+
+/* Futuristic cursor-tracking 1px caramel border spotlight (masked strictly to border ring) */
+.card-border-glow {
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1.5px;
+  pointer-events: none;
+  background: radial-gradient(
+    260px circle at var(--card-x, 50%) var(--card-y, 50%),
+    rgba(246, 200, 152, 0.9),
+    rgba(230, 166, 111, 0.35) 40%,
+    transparent 72%
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  transition: opacity var(--motion-ui) var(--ease-out-soft);
+}
+
+/* Subtle diagonal glass sheen sweeping across product media on card hover */
+.card-media-sheen {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    115deg,
+    transparent 25%,
+    rgba(255, 245, 234, 0.16) 48%,
+    rgba(242, 188, 142, 0.08) 54%,
+    transparent 75%
+  );
+  transform: translate3d(-120%, 0, 0);
+  transition: transform 520ms var(--ease-out-soft);
+}
+
+.group:hover .card-media-sheen {
+  transform: translate3d(120%, 0, 0);
+}
+
+/* Floating Bubble Pagination — Liquid Glass Dock, Hover Ripple & Rising Micro-Bubbles */
+@keyframes pagination-bubble-float {
+  0%, 100% {
+    transform: translate3d(0, -1px, 0) scale(1);
+    box-shadow:
+      inset 0 1px 2px rgba(255, 250, 244, 0.65),
+      0 6px 18px -4px rgba(230, 166, 111, 0.58);
+  }
+  50% {
+    transform: translate3d(0, -5px, 0) scale(1.06);
+    box-shadow:
+      inset 0 1.5px 3px rgba(255, 250, 244, 0.8),
+      0 14px 26px -4px rgba(230, 166, 111, 0.78);
+  }
+}
+
+@keyframes bubble-ring-expand {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.75;
+  }
+  100% {
+    transform: scale(1.48);
+    opacity: 0;
+  }
+}
+
+@keyframes micro-bubble-rise {
+  0% {
+    transform: translate3d(0, 4px, 0) scale(0.5);
+    opacity: 0;
+  }
+  30% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: translate3d(var(--drift-x, 4px), -18px, 0) scale(1.1);
+    opacity: 0;
+  }
+}
+
+.pagination-bubble {
+  position: relative;
+  transition: transform 260ms cubic-bezier(0.34, 1.56, 0.64, 1),
+              background-color var(--motion-fast) var(--ease-out-soft),
+              border-color var(--motion-fast) var(--ease-out-soft),
+              color var(--motion-fast) var(--ease-out-soft),
+              box-shadow 240ms var(--ease-out-soft);
+}
+
+.pagination-bubble::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 9999px;
+  border: 1.5px solid rgba(242, 188, 142, 0.65);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.pagination-bubble:hover:not(:disabled) {
+  transform: translate3d(0, -4px, 0) scale(1.1);
+  box-shadow:
+    inset 0 1px 2px rgba(255, 245, 234, 0.28),
+    0 12px 24px -6px rgba(230, 166, 111, 0.5);
+}
+
+.pagination-bubble:hover:not(:disabled)::after {
+  animation: bubble-ring-expand 650ms var(--ease-out-soft) forwards;
+}
+
+.pagination-bubble:active:not(:disabled) {
+  transform: translate3d(0, 1px, 0) scale(0.88);
+  transition-duration: 90ms;
+}
+
+.pagination-bubble .micro-bubble-a,
+.pagination-bubble .micro-bubble-b,
+.pagination-bubble-active .micro-bubble-a,
+.pagination-bubble-active .micro-bubble-b {
+  position: absolute;
+  border-radius: 9999px;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(circle at 35% 35%, #FFF8F0, rgba(242, 188, 142, 0.85));
+}
+
+.pagination-bubble .micro-bubble-a,
+.pagination-bubble-active .micro-bubble-a {
+  width: 5px;
+  height: 5px;
+  top: 4px;
+  left: 6px;
+  --drift-x: -5px;
+}
+
+.pagination-bubble .micro-bubble-b,
+.pagination-bubble-active .micro-bubble-b {
+  width: 4px;
+  height: 4px;
+  top: 6px;
+  right: 6px;
+  --drift-x: 6px;
+}
+
+.pagination-bubble:hover:not(:disabled) .micro-bubble-a {
+  animation: micro-bubble-rise 900ms var(--ease-out-soft) infinite;
+}
+
+.pagination-bubble:hover:not(:disabled) .micro-bubble-b {
+  animation: micro-bubble-rise 1050ms var(--ease-out-soft) 240ms infinite;
+}
+
+.pagination-bubble-active {
+  position: relative;
+  background: radial-gradient(circle at 32% 24%, #FCE0C2 0%, #EAA96E 48%, #D48D50 100%);
+  box-shadow:
+    inset 0 1px 2px rgba(255, 250, 244, 0.65),
+    0 8px 20px -5px rgba(230, 166, 111, 0.62);
+  transition: transform 240ms cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 220ms var(--ease-out-soft);
+}
+
+.pagination-bubble-active:hover {
+  transform: translate3d(0, -5px, 0) scale(1.1);
+}
+
+.pagination-bubble-active:active {
+  transform: translate3d(0, 1px, 0) scale(0.9);
+}
+
+.pagination-bubble-active .micro-bubble-a {
+  animation: micro-bubble-rise 2.4s var(--ease-out-soft) infinite;
+}
+
+.pagination-bubble-active .micro-bubble-b {
+  animation: micro-bubble-rise 2.8s var(--ease-out-soft) 0.9s infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pagination-bubble-active,
+  .pagination-bubble::after,
+  .micro-bubble-a,
+  .micro-bubble-b,
+  .step-rail-pulse {
+    animation: none !important;
+  }
+}
+
+/* Travelling caramel light beam along How-It-Works connector rail */
+@keyframes step-rail-travel {
+  0% {
+    transform: translate3d(-100%, 0, 0);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(420%, 0, 0);
+    opacity: 0;
+  }
+}
+
+.step-rail-pulse {
+  animation: step-rail-travel 4.2s var(--ease-out-soft) infinite;
+}
+
 /* Smooth CSS Grid Accordion Panel (never clips long content) */
 .accordion-grid {
   display: grid;
