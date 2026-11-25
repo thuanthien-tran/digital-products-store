@@ -343,18 +343,18 @@ export function ProductCard({
     >
       {/* Top Section */}
       <div className="flex flex-col flex-1">
-        {/* 1. Unified Dark-Framed Media Container (normalizes white & dark logos consistently) */}
+        {/* 1. Unified 16:9 Full-Bleed Media Frame */}
         <div className="p-3 pb-0">
           <div
-            className={`relative h-32 sm:h-36 w-full overflow-hidden rounded-xl border flex items-center justify-center ${
+            className={`relative aspect-[16/9] w-full overflow-hidden rounded-xl border ${
               featured && !pricing.isOutOfStock
-                ? "bg-gradient-to-b from-primary/[0.06] to-background border-primary/25"
+                ? "bg-background border-primary/25"
                 : "bg-background border-border/70"
             }`}
           >
             <Link
               href={`/product/${slug}`}
-              className="w-full h-full flex items-center justify-center p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="block w-full h-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               tabIndex={-1}
               aria-hidden="true"
             >
@@ -363,15 +363,17 @@ export function ProductCard({
                 <img
                   src={primaryImage}
                   alt=""
-                  className="max-h-full max-w-full object-contain rounded-lg transition-transform duration-[180ms] ease-out group-hover:scale-[1.02]"
+                  className="w-full h-full object-cover transition-transform duration-[180ms] ease-out group-hover:scale-[1.02]"
                   onError={() => setImgError(true)}
                   loading="lazy"
                 />
               ) : (
-                <div
-                  className={`size-12 rounded-xl flex items-center justify-center border ${categoryAccent.iconBg}`}
-                >
-                  <BrandIcon name={name} className="size-6" />
+                <div className="w-full h-full flex items-center justify-center p-4">
+                  <div
+                    className={`size-12 rounded-xl flex items-center justify-center border ${categoryAccent.iconBg}`}
+                  >
+                    <BrandIcon name={name} className="size-6" />
+                  </div>
                 </div>
               )}
             </Link>

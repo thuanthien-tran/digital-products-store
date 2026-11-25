@@ -150,7 +150,7 @@ function CompactThumb({
 
   return (
     <div
-      className={`${sizeClass} shrink-0 rounded-xl border p-2 flex items-center justify-center overflow-hidden ${surfaceClass}`}
+      className={`${sizeClass} shrink-0 rounded-xl border overflow-hidden flex items-center justify-center ${surfaceClass}`}
     >
       {imageUrl && !failed ? (
         // eslint-disable-next-line @next/next/no-img-element
@@ -159,7 +159,7 @@ function CompactThumb({
           alt=""
           onError={() => setFailed(true)}
           loading="lazy"
-          className="max-h-full max-w-full object-contain rounded-md"
+          className="w-full h-full object-cover"
         />
       ) : (
         <BrandIcon name={name} className="size-6 text-muted-foreground" />
@@ -255,13 +255,13 @@ function FlagshipCard({ product }: { product: StorefrontProduct }) {
   return (
     <article
       ref={cardRef}
-      className="relative h-full flex flex-col justify-between rounded-2xl border border-[#F5C69A]/70 bg-gradient-to-br from-[#EAA96E] via-[#E19E62] to-[#CE8A4E] p-5 sm:p-6 transition-card hover:-translate-y-[3px] hover:border-[#F8D6B4] shadow-[0_14px_34px_-16px_rgba(230,166,111,0.45)] overflow-hidden"
+      className="relative h-full flex flex-col justify-between rounded-2xl border border-[#E6A66F]/35 bg-gradient-to-br from-[#2E2219] via-[#201B18] to-[#16171A] p-5 sm:p-6 transition-card hover:-translate-y-[3px] hover:border-[#E6A66F]/75 shadow-[0_12px_30px_-18px_rgba(230,166,111,0.2)] hover:shadow-[0_16px_38px_-16px_rgba(230,166,111,0.34)] overflow-hidden"
     >
       {/* One-time soft ivory sheen sweep on viewport entry */}
       {hasEntered && (
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-y-0 -left-1/3 w-1/3 bg-gradient-to-r from-transparent via-[#FFF5EA]/40 to-transparent featured-sheen-once"
+          className="pointer-events-none absolute inset-y-0 -left-1/3 w-1/3 bg-gradient-to-r from-transparent via-[#FFF5EA]/14 to-transparent featured-sheen-once"
         />
       )}
 
@@ -272,30 +272,30 @@ function FlagshipCard({ product }: { product: StorefrontProduct }) {
         style={{
           opacity: 0,
           background:
-            "radial-gradient(240px circle at var(--spot-x, 50%) var(--spot-y, 50%), rgba(255, 245, 234, 0.28), transparent 70%)",
+            "radial-gradient(280px circle at var(--spot-x, 50%) var(--spot-y, 50%), rgba(240, 184, 130, 0.22), rgba(230, 166, 111, 0.06) 45%, transparent 72%)",
         }}
         className="pointer-events-none absolute inset-0 transition-opacity duration-200"
       />
 
       <div className="relative z-10 space-y-4">
-        {/* Top Row: Single CAPYGO đề xuất label + High-contrast Stock Status */}
+        {/* Top Row: Single CAPYGO đề xuất label + Stock Status */}
         <div className="flex items-center justify-between gap-2">
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-[0.07em] bg-[#161210]/12 text-[#161210]">
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-[0.07em] bg-[#E6A66F]/18 text-[#F2BC8E] border border-[#E6A66F]/30">
             CAPYGO đề xuất
           </span>
 
           {isContactOnly ? (
-            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#1E1610]">
-              <span className="size-1.5 rounded-full bg-[#1E1610]" />
+            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-[#FFF5EA]/85">
+              <span className="size-1.5 rounded-full bg-[#E6A66F]" />
               Liên hệ đặt
             </span>
           ) : pricing.isOutOfStock ? (
-            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold bg-[#161210]/85 text-rose-300">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-black/35 text-rose-300 border border-rose-400/25">
               <span className="size-1.5 rounded-full bg-rose-400" />
               Hết hàng
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold bg-[#161210]/85 text-emerald-300">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-black/35 text-emerald-300 border border-emerald-400/25">
               <span className="size-1.5 rounded-full bg-emerald-400" />
               Sẵn hàng
             </span>
@@ -308,14 +308,14 @@ function FlagshipCard({ product }: { product: StorefrontProduct }) {
             <Link
               href={`/product/${product.slug}`}
               title={product.name}
-              className="block group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#161210] rounded-md"
+              className="block group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
             >
-              <h3 className="font-heading font-bold text-xl sm:text-[25px] text-[#14110F] group-hover:opacity-80 transition-opacity duration-150 leading-tight line-clamp-2">
+              <h3 className="font-heading font-bold text-xl sm:text-[25px] text-[#FFF5EA] group-hover:text-[#F2BC8E] transition-colors duration-150 leading-tight line-clamp-2">
                 {compactTitle}
               </h3>
             </Link>
 
-            <p className="text-xs sm:text-sm font-medium text-[#2E2016]">
+            <p className="text-xs sm:text-sm font-medium text-[#FFF5EA]/70">
               {[duration, usageMode].filter(Boolean).join(" · ")}
             </p>
           </div>
@@ -329,8 +329,8 @@ function FlagshipCard({ product }: { product: StorefrontProduct }) {
             <CompactThumb
               imageUrl={primaryImage}
               name={product.name}
-              sizeClass="size-16 sm:size-[76px]"
-              surfaceClass="bg-[#141518] border-[#141518]/20 shadow-sm"
+              sizeClass="w-28 sm:w-36 aspect-[16/9]"
+              surfaceClass="bg-[#141518] border-white/15 shadow-sm"
             />
           </Link>
         </div>
@@ -338,27 +338,27 @@ function FlagshipCard({ product }: { product: StorefrontProduct }) {
         {/* Concise Benefit + Warranty */}
         <div className="space-y-1 text-xs sm:text-[13px]">
           {benefitLine && (
-            <p className="text-[#1F1610] font-medium leading-relaxed line-clamp-2">
+            <p className="text-[#FFF5EA]/85 leading-relaxed line-clamp-2">
               {benefitLine}
             </p>
           )}
-          <p className={warranty.isWarning ? "text-[#4A1C12] font-semibold" : "text-[#3B2A1E]"}>
+          <p className={warranty.isWarning ? "text-amber-300 font-medium" : "text-[#FFF5EA]/60"}>
             {warranty.text}
           </p>
         </div>
       </div>
 
-      {/* Footer: Deep Charcoal Price + Dark Charcoal CTA Button with Ivory Text */}
-      <div className="relative z-10 pt-4 mt-5 border-t border-[#161210]/15 flex items-center justify-between gap-4 flex-wrap">
+      {/* Footer: Warm Caramel Price + Crisp Caramel CTA Button */}
+      <div className="relative z-10 pt-4 mt-5 border-t border-white/10 flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-baseline gap-2.5 flex-wrap tabular-nums">
           {hasDistinctPrices && (
-            <span className="text-xs font-semibold text-[#2E2016]">Từ</span>
+            <span className="text-xs font-medium text-[#FFF5EA]/70">Từ</span>
           )}
-          <span className="text-[26px] sm:text-[32px] font-extrabold tracking-tight text-[#14110F] leading-none">
+          <span className="text-[26px] sm:text-[32px] font-bold tracking-tight text-[#F0B47A] leading-none">
             {formatPrice(pricing.lowestPrice)}
           </span>
           {pricing.comparePrice && pricing.comparePrice > pricing.lowestPrice && (
-            <span className="text-sm font-medium text-[#3B2A1E]/75 line-through">
+            <span className="text-sm text-[#FFF5EA]/45 line-through">
               {formatPrice(pricing.comparePrice)}
             </span>
           )}
@@ -371,7 +371,7 @@ function FlagshipCard({ product }: { product: StorefrontProduct }) {
             )}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center justify-center gap-2 h-11 px-5 rounded-xl bg-[#141518] hover:bg-[#22242A] active:scale-[0.98] text-[#FFF5EA] text-sm font-semibold transition-btn shrink-0"
+            className="inline-flex items-center justify-center gap-2 h-11 px-5 rounded-xl bg-[#E6A66F] hover:bg-[#F2BC8E] active:scale-[0.98] text-[#251A14] text-sm font-semibold transition-btn shrink-0"
           >
             <span>Liên hệ Zalo</span>
             <ArrowRight className="size-4" strokeWidth={2.25} />
@@ -383,14 +383,14 @@ function FlagshipCard({ product }: { product: StorefrontProduct }) {
             )}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center justify-center gap-2 h-11 px-5 rounded-xl bg-[#141518]/85 hover:bg-[#141518] active:scale-[0.98] text-[#FFF5EA] text-sm font-medium transition-btn shrink-0"
+            className="inline-flex items-center justify-center gap-2 h-11 px-5 rounded-xl border border-white/15 bg-white/8 hover:bg-white/14 active:scale-[0.98] text-[#FFF5EA]/90 text-sm font-medium transition-btn shrink-0"
           >
             <span>Hỏi khi có hàng</span>
           </a>
         ) : (
           <Link
             href={`/product/${product.slug}`}
-            className="inline-flex items-center justify-center gap-2 h-11 px-5 rounded-xl bg-[#141518] hover:bg-[#22242A] active:scale-[0.98] text-[#FFF5EA] text-sm font-semibold transition-btn shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#141518] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E19E62]"
+            className="inline-flex items-center justify-center gap-2 h-11 px-5 rounded-xl bg-[#E6A66F] hover:bg-[#F2BC8E] active:scale-[0.98] text-[#251A14] text-sm font-semibold transition-btn shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <span>Chọn gói</span>
             <ArrowRight className="size-4" strokeWidth={2.25} />
@@ -427,7 +427,7 @@ function SecondaryFeaturedCard({ product }: { product: StorefrontProduct }) {
           <CompactThumb
             imageUrl={primaryImage}
             name={product.name}
-            sizeClass="size-12 sm:size-14"
+            sizeClass="w-20 sm:w-24 aspect-[16/9]"
           />
         </Link>
 
