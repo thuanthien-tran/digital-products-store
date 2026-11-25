@@ -22,8 +22,8 @@ export default async function HomePage() {
         {/* 1. Compact Hero & Pixel Capybara */}
         <HeroSection settings={settings} />
 
-        {/* 2. Featured Packages + Search, Category Filter & Product List */}
-        <StorefrontCatalog groups={groups} products={products} />
+        {/* 2. Search, Category Filter & Product List */}
+        <StorefrontCatalog groups={groups} products={products} showFeatured={false} />
 
         {/* 3. How It Works (Interactive 4-Step Pipeline with Travelling Light) */}
         <HowItWorksSection />
