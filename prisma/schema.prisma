@@ -454,3 +454,11 @@ model StockImport {
 
   @@index([importDate])
 }
+
+model TelegramConfig {
+  id                String   @id @default("default")
+  botTokenEncrypted String
+  chatId            String
+  webhookUrl        String?
+  updatedAt         DateTime @default(now())
+}
