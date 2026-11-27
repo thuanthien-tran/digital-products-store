@@ -1,4 +1,6 @@
 import { prisma, ensureDatabaseSchema } from "@/lib/db"
+import { getTelegramConfig } from "@/lib/telegram-config"
+import { TelegramUnconfiguredBanner } from "@/components/admin/TelegramUnconfiguredBanner"
 import { OrderManagerClient } from "./OrderManagerClient"
 
 export const dynamic = "force-dynamic"
@@ -6,6 +8,8 @@ export const revalidate = 0
 
 export default async function AdminOrdersPage() {
   await ensureDatabaseSchema()
+  const tgConfig = await getTelegramConfig()
+  const tgMissing = !tgConfig.botToken || !tgConfig.chatId
   const [orders, products, stockImports] = await Promise.all([
     prisma.order.findMany({
       orderBy: { createdAt: "desc" },
@@ -54,6 +58,7 @@ export default async function AdminOrdersPage() {
 
   return (
     <div className="space-y-6">
+      {tgMissing && <TelegramUnconfiguredBanner />}
       <div>
         <h1 className="text-2xl font-black tracking-tight text-foreground">Quản Lý Đơn Hàng</h1>
         <p className="text-xs text-muted-foreground">Theo dõi đơn hàng, ghi nhận nhập hàng theo ngày và đối soát doanh thu</p>

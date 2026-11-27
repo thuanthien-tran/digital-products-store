@@ -10,6 +10,118 @@ import { sendTelegramBuffOrderMessage } from "@/lib/buff-notify"
 
 export const dynamic = "force-dynamic"
 
+async function markBuffNotificationTelegramSent(orderId: string): Promise<void> {
+  try {
+    const marker = `"orderId":"${orderId}"`
+    const existing = await prisma.adminNotification.findFirst({
+      where: {
+        type: "buff_order_paid",
+        metadata: { contains: marker },
+      },
+    })
+    if (!existing) return
+    let meta: Record<string, unknown> = {}
+    try {
+      meta = existing.metadata ? JSON.parse(existing.metadata) : {}
+    } catch {
+      meta = {}
+    }
+    delete meta.telegramError
+    await prisma.adminNotification.update({
+      where: { id: existing.id },
+      data: {
+        metadata: JSON.stringify({
+          ...meta,
+          telegramSent: true,
+        }),
+      },
+    })
+  } catch {}
+}
+
+async function dispatchPendingBuffAlerts(
+  botToken: string,
+  chatId: string,
+  onlyUnsent: boolean
+): Promise<{ total: number; sent: number }> {
+  const pendingBuffs = await prisma.buffFulfillment.findMany({
+    where: { status: { in: ["pending", "processing", "needs_review"] } },
+    include: {
+      orderItem: {
+        include: {
+          order: {
+            select: {
+              id: true,
+              code: true,
+              email: true,
+              status: true,
+              totalCents: true,
+            },
+          },
+        },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 15,
+  })
+
+  const eligible = pendingBuffs.filter(
+    (b) =>
+      b.orderItem?.order &&
+      (b.orderItem.order.status === "paid" || b.orderItem.order.status === "processing")
+  )
+
+  if (eligible.length === 0) {
+    return { total: 0, sent: 0 }
+  }
+
+  let targets = eligible
+  if (onlyUnsent) {
+    const unsent: typeof eligible = []
+    for (const bf of eligible) {
+      const ordId = bf.orderItem!.order!.id
+      const notif = await prisma.adminNotification.findFirst({
+        where: {
+          type: "buff_order_paid",
+          metadata: { contains: `"orderId":"${ordId}"` },
+        },
+        select: { metadata: true },
+      })
+      let alreadySent = false
+      if (notif?.metadata) {
+        try {
+          alreadySent = JSON.parse(notif.metadata).telegramSent === true
+        } catch {
+          alreadySent = false
+        }
+      }
+      if (!alreadySent) {
+        unsent.push(bf)
+      }
+    }
+    targets = unsent
+  }
+
+  let sentCount = 0
+  for (const bf of targets) {
+    const ord = bf.orderItem!.order!
+    const r = await sendTelegramBuffOrderMessage(botToken, chatId, {
+      orderId: ord.id,
+      orderCode: ord.code,
+      email: ord.email,
+      totalCents: ord.totalCents,
+      inviteCode: bf.inviteCode,
+      tokenAmountB: bf.tokenAmountB,
+    })
+    if (r.ok) {
+      sentCount += 1
+      await markBuffNotificationTelegramSent(ord.id)
+    }
+  }
+
+  return { total: targets.length, sent: sentCount }
+}
+
 export async function POST(req: Request) {
   const auth = await verifyAdminRequest(req)
   if (!auth.authenticated) {
@@ -79,6 +191,27 @@ export async function POST(req: Request) {
           })
         : saved
 
+      // Push any missed paid Buff orders (recorded before Telegram was configured on this server)
+      const autoFlushed =
+        finalConfig.botToken && finalConfig.chatId
+          ? await dispatchPendingBuffAlerts(finalConfig.botToken, finalConfig.chatId, true).catch(() => ({
+              total: 0,
+              sent: 0,
+            }))
+          : { total: 0, sent: 0 }
+
+      const parts: string[] = []
+      if (hookRes.webhookConfigured) {
+        parts.push(`Đã lưu & gắn Webhook tự động (${hookRes.webhookUrl})!`)
+      } else if (hookRes.error) {
+        parts.push(`Đã lưu Bot vào Database nhưng Webhook lỗi (${hookRes.error}).`)
+      } else {
+        parts.push("Đã lưu cấu hình Telegram Bot vào Database!")
+      }
+      if (autoFlushed.sent > 0) {
+        parts.push(`Đã tự gửi bù ${autoFlushed.sent} đơn Buff đang chờ qua Telegram!`)
+      }
+
       return NextResponse.json({
         success: true,
         config: {
@@ -88,9 +221,9 @@ export async function POST(req: Request) {
           chatId: finalConfig.chatId,
           webhookUrl: finalConfig.webhookUrl,
         },
-        message: hookRes.webhookConfigured
-          ? `Đã lưu & gắn Webhook tự động (${hookRes.webhookUrl})!`
-          : "Đã lưu cấu hình Telegram Bot vào Database!",
+        autoSent: autoFlushed.sent,
+        webhookError: hookRes.error || null,
+        message: parts.join(" "),
       })
     }
 
@@ -129,34 +262,9 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Vui lòng lưu Bot Token & Chat ID trước" }, { status: 400 })
       }
 
-      const pendingBuffs = await prisma.buffFulfillment.findMany({
-        where: { status: { in: ["pending", "processing", "needs_review"] } },
-        include: {
-          orderItem: {
-            include: {
-              order: {
-                select: {
-                  id: true,
-                  code: true,
-                  email: true,
-                  status: true,
-                  totalCents: true,
-                },
-              },
-            },
-          },
-        },
-        orderBy: { createdAt: "desc" },
-        take: 15,
-      })
+      const { total, sent } = await dispatchPendingBuffAlerts(tokenToUse, chatToUse, false)
 
-      const eligible = pendingBuffs.filter(
-        (b) =>
-          b.orderItem?.order &&
-          (b.orderItem.order.status === "paid" || b.orderItem.order.status === "processing")
-      )
-
-      if (eligible.length === 0) {
+      if (total === 0) {
         return NextResponse.json({
           success: true,
           sent: 0,
@@ -164,24 +272,10 @@ export async function POST(req: Request) {
         })
       }
 
-      let sentCount = 0
-      for (const bf of eligible) {
-        const ord = bf.orderItem!.order!
-        const r = await sendTelegramBuffOrderMessage(tokenToUse, chatToUse, {
-          orderId: ord.id,
-          orderCode: ord.code,
-          email: ord.email,
-          totalCents: ord.totalCents,
-          inviteCode: bf.inviteCode,
-          tokenAmountB: bf.tokenAmountB,
-        })
-        if (r.ok) sentCount += 1
-      }
-
       return NextResponse.json({
         success: true,
-        sent: sentCount,
-        message: `Đã gửi ${sentCount}/${eligible.length} đơn Buff đang chờ về Telegram!`,
+        sent,
+        message: `Đã gửi ${sent}/${total} đơn Buff đang chờ về Telegram!`,
       })
     }
 

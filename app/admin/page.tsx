@@ -1,5 +1,7 @@
 import { prisma, ensureDatabaseSchema } from "@/lib/db"
 import { getVisitorStats } from "@/lib/analytics"
+import { getTelegramConfig } from "@/lib/telegram-config"
+import { TelegramUnconfiguredBanner } from "@/components/admin/TelegramUnconfiguredBanner"
 import {
   AdminDashboardClient,
   DashboardOrder,
@@ -13,6 +15,8 @@ export const revalidate = 0
 
 export default async function AdminDashboardPage() {
   await ensureDatabaseSchema()
+  const tgConfig = await getTelegramConfig()
+  const tgMissing = !tgConfig.botToken || !tgConfig.chatId
   const [orders, providers, totalSerials, availableSerials, lowStockVariants, visitorStats, stockImports] = await Promise.all([
     prisma.order.findMany({
       orderBy: { createdAt: "desc" },
@@ -112,14 +116,17 @@ export default async function AdminDashboardPage() {
   }))
 
   return (
-    <AdminDashboardClient
-      initialOrders={serializedOrders}
-      initialProviders={serializedProviders}
-      initialStockImports={serializedStockImports}
-      totalSerials={totalSerials}
-      availableSerials={availableSerials}
-      lowStockVariants={serializedVariants}
-      visitorStats={visitorStats}
-    />
+    <>
+      {tgMissing && <TelegramUnconfiguredBanner />}
+      <AdminDashboardClient
+        initialOrders={serializedOrders}
+        initialProviders={serializedProviders}
+        initialStockImports={serializedStockImports}
+        totalSerials={totalSerials}
+        availableSerials={availableSerials}
+        lowStockVariants={serializedVariants}
+        visitorStats={visitorStats}
+      />
+    </>
   )
 }

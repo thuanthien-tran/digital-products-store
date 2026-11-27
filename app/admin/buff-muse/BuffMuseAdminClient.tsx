@@ -461,7 +461,7 @@ export function BuffMuseAdminClient({
       </div>
 
       {/* Telegram Bot Configuration Card (Persists in DB so production works even without editing .env) */}
-      <div className="rounded-2xl border border-border bg-card p-4 sm:p-5 space-y-4">
+      <div id="telegram-config" className="rounded-2xl border border-border bg-card p-4 sm:p-5 space-y-4 scroll-mt-20">
         <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-border/70">
           <div className="flex items-center gap-2">
             <span className="inline-flex size-8 items-center justify-center rounded-xl bg-primary/15 border border-primary/30 text-primary">
