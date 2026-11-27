@@ -406,7 +406,7 @@ export function BuffMuseClient({
                   }`}
                 >
                   <div className="flex items-center justify-between gap-1 mb-0.5">
-                    <span className="font-heading font-bold text-sm sm:text-base text-foreground">
+                    <span className="font-heading font-bold text-sm sm:text-[15px] text-foreground whitespace-nowrap">
                       {amountB}B
                     </span>
                     <span
@@ -419,7 +419,7 @@ export function BuffMuseClient({
                       {isSelected && <Check className="size-2.5 stroke-[3]" />}
                     </span>
                   </div>
-                  <span className="text-xs font-semibold text-primary tabular-nums block">
+                  <span className="text-xs font-semibold text-primary tabular-nums block whitespace-nowrap">
                     {formatPrice(presetInfo.priceCents)}
                   </span>
                 </button>
@@ -440,8 +440,8 @@ export function BuffMuseClient({
               }`}
             >
               <div className="flex items-center justify-between gap-1 mb-0.5">
-                <span className="font-heading font-bold text-sm sm:text-base text-foreground inline-flex items-center gap-1">
-                  <SlidersHorizontal className="size-3.5 text-primary" />
+                <span className="font-heading font-bold text-[13px] sm:text-sm text-foreground inline-flex items-center gap-1 whitespace-nowrap">
+                  <SlidersHorizontal className="size-3.5 text-primary shrink-0" />
                   <span>Tùy chọn</span>
                 </span>
                 <span

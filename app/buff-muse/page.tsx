@@ -1,7 +1,7 @@
 import { Metadata } from "next"
 import Link from "next/link"
-import { prisma } from "@/lib/db"
 import { getSiteSettings } from "@/lib/settings"
+import { findTargetBuffMuseProduct } from "@/lib/buff-config"
 import { Header } from "@/components/storefront/Header"
 import { Footer } from "@/components/storefront/Footer"
 import { ZaloWidget } from "@/components/storefront/ZaloWidget"
@@ -21,30 +21,13 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function BuffMusePage() {
-  const [settings, buffProducts] = await Promise.all([
+  const [settings, activeProduct] = await Promise.all([
     getSiteSettings(),
-    prisma.product.findMany({
-      where: {
-        fulfillmentType: "buff",
-        visibility: "public",
-        editorialStatus: "published",
-      },
-      include: {
-        variants: {
-          where: { isActive: true },
-          orderBy: [{ sortOrder: "asc" }, { priceCents: "asc" }],
-        },
-      },
-      orderBy: [{ sortOrder: "asc" }, { updatedAt: "desc" }],
-    }),
+    findTargetBuffMuseProduct(),
   ])
 
-  const activeProduct =
-    buffProducts.find((p) => p.statusOverride !== "out_of_stock" && p.variants.length > 0) ||
-    buffProducts.find((p) => p.variants.length > 0) ||
-    null
-
   const variants: BuffMuseVariant[] = (activeProduct?.variants || [])
+    .filter((v) => v.isActive)
     .map((v) => {
       const parsedB =
         v.tokenAmountB ??
@@ -62,6 +45,14 @@ export default async function BuffMusePage() {
     })
     .filter((v) => v.tokenAmountB > 0 && v.tokenAmountB <= 30)
     .sort((a, b) => a.tokenAmountB - b.tokenAmountB)
+
+  const isOutOfStock = Boolean(
+    !activeProduct ||
+      activeProduct.visibility !== "public" ||
+      activeProduct.editorialStatus !== "published" ||
+      activeProduct.statusOverride === "out_of_stock" ||
+      variants.length === 0
+  )
 
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
@@ -87,7 +78,7 @@ export default async function BuffMusePage() {
         <BuffMuseClient
           productId={activeProduct?.id || null}
           productName={activeProduct?.name || "Buff Token Muse AI Chính Chủ"}
-          isProductOutOfStock={Boolean(!activeProduct || activeProduct.statusOverride === "out_of_stock")}
+          isProductOutOfStock={isOutOfStock}
           variants={variants}
         />
       </main>
