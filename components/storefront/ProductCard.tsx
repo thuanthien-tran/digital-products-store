@@ -405,7 +405,7 @@ export function ProductCard({
       {/* Top Section */}
       <div className="flex flex-col flex-1">
         {/* 1. Unified 16:9 Full-Bleed Media Frame */}
-        <div className="p-3 pb-0">
+        <div className="p-2 pb-0 sm:p-3 sm:pb-0">
           <div
             className={`relative aspect-[16/9] w-full overflow-hidden rounded-xl border ${
               featured && !pricing.isOutOfStock
@@ -429,11 +429,11 @@ export function ProductCard({
                   loading="lazy"
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center p-4">
+                <div className="w-full h-full flex items-center justify-center p-3 sm:p-4">
                   <div
-                    className={`size-12 rounded-xl flex items-center justify-center border ${categoryAccent.iconBg}`}
+                    className={`size-10 sm:size-12 rounded-xl flex items-center justify-center border ${categoryAccent.iconBg}`}
                   >
-                    <BrandIcon name={name} className="size-6" />
+                    <BrandIcon name={name} className="size-5 sm:size-6" />
                   </div>
                 </div>
               )}
@@ -444,44 +444,44 @@ export function ProductCard({
 
             {/* Subtle Category Label (top-left) */}
             <span
-              className={`absolute top-2 left-2 inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-0.5 rounded-md border bg-card/90 backdrop-blur-xs ${categoryAccent.badge} pointer-events-none`}
+              className={`absolute top-1.5 left-1.5 sm:top-2 sm:left-2 inline-flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-[11px] font-medium px-1.5 sm:px-2 py-0.5 rounded-md border bg-card/90 backdrop-blur-xs ${categoryAccent.badge} pointer-events-none`}
             >
-              <span className={`size-1.5 rounded-full ${categoryAccent.dot}`} aria-hidden="true" />
-              <span className="max-w-[130px] truncate">{groupName}</span>
+              <span className={`size-1.5 rounded-full shrink-0 ${categoryAccent.dot}`} aria-hidden="true" />
+              <span className="max-w-[92px] sm:max-w-[130px] truncate">{groupName}</span>
             </span>
           </div>
         </div>
 
-        {/* 2. Content Body — Consistent Reading Order */}
-        <div className="flex flex-col flex-1 px-4 pt-3.5 pb-3 gap-1.5">
-          {/* Product Name (max 2 lines, consistent min-height so cards align) */}
+        {/* 2. Content Body — Consistent Reading Order (compact on 2-col mobile) */}
+        <div className="flex flex-col flex-1 px-2.5 pt-2.5 pb-2 sm:px-4 sm:pt-3.5 sm:pb-3 gap-1 sm:gap-1.5">
+          {/* Product Name (fixed 2-line box height so adjacent cards align pixel-perfect) */}
           <Link
             href={`/product/${slug}`}
             title={name}
             className="block group/title focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
           >
-            <h3 className="font-sans font-semibold text-[15px] sm:text-base text-foreground group-hover/title:text-primary transition-colors duration-150 leading-snug line-clamp-2 min-h-[2.5rem] break-words">
+            <h3 className="font-sans font-semibold text-[13px] sm:text-base text-foreground group-hover/title:text-primary transition-colors duration-150 leading-[1.35] line-clamp-2 h-[35px] sm:h-[44px] break-words">
               {name}
             </h3>
           </Link>
 
-          {/* Short Benefit (1 clean line) */}
+          {/* Short Benefit (1 clean line — shown on sm+ so 2-col mobile cards stay crisp) */}
           {shortBenefit && (
-            <p className="text-xs text-muted-foreground/90 leading-snug line-clamp-1">
+            <p className="hidden sm:block text-xs text-muted-foreground/90 leading-snug line-clamp-1">
               {shortBenefit}
             </p>
           )}
 
-          {/* Duration · Delivery / Usage Mode */}
-          <p className="text-xs text-muted-foreground leading-snug pt-0.5">
+          {/* Duration · Delivery / Usage Mode (hidden on narrow 2-col mobile for cleaner cards) */}
+          <p className="hidden sm:block text-xs text-muted-foreground leading-snug truncate pt-0.5">
             {metaLine}
           </p>
 
           {/* Warranty & Stock Status Row */}
-          <div className="relative flex items-center justify-between gap-2 pt-1 mt-auto">
-            <div className="flex items-center gap-1 min-w-0">
+          <div className="relative flex items-center justify-between gap-2 pt-0.5 sm:pt-1 mt-auto">
+            <div className="hidden sm:flex items-center gap-1 min-w-0 max-w-full">
               <div
-                className={`inline-flex items-center gap-1 text-[11px] sm:text-xs leading-snug min-w-0 ${
+                className={`inline-flex items-center gap-1 text-[10.5px] sm:text-xs leading-snug min-w-0 ${
                   warrantySummary.isWarning
                     ? "text-amber-300 font-medium"
                     : "text-muted-foreground"
@@ -506,26 +506,26 @@ export function ProductCard({
                   aria-expanded={popoverOpen}
                   aria-controls={popoverId}
                   aria-label={`Xem điều kiện gói ${name}`}
-                  className="inline-flex items-center justify-center size-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-btn shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="inline-flex items-center justify-center size-5 sm:size-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-btn shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
-                  <Info className="size-3.5" />
+                  <Info className="size-3 sm:size-3.5" />
                 </button>
               )}
             </div>
 
             {/* Clean Inline Stock Indicator */}
             {isContactOnly ? (
-              <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground shrink-0">
+              <span className="inline-flex items-center gap-1 text-[10.5px] sm:text-[11px] font-medium text-muted-foreground shrink-0">
                 <span className="size-1.5 rounded-full bg-primary" aria-hidden="true" />
                 Liên hệ
               </span>
             ) : pricing.isOutOfStock ? (
-              <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-rose-300/90 shrink-0">
+              <span className="inline-flex items-center gap-1 text-[10.5px] sm:text-[11px] font-medium text-rose-300/90 shrink-0">
                 <span className="size-1.5 rounded-full bg-rose-400" aria-hidden="true" />
                 Hết hàng
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-emerald-400 shrink-0">
+              <span className="inline-flex items-center gap-1 text-[10.5px] sm:text-[11px] font-medium text-emerald-400 shrink-0">
                 <span className="size-1.5 rounded-full bg-emerald-400" aria-hidden="true" />
                 Còn hàng
               </span>
@@ -563,13 +563,14 @@ export function ProductCard({
         </div>
       </div>
 
-      {/* 3. Footer: Aligned Price & Compact Action Button */}
-      <div className="px-4 py-3 border-t border-border/60 flex items-center justify-between gap-3">
-        <div className="min-w-0">
+      {/* 3. Footer: Single-line price + full-width button on mobile, horizontal on sm+ */}
+      <div className="px-2.5 py-2.5 sm:px-4 sm:py-3 border-t border-border/60 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3">
+        <div className="min-w-0 h-5 sm:h-auto flex items-center">
           <PriceDisplay
             priceCents={pricing.lowestPrice}
             compareAtPriceCents={pricing.comparePrice}
             prefix={hasDistinctPrices ? "Từ" : undefined}
+            size="sm"
           />
         </div>
 
@@ -578,7 +579,7 @@ export function ProductCard({
           <Button
             asChild
             variant="outline"
-            className="h-9 px-3.5 rounded-xl text-xs font-semibold border-border hover:border-primary/50 hover:bg-secondary text-foreground transition-btn shrink-0"
+            className="w-full sm:w-auto h-8 sm:h-9 px-3 sm:px-3.5 rounded-xl text-[11px] sm:text-xs font-semibold border-border hover:border-primary/50 hover:bg-secondary text-foreground transition-btn shrink-0"
           >
             <a
               href={`https://zalo.me/${ZALO_PHONE}?text=${encodeURIComponent(
@@ -596,7 +597,7 @@ export function ProductCard({
           <Button
             asChild
             variant="outline"
-            className="h-9 px-3 rounded-xl text-xs font-medium border-border/80 text-muted-foreground hover:text-foreground hover:bg-secondary transition-btn shrink-0"
+            className="w-full sm:w-auto h-8 sm:h-9 px-3 rounded-xl text-[11px] sm:text-xs font-medium border-border/80 text-muted-foreground hover:text-foreground hover:bg-secondary transition-btn shrink-0"
           >
             <a
               href={`https://zalo.me/${ZALO_PHONE}?text=${encodeURIComponent(
@@ -615,8 +616,8 @@ export function ProductCard({
             variant={featured ? "default" : "secondary"}
             className={
               featured
-                ? "h-9 px-3.5 rounded-xl text-xs font-semibold bg-primary text-primary-foreground hover:bg-caramel-light transition-btn shrink-0"
-                : "h-9 px-3.5 rounded-xl text-xs font-semibold bg-secondary text-foreground border border-border hover:border-primary/50 hover:bg-primary hover:text-primary-foreground transition-btn shrink-0"
+                ? "w-full sm:w-auto h-8 sm:h-9 px-3 sm:px-3.5 rounded-xl text-[11px] sm:text-xs font-semibold bg-primary text-primary-foreground hover:bg-caramel-light transition-btn shrink-0"
+                : "w-full sm:w-auto h-8 sm:h-9 px-3 sm:px-3.5 rounded-xl text-[11px] sm:text-xs font-semibold bg-secondary text-foreground border border-border hover:border-primary/50 hover:bg-primary hover:text-primary-foreground transition-btn shrink-0"
             }
           >
             <Link href={`/product/${slug}`}>

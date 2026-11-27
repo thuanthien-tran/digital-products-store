@@ -35,11 +35,13 @@ interface OrderStatusProps {
     inviteCode?: string | null
     buffFulfillment?: {
       status: string
+      usedMethod?: string | null
       tokenAmountB: number
       completedB?: number | null
       providerOrderCode?: string | null
       inviteCode?: string | null
       errorMessage?: string | null
+      buffNote?: string | null
     } | null
     serials?: string[]
     serial?: string | null
@@ -117,10 +119,20 @@ export function OrderStatus({
     return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`
   }
 
-  // Polling check order status every 3s until paid or cancelled or refunded
-  useEffect(() => {
-    if (status === "paid" || status === "cancelled" || status === "refunded") return
+  const hasPendingBuff = currentItems.some(
+    (it) =>
+      it.buffFulfillment &&
+      (it.buffFulfillment.status === "submitting" ||
+        it.buffFulfillment.status === "processing" ||
+        (it.buffFulfillment.usedMethod === "manual_queue" && it.buffFulfillment.status === "pending"))
+  )
 
+  // Polling check order status until paid (+ any active buff job settles) or cancelled/refunded
+  useEffect(() => {
+    if (status === "cancelled" || status === "refunded") return
+    if (status === "paid" && !hasPendingBuff) return
+
+    const pollMs = status === "paid" ? 4000 : 3000
     const interval = setInterval(async () => {
       try {
         const res = await fetch(`/api/orders/${orderId}/status`)
@@ -141,16 +153,30 @@ export function OrderStatus({
           setCurrentItems(data.items)
         }
 
-        if (data.status === "paid" || data.status === "cancelled" || data.status === "refunded") {
+        const stillBuffing = Array.isArray(data.items)
+          ? data.items.some(
+              (it: { buffFulfillment?: { status?: string; usedMethod?: string | null } | null }) =>
+                it.buffFulfillment?.status === "submitting" ||
+                it.buffFulfillment?.status === "processing" ||
+                (it.buffFulfillment?.usedMethod === "manual_queue" &&
+                  it.buffFulfillment?.status === "pending")
+            )
+          : false
+
+        if (
+          data.status === "cancelled" ||
+          data.status === "refunded" ||
+          (data.status === "paid" && !stillBuffing)
+        ) {
           clearInterval(interval)
         }
       } catch {
         setPollingError(true)
       }
-    }, 3000)
+    }, pollMs)
 
     return () => clearInterval(interval)
-  }, [orderId, status])
+  }, [orderId, status, hasPendingBuff])
 
   const copyText = (text: string, keyName: string) => {
     navigator.clipboard.writeText(text)
@@ -201,8 +227,22 @@ export function OrderStatus({
           <CheckCircle2 className="size-5 text-emerald-400 shrink-0 mt-0.5" strokeWidth={2} />
           <div className="space-y-1">
             <h2 className="text-base font-bold text-foreground">Thanh toán thành công</h2>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Đơn hàng <span className="font-mono font-semibold text-foreground">#{orderCode}</span> đã được ghi nhận. Thông tin tài khoản được lưu trực tiếp dưới đây.
+            <p className="text-xs text-muted-foreground leading-relaxed flex flex-wrap items-center gap-1.5">
+              <span>Đơn hàng</span>
+              <button
+                type="button"
+                onClick={() => copyText(orderCode, "paid-order-code")}
+                className="inline-flex items-center gap-1 font-mono font-semibold text-foreground bg-background/60 hover:bg-background px-1.5 py-0.5 rounded border border-border/70 cursor-pointer"
+                title="Sao chép mã đơn"
+              >
+                <span>#{orderCode}</span>
+                {copiedKey === "paid-order-code" ? (
+                  <Check className="size-3 text-emerald-400" />
+                ) : (
+                  <Copy className="size-3 text-muted-foreground" />
+                )}
+              </button>
+              <span>đã được ghi nhận. Thông tin tài khoản được lưu trực tiếp dưới đây.</span>
             </p>
           </div>
         </div>
@@ -238,17 +278,60 @@ export function OrderStatus({
                       <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
                         item.buffFulfillment?.status === 'succeeded'
                           ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                          : item.buffFulfillment?.status === 'failed'
+                          : item.buffFulfillment?.status === 'failed' || item.buffFulfillment?.status === 'needs_review'
                           ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
                           : 'bg-caramel/20 text-caramel border border-caramel/40 animate-pulse'
                       }`}>
                         {item.buffFulfillment?.status === 'succeeded'
                           ? '✓ Đã hoàn tất'
+                          : item.buffFulfillment?.status === 'needs_review'
+                          ? 'Cần kiểm tra bù'
                           : item.buffFulfillment?.status === 'failed'
                           ? 'Cần hỗ trợ'
+                          : item.buffFulfillment?.usedMethod === 'manual_queue'
+                          ? '⏳ Chờ Admin nạp'
                           : 'Đang xử lý tự động'}
                       </span>
                     </div>
+
+                    {/* Live Progress Bar (shown for auto providers or once succeeded) */}
+                    {item.buffFulfillment &&
+                      (item.buffFulfillment.usedMethod !== "manual_queue" ||
+                        item.buffFulfillment.status === "succeeded") && (
+                      <div className="space-y-1">
+                        {(() => {
+                          const targetB = item.buffFulfillment.tokenAmountB || item.tokenAmountB || 1
+                          const doneB =
+                            item.buffFulfillment.status === "succeeded"
+                              ? targetB
+                              : Math.min(targetB, item.buffFulfillment.completedB ?? 0)
+                          const pct = Math.max(0, Math.min(100, Math.round((doneB / targetB) * 100)))
+                          return (
+                            <>
+                              <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                                <span>Tiến độ nạp:</span>
+                                <span className="font-mono font-semibold text-foreground">
+                                  {doneB}/{targetB}B ({pct}%)
+                                </span>
+                              </div>
+                              <div className="h-1.5 w-full rounded-full bg-secondary overflow-hidden">
+                                <div
+                                  style={{ width: `${pct}%` }}
+                                  className={`h-full rounded-full transition-[width] duration-300 ${
+                                    item.buffFulfillment.status === "succeeded"
+                                      ? "bg-emerald-400"
+                                      : item.buffFulfillment.status === "failed" ||
+                                        item.buffFulfillment.status === "needs_review"
+                                      ? "bg-rose-400"
+                                      : "bg-primary"
+                                  }`}
+                                />
+                              </div>
+                            </>
+                          )
+                        })()}
+                      </div>
+                    )}
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
                       <div className="p-2.5 rounded-lg bg-secondary/50 border border-border">
@@ -258,11 +341,33 @@ export function OrderStatus({
                         </strong>
                       </div>
 
-                      <div className="p-2.5 rounded-lg bg-secondary/50 border border-border">
-                        <span className="text-muted-foreground block text-[11px]">Mã mời (Invite Code):</span>
-                        <strong className="text-caramel font-mono text-sm tracking-wider">
-                          {item.inviteCode || item.buffFulfillment?.inviteCode || 'N/A'}
-                        </strong>
+                      <div className="p-2.5 rounded-lg bg-secondary/50 border border-border flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <span className="text-muted-foreground block text-[11px]">Mã mời (Invite Code):</span>
+                          <strong className="text-caramel font-mono text-sm tracking-wider">
+                            {item.inviteCode || item.buffFulfillment?.inviteCode || 'N/A'}
+                          </strong>
+                        </div>
+                        {(item.inviteCode || item.buffFulfillment?.inviteCode) && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              copyText(
+                                item.inviteCode || item.buffFulfillment?.inviteCode || "",
+                                `invite-${idx}`
+                              )
+                            }
+                            className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors shrink-0 cursor-pointer"
+                            aria-label="Sao chép mã mời"
+                            title="Sao chép mã mời"
+                          >
+                            {copiedKey === `invite-${idx}` ? (
+                              <Check className="size-4 text-emerald-400" />
+                            ) : (
+                              <Copy className="size-4" />
+                            )}
+                          </button>
+                        )}
                       </div>
                     </div>
 
@@ -274,12 +379,24 @@ export function OrderStatus({
                     )}
 
                     {item.buffFulfillment?.status === 'succeeded' ? (
-                      <p className="text-xs text-emerald-400 font-medium">
-                        ✓ Lệnh nạp token đã hoàn tất thành công. Vui lòng mở tài khoản Muse AI của bạn để kiểm tra số dư token!
-                      </p>
-                    ) : item.buffFulfillment?.status === 'failed' ? (
+                      <div className="space-y-1.5">
+                        <p className="text-xs text-emerald-400 font-medium">
+                          ✓ Lệnh nạp token đã hoàn tất thành công. Vui lòng mở tài khoản Muse AI của bạn để kiểm tra số dư token!
+                        </p>
+                        {item.buffFulfillment.buffNote && (
+                          <p className="text-xs text-foreground/90 bg-secondary/50 border border-border/70 rounded-lg px-2.5 py-1.5">
+                            <span className="text-muted-foreground">Ghi chú: </span>
+                            {item.buffFulfillment.buffNote}
+                          </p>
+                        )}
+                      </div>
+                    ) : item.buffFulfillment?.status === 'failed' || item.buffFulfillment?.status === 'needs_review' ? (
                       <p className="text-xs text-rose-400">
                         {item.buffFulfillment.errorMessage || 'Lệnh nạp đang được hỗ trợ viên kiểm tra lại.'}
+                      </p>
+                    ) : item.buffFulfillment?.usedMethod === 'manual_queue' ? (
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        ✓ Đã nhận thanh toán! Thông tin <strong className="text-foreground">Mã mời &amp; Số lượng Token</strong> đã được gửi thông báo tới Admin để tiến hành nạp cho bạn ngay.
                       </p>
                     ) : (
                       <p className="text-xs text-muted-foreground leading-relaxed">
@@ -355,7 +472,14 @@ export function OrderStatus({
         </div>
 
         <p className="text-center text-xs text-muted-foreground">
-          Bạn có thể đánh dấu lưu lại đường dẫn này hoặc kiểm tra hộp thư email <span className="font-medium text-foreground">{email}</span> để xem lại thông tin đơn hàng bất kỳ lúc nào.
+          {email && !email.endsWith("@capygo.local") ? (
+            <>
+              Bạn có thể đánh dấu lưu lại đường dẫn này hoặc kiểm tra hộp thư email{" "}
+              <span className="font-medium text-foreground">{email}</span> để xem lại thông tin đơn hàng bất kỳ lúc nào.
+            </>
+          ) : (
+            <>Bạn có thể lưu lại đường dẫn này hoặc sao chép mã đơn để tra cứu tiến độ bất kỳ lúc nào.</>
+          )}
         </p>
       </div>
     )

@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Menu, X, ShoppingBag, Search, HelpCircle, MessageCircle } from "lucide-react"
+import { Menu, X, ShoppingBag, Search, HelpCircle, MessageCircle, Zap } from "lucide-react"
 
 const ZALO_PHONE = (process.env.NEXT_PUBLIC_ZALO_PHONE_1 || "0356970964").replace(/\D/g, "")
 
@@ -154,6 +154,7 @@ export function Header({ initialSettings }: HeaderProps) {
 
   const navLinks = [
     { href: "/san-pham", label: "Sản phẩm", icon: ShoppingBag },
+    { href: "/buff-muse", label: "Buff Token", icon: Zap, badge: "Auto" },
     { href: "/lookup", label: "Tra cứu đơn", icon: Search },
     { href: "/#faq", label: "Hỗ trợ", icon: HelpCircle },
   ]
@@ -197,6 +198,8 @@ export function Header({ initialSettings }: HeaderProps) {
               const isActive =
                 link.href === "/san-pham"
                   ? pathname.startsWith("/san-pham")
+                  : link.href === "/buff-muse"
+                  ? pathname.startsWith("/buff-muse")
                   : link.href === "/lookup"
                   ? pathname.startsWith("/lookup")
                   : false
@@ -205,13 +208,19 @@ export function Header({ initialSettings }: HeaderProps) {
                   key={link.href}
                   href={link.href}
                   onClick={(e) => handleNavClick(e, link.href)}
-                  className={`px-3.5 py-2 text-sm font-medium rounded-xl transition-btn whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium rounded-xl transition-btn whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                     isActive
                       ? "bg-secondary text-foreground font-semibold"
                       : "text-muted-foreground hover:text-foreground hover:bg-secondary/70"
                   }`}
                 >
-                  {link.label}
+                  {link.badge && <Zap className="size-3.5 text-primary shrink-0" />}
+                  <span>{link.label}</span>
+                  {link.badge && (
+                    <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-primary/15 text-primary border border-primary/25">
+                      {link.badge}
+                    </span>
+                  )}
                 </Link>
               )
             })}
@@ -258,6 +267,8 @@ export function Header({ initialSettings }: HeaderProps) {
             const isActive =
               link.href === "/san-pham"
                 ? pathname.startsWith("/san-pham")
+                : link.href === "/buff-muse"
+                ? pathname.startsWith("/buff-muse")
                 : link.href === "/lookup"
                 ? pathname.startsWith("/lookup")
                 : false
@@ -266,14 +277,21 @@ export function Header({ initialSettings }: HeaderProps) {
                 key={link.href}
                 href={link.href}
                 onClick={(e) => handleNavClick(e, link.href)}
-                className={`flex items-center gap-3 min-h-[44px] px-3.5 py-2.5 text-sm font-medium rounded-xl transition-btn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                className={`flex items-center justify-between gap-3 min-h-[44px] px-3.5 py-2.5 text-sm font-medium rounded-xl transition-btn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                   isActive
                     ? "bg-secondary text-foreground font-semibold border border-border"
                     : "text-muted-foreground hover:text-foreground hover:bg-secondary/70"
                 }`}
               >
-                <Icon className="size-4 text-primary shrink-0" strokeWidth={1.75} />
-                <span>{link.label}</span>
+                <span className="flex items-center gap-3">
+                  <Icon className="size-4 text-primary shrink-0" strokeWidth={1.75} />
+                  <span>{link.label}</span>
+                </span>
+                {link.badge && (
+                  <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-primary/15 text-primary border border-primary/25">
+                    {link.badge}
+                  </span>
+                )}
               </Link>
             )
           })}

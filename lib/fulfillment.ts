@@ -161,10 +161,13 @@ export async function fulfillOrder(
 
     if (isBuff) {
       // -------------------------------------------------------------
-      // BUFF TOKEN MUSE AI FULFILLMENT (Idempotent & Exact Token B)
+      // BUFF TOKEN MUSE AI FULFILLMENT (Atomic Lock + Exact Token B)
       // -------------------------------------------------------------
-      if (item.buffFulfillment && ['processing', 'succeeded', 'submitting'].includes(item.buffFulfillment.status)) {
-        // Already claimed / submitted to ShopTool - Prevent duplicate API call
+      if (
+        item.buffFulfillment &&
+        ['processing', 'succeeded', 'submitting', 'needs_review'].includes(item.buffFulfillment.status)
+      ) {
+        // Already claimed / submitted - Prevent duplicate API call
         totalDelivered += item.quantity
         continue
       }
@@ -195,59 +198,98 @@ export async function fulfillOrder(
       }
 
       try {
+        const { notifyAdminNewBuffOrder } = await import('./buff-notify')
         const { buyShopToolBuff, getShopToolActiveConnection } = await import('./shoptool')
         const { decryptSecret } = await import('./crypto')
 
+        // Manual queue mode when ordered via /buff-muse ([BUFF_ADMIN_NOTIFY] or no provider connection)
+        const forceManualQueue = Boolean(
+          (order.note && order.note.includes('[BUFF_ADMIN_NOTIFY]')) ||
+          (!item.connectionId && item.variant?.provider !== 'shoptool')
+        )
+
         let shopToolConfig = null
-        if (item.variant?.connection?.isEnabled && item.variant.connection.apiKeyEncrypted) {
+        if (!forceManualQueue) {
+          if (item.variant?.connection?.isEnabled && item.variant.connection.apiKeyEncrypted) {
+            try {
+              shopToolConfig = {
+                baseUrl: item.variant.connection.baseUrl.trim().replace(/\/+$/, ''),
+                apiKey: decryptSecret(item.variant.connection.apiKeyEncrypted),
+              }
+            } catch {}
+          }
+
+          if (!shopToolConfig && item.variant?.provider === 'shoptool') {
+            const activeConn = await getShopToolActiveConnection()
+            shopToolConfig = activeConn.config
+          }
+        }
+
+        // Atomic claim lock: guarantees at most ONE caller ever processes/notifies this buff item
+        const partnerRef = `${order.code}-${item.id}`
+        let buffRec = item.buffFulfillment
+        if (!buffRec) {
           try {
-            shopToolConfig = {
-              baseUrl: item.variant.connection.baseUrl.trim().replace(/\/+$/, ''),
-              apiKey: decryptSecret(item.variant.connection.apiKeyEncrypted),
+            buffRec = await db.buffFulfillment.create({
+              data: {
+                orderItemId: item.id,
+                orderId: order.id,
+                inviteCode,
+                tokenAmountB,
+                status: shopToolConfig ? 'submitting' : 'pending',
+                usedMethod: shopToolConfig ? null : 'manual_queue',
+                partnerRef,
+              },
+            })
+          } catch (createErr: unknown) {
+            if (typeof createErr === 'object' && createErr !== null && 'code' in createErr && (createErr as { code: string }).code === 'P2002') {
+              totalDelivered += item.quantity
+              continue
             }
-          } catch {}
+            throw createErr
+          }
+        } else if (shopToolConfig) {
+          const claimed = await db.buffFulfillment.updateMany({
+            where: {
+              id: buffRec.id,
+              status: { in: ['pending', 'failed'] },
+            },
+            data: { status: 'submitting', errorMessage: null },
+          })
+          if (claimed.count === 0) {
+            totalDelivered += item.quantity
+            continue
+          }
+        } else {
+          // Already recorded in manual queue
+          totalDelivered += item.quantity
+          continue
         }
 
         if (!shopToolConfig) {
-          const activeConn = await getShopToolActiveConnection()
-          shopToolConfig = activeConn.config
-        }
-
-        if (!shopToolConfig) {
+          // Manual Admin Buff Flow: mark order paid, notify Admin immediately with Invite Code + Token B
+          totalDelivered += item.quantity
           await updateOrderNote(
             db,
             orderId,
             order.note,
-            '[Kênh giao hàng ShopTool chưa kết nối]: Chưa tìm thấy cấu hình đại lý ShopTool Giá Rẻ hợp lệ.'
+            `[Chờ Admin Buff ${tokenAmountB}B]: Mã mời ${inviteCode} · Đã gửi thông báo để Admin tiến hành nạp.`
           )
+          notifyAdminNewBuffOrder({
+            orderId: order.id,
+            orderCode: order.code,
+            email: order.email,
+            totalCents: order.totalCents,
+            inviteCode,
+            tokenAmountB,
+          }).catch(() => {})
           continue
         }
 
-        // Claim work atomically with status: submitting
-        const partnerRef = `${order.code}-${item.id}`
-        let buffRec = item.buffFulfillment
-        if (!buffRec) {
-          buffRec = await db.buffFulfillment.create({
-            data: {
-              orderItemId: item.id,
-              orderId: order.id,
-              inviteCode,
-              tokenAmountB,
-              status: 'submitting',
-              partnerRef,
-            },
-          })
-        } else {
-          await db.buffFulfillment.update({
-            where: { id: buffRec.id },
-            data: { status: 'submitting', errorMessage: null },
-          })
-        }
-
-        // Call provider API with exact capacity in Billions (B)
+        // ShopTool API Flow (if explicitly linked to a ShopTool variant)
         const buffRes = await buyShopToolBuff(shopToolConfig, {
           invite_code: inviteCode,
-          quantity: tokenAmountB, // Send exact token amount B (e.g. 10 for 10B)
+          quantity: tokenAmountB,
           mode: 'auto',
         })
 
@@ -931,18 +973,25 @@ export async function releaseOrderSerials(
 export async function syncBuffFulfillmentsForOrder(orderId: string): Promise<void> {
   try {
     const buffItems = await prisma.buffFulfillment.findMany({
-      where: { orderId, status: { in: ['submitting', 'processing'] } },
+      where: {
+        orderId,
+        status: { in: ['submitting', 'processing'] },
+      },
     })
     if (buffItems.length === 0) return
 
-    const { getShopToolActiveConnection, getShopToolBuffStatus } = await import('./shoptool')
-    const { config } = await getShopToolActiveConnection()
-    if (!config) return
+    const shopToolItems = buffItems.filter((it) => it.usedMethod !== 'manual_queue')
+    if (shopToolItems.length === 0) return
 
-    for (const item of buffItems) {
+    const { getShopToolActiveConnection, getShopToolBuffStatus } = await import('./shoptool')
+    const { config: shopToolConfig } = await getShopToolActiveConnection()
+    if (!shopToolConfig) return
+
+    for (const item of shopToolItems) {
       if (!item.providerOrderCode) continue
+
       try {
-        const res = await getShopToolBuffStatus(config, item.providerOrderCode)
+        const res = await getShopToolBuffStatus(shopToolConfig, item.providerOrderCode)
         if (res.success && res.data) {
           const st = String(res.data.status || res.data.order?.status || '').toLowerCase()
           const completedAmount = Number(res.data.completed_quantity ?? res.data.completed ?? item.tokenAmountB)

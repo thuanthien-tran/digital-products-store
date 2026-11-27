@@ -10,6 +10,7 @@ import { generateVietQRUrl } from "@/lib/vietqr"
 import { verifyAdminToken } from "@/lib/auth"
 import { cancelIfExpired } from "@/lib/order-expiry"
 import { syncBuffFulfillmentsForOrder } from "@/lib/fulfillment"
+import { extractBuffDoneNote } from "@/lib/buff-stats"
 
 export const dynamic = "force-dynamic"
 export const revalidate = 0
@@ -125,11 +126,13 @@ export default async function OrderPage({ params, searchParams }: Props) {
       inviteCode: canViewCredentials ? item.inviteCode : (item.inviteCode ? `${item.inviteCode.slice(0, 2)}***` : null),
       buffFulfillment: buff ? {
         status: buff.status,
+        usedMethod: buff.usedMethod,
         tokenAmountB: buff.tokenAmountB,
         completedB: buff.completedB,
         providerOrderCode: buff.providerOrderCode,
         inviteCode: canViewCredentials ? buff.inviteCode : `${buff.inviteCode.slice(0, 2)}***`,
         errorMessage: buff.errorMessage,
+        buffNote: extractBuffDoneNote(order.note),
       } : null,
       serials: serialList,
       serial: serialList.length > 0 ? serialList.join("\n") : null,

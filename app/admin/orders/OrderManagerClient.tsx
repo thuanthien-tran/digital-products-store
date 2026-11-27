@@ -24,6 +24,7 @@ import {
   Check,
   PackagePlus,
   Calendar,
+  Copy,
 } from "lucide-react"
 
 export interface StockImportItem {
@@ -93,6 +94,8 @@ export interface OrderItem {
     provider?: string | null
     inviteCode?: string | null
     tokenAmountB?: number | null
+    buffStatus?: string | null
+    buffUsedMethod?: string | null
   }>
 }
 
@@ -870,7 +873,18 @@ export function OrderManagerClient({
             >
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border/50 pb-3">
                 <div className="flex items-center gap-2.5">
-                  <span className="font-mono font-bold text-base text-foreground">#{order.code}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard?.writeText(order.code)
+                      toast({ title: "Đã sao chép mã đơn", description: order.code })
+                    }}
+                    className="inline-flex items-center gap-1 font-mono font-bold text-base text-foreground hover:text-primary transition-colors cursor-pointer"
+                    title="Bấm để sao chép nhanh mã đơn"
+                  >
+                    <span>#{order.code}</span>
+                    <Copy className="size-3.5 text-muted-foreground" />
+                  </button>
                   <span
                     className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${
                       order.status === "paid"
@@ -950,10 +964,64 @@ export function OrderManagerClient({
                           </span>
                         )}
                         {(it.inviteCode || order.inviteCode) && (
-                          <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                            Mã mời: {it.inviteCode || order.inviteCode}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const codeVal = it.inviteCode || order.inviteCode || ""
+                              navigator.clipboard?.writeText(codeVal)
+                              toast({ title: "Đã sao chép mã mời", description: codeVal })
+                            }}
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 transition-colors cursor-pointer"
+                            title="Bấm để sao chép nhanh mã mời"
+                          >
+                            <span>
+                              Mã mời: {it.inviteCode || order.inviteCode}
+                              {it.tokenAmountB ? ` · ${it.tokenAmountB}B` : ""}
+                            </span>
+                            <Copy className="size-3" />
+                          </button>
+                        )}
+                        {it.buffStatus === "succeeded" && (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                            ✓ Đã Buff xong
                           </span>
                         )}
+                        {(order.status === "paid" || order.status === "processing") &&
+                          it.buffStatus &&
+                          it.buffStatus !== "succeeded" && (
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                try {
+                                  const res = await fetch("/api/admin/orders", {
+                                    method: "PATCH",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ orderId: order.id, action: "complete_buff" }),
+                                  })
+                                  if (res.ok) {
+                                    toast({ title: "Đã đánh dấu hoàn tất Buff", description: `Đơn #${order.code}` })
+                                    setCurrentOrders((prev) =>
+                                      prev.map((o) =>
+                                        o.id === order.id
+                                          ? {
+                                              ...o,
+                                              items: o.items.map((itemRow) => ({
+                                                ...itemRow,
+                                                buffStatus: itemRow.buffStatus ? "succeeded" : itemRow.buffStatus,
+                                              })),
+                                            }
+                                          : o
+                                      )
+                                    )
+                                    router.refresh()
+                                  }
+                                } catch {}
+                              }}
+                              className="px-2 py-0.5 rounded text-[10px] font-semibold bg-primary/15 text-primary border border-primary/35 hover:bg-primary/25 cursor-pointer"
+                            >
+                              ✓ Hoàn tất Buff
+                            </button>
+                          )}
                       </div>
                       {serialList.length > 0 ? (
                         <div className="flex flex-wrap gap-1 max-w-sm">

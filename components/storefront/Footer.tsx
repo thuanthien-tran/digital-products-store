@@ -93,35 +93,48 @@ export function Footer({ initialSettings }: FooterProps) {
   }
 
   return (
-    <footer className="border-t border-border bg-card/70 text-foreground mt-12">
-      <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 py-5 sm:py-6 space-y-4">
-        {/* Row 1: Brand + Navigation & Zalo */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <span className="flex size-7 items-center justify-center rounded-lg bg-secondary border border-border text-[11px] font-bold text-primary tracking-wider overflow-hidden shrink-0">
-              {settings.logoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={settings.logoUrl}
-                  alt={settings.siteName}
-                  className="size-full object-cover"
-                />
-              ) : (
-                settings.initials
-              )}
-            </span>
-            <span className="font-heading font-bold text-sm tracking-tight text-foreground shrink-0">
-              {settings.siteName}
-            </span>
-            <span className="hidden lg:inline text-border select-none" aria-hidden="true">
-              ·
-            </span>
-            <span className="hidden lg:inline text-xs text-muted-foreground truncate">
-              Tài khoản, phần mềm, dịch vụ nâng cấp &amp; API
-            </span>
+    <footer className="border-t border-border bg-card/70 text-foreground mt-10 sm:mt-12">
+      <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 pt-5 pb-16 sm:py-6 space-y-3.5 sm:space-y-4">
+        {/* Row 1: Brand + Navigation & Zalo (Brand + Zalo stay on 1 compact line on mobile) */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div className="flex items-center justify-between gap-3 min-w-0">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="flex size-7 items-center justify-center rounded-lg bg-secondary border border-border text-[11px] font-bold text-primary tracking-wider overflow-hidden shrink-0">
+                {settings.logoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={settings.logoUrl}
+                    alt={settings.siteName}
+                    className="size-full object-cover"
+                  />
+                ) : (
+                  settings.initials
+                )}
+              </span>
+              <span className="font-heading font-bold text-sm tracking-tight text-foreground shrink-0">
+                {settings.siteName}
+              </span>
+              <span className="hidden lg:inline text-border select-none" aria-hidden="true">
+                ·
+              </span>
+              <span className="hidden lg:inline text-xs text-muted-foreground truncate">
+                Tài khoản, phần mềm, dịch vụ nâng cấp &amp; API
+              </span>
+            </div>
+
+            {/* Mobile-only compact Zalo button on the same top line */}
+            <a
+              href={`https://zalo.me/${cleanZaloPhone}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="md:hidden inline-flex items-center gap-1.5 h-7 px-3 rounded-full border border-primary/40 bg-primary/10 text-primary hover:bg-primary/15 text-[11px] font-semibold transition-btn shrink-0"
+            >
+              <MessageCircle className="size-3 shrink-0" />
+              <span>Zalo</span>
+            </a>
           </div>
 
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <div className="flex flex-wrap items-center gap-x-3.5 sm:gap-x-4 gap-y-1.5">
             <Link
               href="/san-pham"
               className="text-xs sm:text-[13px] font-medium text-muted-foreground hover:text-foreground transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
@@ -152,7 +165,7 @@ export function Footer({ initialSettings }: FooterProps) {
               href={`https://zalo.me/${cleanZaloPhone}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 h-8 px-3.5 rounded-full border border-primary/40 bg-primary/10 text-primary hover:bg-primary/15 text-xs font-semibold transition-btn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="hidden md:inline-flex items-center gap-1.5 h-8 px-3.5 rounded-full border border-primary/40 bg-primary/10 text-primary hover:bg-primary/15 text-xs font-semibold transition-btn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <MessageCircle className="size-3.5 shrink-0" />
               <span>Liên hệ Zalo</span>
@@ -161,17 +174,17 @@ export function Footer({ initialSettings }: FooterProps) {
         </div>
 
         {/* Row 2: Copyright, Visitor Stats & Legal Links + Compact Disclaimer */}
-        <div className="border-t border-border/70 pt-3.5 space-y-2.5">
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-2.5 text-xs text-muted-foreground">
-            <div className="flex flex-wrap items-center gap-2.5">
+        <div className="border-t border-border/70 pt-3 space-y-2">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-2 text-[11px] sm:text-xs text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-2">
               <p>© {currentYear} {settings.siteName}.</p>
 
               {visitorStats?.showVisitorStats && (
                 <div
-                  className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-secondary/80 border border-border text-[11px] text-muted-foreground"
+                  className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-secondary/80 border border-border text-[10.5px] sm:text-[11px] text-muted-foreground"
                   title="Thống kê lượt truy cập thực tế"
                 >
-                  <span className="inline-flex items-center gap-1.5 font-medium text-foreground">
+                  <span className="inline-flex items-center gap-1 font-medium text-foreground">
                     <span className="size-1.5 rounded-full bg-emerald-400" aria-hidden="true" />
                     <span>
                       Online:{" "}
@@ -194,12 +207,12 @@ export function Footer({ initialSettings }: FooterProps) {
               )}
             </div>
 
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs">
+            <div className="flex flex-wrap items-center gap-x-3 sm:gap-x-4 gap-y-1 text-[11px] sm:text-xs">
               <Link
                 href="/dieu-khoan-dich-vu"
                 className="hover:text-foreground transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
               >
-                Điều khoản dịch vụ
+                Điều khoản
               </Link>
               <Link
                 href="/chinh-sach-bao-hanh"
@@ -216,9 +229,9 @@ export function Footer({ initialSettings }: FooterProps) {
             </div>
           </div>
 
-          <p className="text-[11px] text-muted-foreground/70 leading-relaxed">
+          <p className="text-[10.5px] sm:text-[11px] text-muted-foreground/70 leading-snug sm:leading-relaxed pr-12 sm:pr-0">
             <span className="text-muted-foreground font-medium">Miễn trừ trách nhiệm:</span>{" "}
-            {settings.siteName} là nền tảng phân phối dịch vụ số độc lập. Tên gọi, logo và hình ảnh của các thương hiệu bên thứ ba thuộc quyền sở hữu của các tổ chức tương ứng và chỉ dùng cho mục đích mô tả sản phẩm.
+            {settings.siteName} là nền tảng phân phối dịch vụ số độc lập. Tên gọi, logo và hình ảnh bên thứ ba thuộc quyền sở hữu của các tổ chức tương ứng và chỉ dùng để mô tả sản phẩm.
           </p>
         </div>
       </div>

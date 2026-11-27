@@ -126,6 +126,25 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
 
   const isSubmittingRef = useRef(false)
   const radioRefs = useRef<Map<string, HTMLDivElement>>(new Map())
+  const formRef = useRef<HTMLFormElement>(null)
+  const submitBtnRef = useRef<HTMLButtonElement>(null)
+  const [isSubmitVisible, setIsSubmitVisible] = useState(true)
+  const [isInputFocused, setIsInputFocused] = useState(false)
+
+  // Track submit button visibility for smart Mobile Sticky Checkout Bar
+  useEffect(() => {
+    const btn = submitBtnRef.current
+    if (!btn || typeof IntersectionObserver === "undefined") return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0]
+        if (entry) setIsSubmitVisible(entry.isIntersecting)
+      },
+      { threshold: 0.25 }
+    )
+    observer.observe(btn)
+    return () => observer.disconnect()
+  }, [])
 
   // Poll live availability without losing any user selections or input data
   const pollAvailability = useCallback(async () => {
@@ -312,12 +331,8 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
     return () => clearTimeout(timer)
   }, [selectedVariantId, quantity, handleApplyCoupon])
 
-  // Auto-open coupon panel whenever a coupon is applied or has an error
-  useEffect(() => {
-    if (appliedCoupon || couponError) {
-      setIsCouponOpen(true)
-    }
-  }, [appliedCoupon, couponError])
+  // Keep coupon panel open whenever a coupon is applied or has an error
+  const couponPanelOpen = isCouponOpen || Boolean(appliedCoupon) || Boolean(couponError)
 
   // Validate email
   const validateEmailValue = (val: string): string | null => {
@@ -492,14 +507,14 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
   const totalTokenB = selectedUnitTokenB ? selectedUnitTokenB * quantity : null
 
   return (
-    <div className="rounded-2xl border border-border bg-card p-5 sm:p-6 text-foreground space-y-5">
-      {/* A. Header: Title & Stock Status */}
-      <div className="flex items-center justify-between gap-3 pb-4 border-b border-border">
+    <div className="rounded-2xl border border-border bg-card p-4 sm:p-6 text-foreground space-y-4 sm:space-y-5">
+      {/* A. Header: Title & Stock Status (Desktop only — mobile already displays status in top product row) */}
+      <div className="hidden lg:flex items-center justify-between gap-2 pb-4 border-b border-border">
         <div>
-          <h2 className="text-base sm:text-lg font-bold text-foreground tracking-tight">
+          <h2 className="text-lg font-bold text-foreground tracking-tight">
             Đặt mua gói
           </h2>
-          <p className="text-xs sm:text-[13px] text-muted-foreground mt-0.5">
+          <p className="text-[13px] text-muted-foreground mt-0.5">
             Chọn gói phù hợp và điền thông tin nhận đơn
           </p>
         </div>
@@ -519,17 +534,63 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-5" noValidate>
-        {/* B. Chọn gói (Radio Card List) */}
-        <div className="space-y-2.5">
-          <div className="flex items-center justify-between">
+      <form
+        ref={formRef}
+        onSubmit={handleSubmit}
+        onFocusCapture={(e) => {
+          const tag = (e.target as HTMLElement)?.tagName
+          if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") {
+            setIsInputFocused(true)
+          }
+        }}
+        onBlurCapture={() => {
+          setTimeout(() => {
+            const activeTag = document.activeElement?.tagName
+            if (activeTag !== "INPUT" && activeTag !== "TEXTAREA" && activeTag !== "SELECT") {
+              setIsInputFocused(false)
+            }
+          }, 80)
+        }}
+        className="space-y-4 sm:space-y-5"
+        noValidate
+      >
+        {/* B. Chọn gói (Single-variant compact bar | Multi-variant 2-col grid on mobile) */}
+        {variants.length === 1 && selectedVariant ? (
+          <div className="flex items-center justify-between gap-3 p-3 rounded-xl border border-primary/40 bg-primary/10">
+            <div className="min-w-0 space-y-0.5">
+              <span className="text-xs sm:text-sm font-bold text-foreground block truncate">
+                {selectedVariant.name}
+              </span>
+              <span className="text-[11px] text-muted-foreground block">
+                {product.deliveryType === "contact"
+                  ? "Cấp qua Zalo"
+                  : isOutOfStock
+                  ? "Tạm hết hàng"
+                  : `Kho còn: ${effectiveStock}`}
+              </span>
+            </div>
+            <div className="text-right shrink-0">
+              <span className="text-base font-bold text-primary tabular-nums block">
+                {formatPrice(selectedVariant.priceCents)}
+              </span>
+              {selectedVariant.compareAtPriceCents &&
+                selectedVariant.compareAtPriceCents > selectedVariant.priceCents && (
+                  <span className="text-[11px] text-muted-foreground/70 line-through tabular-nums block">
+                    {formatPrice(selectedVariant.compareAtPriceCents)}
+                  </span>
+                )}
+            </div>
+          </div>
+        ) : (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-2">
             <label
               id={`${formId}-variant-label`}
-              className="text-xs font-bold text-foreground uppercase tracking-wider block"
+              className="text-[11px] sm:text-xs font-bold text-foreground uppercase tracking-wider block"
             >
-              {isBuffProduct ? "1. Chọn gói dung lượng Token Muse AI *" : "1. Chọn gói / thời hạn *"}
+              {isBuffProduct ? "1. Chọn gói dung lượng *" : "1. Chọn gói / thời hạn *"}
             </label>
-            <span className="text-[11px] text-muted-foreground font-medium">
+            <span className="text-[11px] text-muted-foreground font-medium shrink-0">
               {variants.length} gói
             </span>
           </div>
@@ -537,7 +598,7 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
           <div
             role="radiogroup"
             aria-labelledby={`${formId}-variant-label`}
-            className="space-y-2"
+            className="grid grid-cols-2 sm:flex sm:flex-col gap-2"
           >
             {variants.map((v, idx) => {
               const isSelected = selectedVariantId === v.id
@@ -570,18 +631,18 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
                       handleKeyDown(e, idx)
                     }
                   }}
-                  className={`group relative flex flex-col sm:flex-row sm:items-center justify-between p-3.5 sm:p-4 rounded-xl border text-left transition-ui select-none outline-none ${
+                  className={`group relative flex flex-col sm:flex-row sm:items-center justify-between p-2.5 sm:p-4 rounded-xl border text-left transition-ui select-none outline-none ${
                     outOfStock
                       ? "opacity-40 cursor-not-allowed bg-secondary/10 border-border/40"
                       : isSelected
-                      ? "border-caramel bg-caramel/10 ring-1 ring-caramel/80 cursor-pointer shadow-sm"
-                      : "border-border/80 bg-secondary/30 hover:border-border hover:bg-secondary/60 cursor-pointer focus-visible:ring-2 focus-visible:ring-caramel-light focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                      ? "border-caramel bg-caramel/10 ring-1 ring-caramel/80 cursor-pointer shadow-sm active:scale-[0.98]"
+                      : "border-border/80 bg-secondary/30 hover:border-border hover:bg-secondary/60 cursor-pointer active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-caramel-light focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   }`}
                 >
                   {/* Left: Radio Check Indicator & Package Title */}
-                  <div className="flex items-start gap-3 min-w-0 pr-2">
+                  <div className="flex items-start gap-2 sm:gap-3 min-w-0 sm:pr-2">
                     <div
-                      className={`size-5 rounded-full border flex items-center justify-center shrink-0 mt-0.5 transition-btn ${
+                      className={`size-4 sm:size-5 rounded-full border flex items-center justify-center shrink-0 mt-0.5 transition-btn ${
                         outOfStock
                           ? "border-border bg-secondary/20"
                           : isSelected
@@ -589,12 +650,12 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
                           : "border-border bg-background group-hover:border-muted-foreground"
                       }`}
                     >
-                      {isSelected && <Check className="size-3" strokeWidth={3} />}
+                      {isSelected && <Check className="size-2.5 sm:size-3 animate-chip-in" strokeWidth={3} />}
                     </div>
 
                     <div className="space-y-1 min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className={`text-sm font-semibold leading-snug break-words ${isSelected ? "text-foreground font-bold" : "text-foreground/90"}`}>
+                        <span className={`text-xs sm:text-sm font-semibold leading-snug line-clamp-2 sm:line-clamp-none break-words ${isSelected ? "text-foreground font-bold" : "text-foreground/90"}`}>
                           {v.name}
                         </span>
 
@@ -605,20 +666,20 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
                             displayB = parseInt(match[1], 10)
                           }
                           return displayB ? (
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-caramel/20 text-caramel border border-caramel/40">
+                            <span className="hidden sm:inline-block text-[10px] font-bold px-2 py-0.5 rounded-md bg-caramel/20 text-caramel border border-caramel/40">
                               ⚡ Nạp {displayB}B Token (~{displayB} tỷ Tokens)
                             </span>
                           ) : null
                         })()}
 
                         {conditionBadge && (
-                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-300 border border-amber-500/30">
+                          <span className="hidden sm:inline-block text-[10px] font-semibold px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-300 border border-amber-500/30">
                             {conditionBadge}
                           </span>
                         )}
                       </div>
 
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
+                      <div className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
                         {durationTag && (
                           <span className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
                             <Clock className="size-3 text-muted-foreground/70" />
@@ -639,21 +700,21 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
                   </div>
 
                   {/* Right: Pricing & Discount Tag */}
-                  <div className="mt-2 sm:mt-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-border/40 flex sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-1 shrink-0">
-                    <div className="flex items-baseline gap-1.5">
-                      <span className="text-base font-bold text-foreground tabular-nums">
+                  <div className="mt-2 sm:mt-0 pt-1.5 sm:pt-0 border-t sm:border-t-0 border-border/40 flex sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-1 shrink-0">
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-[13px] sm:text-base font-bold text-foreground tabular-nums whitespace-nowrap">
                         {formatPrice(v.priceCents)}
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1">
                       {v.compareAtPriceCents && v.compareAtPriceCents > v.priceCents && (
-                        <span className="text-xs text-muted-foreground/60 line-through tabular-nums">
+                        <span className="hidden sm:inline text-xs text-muted-foreground/60 line-through tabular-nums">
                           {formatPrice(v.compareAtPriceCents)}
                         </span>
                       )}
                       {vDiscountPct && vDiscountPct >= 1 && (
-                        <span className="text-[10px] font-bold text-rose-300 bg-rose-500/15 border border-rose-500/30 px-1.5 py-0.2 rounded-full tabular-nums">
+                        <span className="text-[9.5px] sm:text-[10px] font-bold text-rose-300 bg-rose-500/15 border border-rose-500/30 px-1.5 py-0.2 rounded-full tabular-nums">
                           -{vDiscountPct}%
                         </span>
                       )}
@@ -664,7 +725,11 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
             })}
           </div>
         </div>
+        )}
 
+        {/* Hide unusable checkout inputs when product is out of stock (except contact-only) */}
+        {!isOutOfStock && product.deliveryType !== "contact" && (
+          <>
         {/* C. Email nhận thông tin đơn hàng */}
         <div className="space-y-1.5">
           <label
@@ -712,12 +777,12 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
 
         {/* Trường nhập Mã Mời (Invite Code) dành riêng cho các gói Buff Token */}
         {(isBuffProduct || product.requiresInviteCode) && (
-          <div className="space-y-1.5 p-3.5 rounded-xl border border-caramel/30 bg-caramel/5">
-            <div className="flex items-center justify-between">
-              <label htmlFor="customer-invite-code" className="text-xs font-bold text-caramel uppercase tracking-wider block">
-                Mã mời Muse AI của bạn (Invite Code) *
+          <div className="space-y-1.5 p-3 sm:p-3.5 rounded-xl border border-caramel/30 bg-caramel/5">
+            <div className="flex items-center justify-between gap-2">
+              <label htmlFor="customer-invite-code" className="text-[11px] sm:text-xs font-bold text-caramel uppercase tracking-wider block">
+                Mã mời (Invite Code) *
               </label>
-              <span className="text-[11px] text-muted-foreground font-mono">
+              <span className="text-[11px] text-muted-foreground font-mono shrink-0">
                 {inviteCode.length}/20
               </span>
             </div>
@@ -726,14 +791,14 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
               id="customer-invite-code"
               type="text"
               maxLength={20}
-              placeholder="VD: 0FBALX (Mã mời từ Muse AI)"
+              placeholder="VD: 0FBALX"
               value={inviteCode}
               onChange={(e) => {
                 const val = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "")
                 setInviteCode(val)
                 if (inviteCodeError && val.length >= 4) setInviteCodeError(null)
               }}
-              className={`w-full h-11 px-3.5 rounded-xl border bg-secondary/40 text-foreground font-mono text-sm tracking-widest uppercase placeholder:text-muted-foreground/50 transition-all focus:outline-none ${
+              className={`w-full h-10 sm:h-11 px-3 sm:px-3.5 rounded-xl border bg-secondary/40 text-foreground font-mono text-sm tracking-widest uppercase placeholder:text-muted-foreground/50 transition-ui focus:outline-none ${
                 inviteCodeError
                   ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20"
                   : "border-caramel/50 hover:border-caramel focus:border-caramel focus:ring-2 focus:ring-caramel/20"
@@ -745,15 +810,15 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
                 <span>{inviteCodeError}</span>
               </p>
             ) : (
-              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                Nhập mã mời nhận token trong tài khoản Muse AI của bạn để hệ thống nạp tự động ngay sau khi thanh toán.
+              <p className="text-[11px] sm:text-xs text-muted-foreground leading-snug">
+                Nhập mã mời trong tài khoản Muse AI để nạp tự động sau thanh toán.
               </p>
             )}
           </div>
         )}
 
-        {/* D. Số lượng mua */}
-        <div className="flex items-center justify-between p-3.5 rounded-xl border border-border/80 bg-secondary/30">
+        {/* D. Số lượng mua (Clean hairline divider instead of nested box) */}
+        <div className="flex items-center justify-between pt-3 border-t border-border/70">
           <div>
             <span className="text-xs font-bold text-foreground uppercase tracking-wider block">
               Số lượng mua
@@ -832,7 +897,7 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
           <button
             type="button"
             onClick={() => setIsCouponOpen((prev) => !prev)}
-            aria-expanded={isCouponOpen}
+            aria-expanded={couponPanelOpen}
             className="w-full min-h-[44px] px-3.5 py-2.5 flex items-center justify-between text-xs sm:text-[13px] font-medium text-foreground hover:bg-secondary/60 transition-btn cursor-pointer"
           >
             <span className="flex items-center gap-2">
@@ -845,13 +910,18 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
             </span>
             <ChevronDown
               className={`size-4 text-muted-foreground transition-transform duration-150 ${
-                isCouponOpen ? "rotate-180" : ""
+                couponPanelOpen ? "rotate-180" : ""
               }`}
             />
           </button>
 
-          {isCouponOpen && (
-            <div className="px-3.5 pb-3.5 pt-1 space-y-2 border-t border-border/60">
+          <div
+            aria-hidden={!couponPanelOpen}
+            className="accordion-grid"
+            data-open={couponPanelOpen ? "true" : "false"}
+          >
+            <div className="accordion-grid-inner">
+            <div className="px-3.5 pb-3.5 pt-2 space-y-2 border-t border-border/60">
               {appliedCoupon ? (
                 <div className="flex items-center justify-between p-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-xs">
                   <div className="flex items-center gap-2.5 min-w-0">
@@ -930,11 +1000,12 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
                 </p>
               )}
             </div>
-          )}
+            </div>
+          </div>
         </div>
 
-        {/* E. Tóm tắt thanh toán */}
-        <div className="p-4 rounded-xl border border-border bg-background/70 space-y-2 text-xs sm:text-[13px] text-muted-foreground">
+        {/* E. Tóm tắt thanh toán (Clean hairline summary — no nested card clutter) */}
+        <div className="pt-3.5 border-t border-border/70 space-y-2 text-xs sm:text-[13px] text-muted-foreground">
           {/* Buff Token total volume breakdown */}
           {isBuffProduct && selectedUnitTokenB && totalTokenB && (
             <div className="flex items-center justify-between pb-2 mb-1 border-b border-border/60">
@@ -974,12 +1045,12 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
           </div>
         </div>
 
-        {/* Consent Checkbox */}
+        {/* Consent Checkbox (Clean borderless line unless validation error) */}
         <div className="pt-0.5">
-          <label className={`flex items-start gap-2.5 p-3.5 rounded-xl border transition-btn cursor-pointer select-none ${
+          <label className={`flex items-start gap-2.5 rounded-xl transition-btn cursor-pointer select-none ${
             consentError && !consentAgreed
-              ? "border-rose-500/60 bg-rose-500/10 text-rose-200"
-              : "border-border bg-background/50 hover:border-primary/40 text-muted-foreground hover:text-foreground"
+              ? "p-3 border border-rose-500/60 bg-rose-500/10 text-rose-200"
+              : "py-1 text-muted-foreground hover:text-foreground"
           }`}>
             <input
               ref={consentInputRef}
@@ -1017,6 +1088,8 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
             </span>
           </label>
         </div>
+          </>
+        )}
 
         {/* F. Nút chính / Nút Liên Hệ Đặt Hàng */}
         {product.deliveryType === "contact" ? (
@@ -1041,9 +1114,10 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
         ) : (
           <>
             <button
+              ref={submitBtnRef}
               type="submit"
               disabled={loading || isOutOfStock}
-              className="w-full h-12 rounded-xl text-sm font-bold bg-caramel hover:bg-caramel-light active:bg-[#D9955C] text-espresso shadow-sm transition-btn flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel-light focus-visible:ring-offset-2 focus-visible:ring-offset-background cursor-pointer"
+              className="w-full h-12 rounded-xl text-sm font-bold bg-caramel hover:bg-caramel-light active:scale-[0.98] active:bg-[#D9955C] text-espresso shadow-sm transition-btn flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel-light focus-visible:ring-offset-2 focus-visible:ring-offset-background cursor-pointer"
             >
               {loading ? (
                 <>
@@ -1088,6 +1162,49 @@ export function PurchaseForm({ product, variants }: PurchaseFormProps) {
           </span>
         </div>
       </form>
+
+      {/* Smart Mobile Sticky Checkout Bar (auto-hides when CTA is in view or keyboard/input is focused) */}
+      {!isOutOfStock && product.deliveryType !== "contact" && (
+        <div
+          aria-hidden={isSubmitVisible || isInputFocused}
+          className={`fixed inset-x-0 bottom-0 z-30 lg:hidden border-t border-border bg-card/95 backdrop-blur-md px-4 py-3 shadow-[0_-10px_28px_-12px_rgba(0,0,0,0.8)] transition-[transform,opacity] duration-[240ms] ease-[cubic-bezier(0.22,1,0.36,1)] ${
+            !isSubmitVisible && !isInputFocused
+              ? "translate-y-0 opacity-100"
+              : "translate-y-full opacity-0 pointer-events-none"
+          }`}
+        >
+          <div className="mx-auto max-w-lg flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <span className="text-[11px] text-muted-foreground block leading-none">
+                Tổng thanh toán
+              </span>
+              <span
+                key={`sticky-${finalPrice}`}
+                className="text-lg font-bold text-primary tabular-nums block mt-1 animate-price-flash"
+              >
+                {formatPrice(finalPrice)}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (email.trim() && consentAgreed && (!isBuffProduct || inviteCode.trim().length >= 4)) {
+                  formRef.current?.requestSubmit()
+                } else {
+                  formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+                  if (!email.trim()) {
+                    setTimeout(() => emailInputRef.current?.focus(), 320)
+                  }
+                }
+              }}
+              className="inline-flex items-center justify-center gap-1.5 h-11 px-5 rounded-xl bg-caramel hover:bg-caramel-light active:scale-[0.97] text-espresso text-sm font-bold transition-btn shrink-0 cursor-pointer"
+            >
+              <span>Tiếp tục</span>
+              <ArrowRight className="size-4" strokeWidth={2.25} />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

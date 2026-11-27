@@ -7,7 +7,8 @@ import { Footer } from "@/components/storefront/Footer"
 import { ZaloWidget } from "@/components/storefront/ZaloWidget"
 import { PurchaseForm } from "@/components/storefront/PurchaseForm"
 import { ProductDetailImage } from "@/components/storefront/ProductDetailImage"
-import { ChevronRight, ShieldCheck, AlertCircle } from "lucide-react"
+import { ProductDetailSections } from "@/components/storefront/ProductDetailSections"
+import { ChevronRight, AlertCircle } from "lucide-react"
 
 export const dynamic = "force-dynamic"
 export const revalidate = 0
@@ -133,7 +134,7 @@ export default async function ProductPage({ params }: Props) {
       // Skip bare generic headings like "Thông tin & Quyền lợi:"
       if (/^(thông tin\s*&\s*quyền lợi|mô tả sản phẩm)\s*:?$/i.test(plain)) return false
       // Avoid duplicating dedicated Instructions / Warranty / Notice blocks inside description
-      if (normalizedInstructions && (/^hướng dẫn sử dụng|^hướng dẫn kích hoạt/i.test(plain) || normalizedInstructions.includes(plain))) {
+      if (normalizedInstructions && (/^hướng dẫn sử dụng|^hướng dẫn kích hoạt|^hướng dẫn nhận hàng/i.test(plain) || normalizedInstructions.includes(plain))) {
         return false
       }
       if (normalizedWarranty && (/^chính sách bảo hành|^bảo hành\s*:/i.test(plain) || normalizedWarranty.includes(plain))) {
@@ -169,91 +170,164 @@ export default async function ProductPage({ params }: Props) {
       ? "Nạp / kích hoạt trực tiếp vào tài khoản"
       : "Hiển thị thông tin bàn giao trong trang đơn hàng"
 
+  const mobileDeliverySummary =
+    product.deliveryType === "contact"
+      ? "Bàn giao qua Zalo"
+      : isBuffOrService
+      ? "Nạp trực tiếp"
+      : "Bàn giao tại đơn hàng"
+
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
       <Header initialSettings={settings} />
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 sm:px-6 pt-5 pb-12 space-y-5">
-        {/* Breadcrumb */}
-        <nav aria-label="Đường dẫn" className="flex items-center gap-1.5 text-xs text-muted-foreground flex-wrap">
-          <Link href="/" className="hover:text-foreground transition-colors">
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 sm:px-6 pt-3 sm:pt-5 pb-8 sm:pb-12 space-y-3.5 sm:space-y-5">
+        {/* Compact Single-Line Breadcrumb */}
+        <nav aria-label="Đường dẫn" className="flex items-center gap-1 text-[11px] sm:text-xs text-muted-foreground overflow-hidden whitespace-nowrap">
+          <Link href="/" className="hover:text-foreground transition-colors shrink-0">
             Trang chủ
           </Link>
-          <ChevronRight className="size-3.5 text-muted-foreground/60" />
-          <Link href="/san-pham" className="hover:text-foreground transition-colors">
+          <ChevronRight className="size-3 text-muted-foreground/60 shrink-0" />
+          <Link href="/san-pham" className="hover:text-foreground transition-colors shrink-0">
             Sản phẩm
           </Link>
           {product.group && (
             <>
-              <ChevronRight className="size-3.5 text-muted-foreground/60" />
-              <span className="text-muted-foreground">{product.group.name}</span>
+              <ChevronRight className="size-3 text-muted-foreground/60 shrink-0 hidden sm:block" />
+              <span className="text-muted-foreground hidden sm:inline shrink-0">{product.group.name}</span>
             </>
           )}
-          <ChevronRight className="size-3.5 text-muted-foreground/60" />
-          <span className="text-foreground font-medium truncate max-w-[220px] sm:max-w-xs">
+          <ChevronRight className="size-3 text-muted-foreground/60 shrink-0" />
+          <span className="text-foreground font-medium truncate min-w-0">
             {product.name}
           </span>
         </nav>
 
         {/*
-          Natural DOM order (Summary -> PurchaseForm -> Detailed Description):
-          - Mobile (< lg): flows naturally without CSS order-* mismatching keyboard/screen-reader order.
+          Natural DOM order (Summary -> Package Details -> PurchaseForm):
+          - Mobile (< lg): Product Header -> Compact Package Description Tabs -> PurchaseForm.
           - Desktop (lg): Summary (left top) + Details (left bottom) alongside sticky PurchaseForm (right).
         */}
-        <div className="grid gap-6 lg:grid-cols-12 lg:grid-rows-[auto_1fr] items-start">
-          {/* 1. Product Header: Title & Benefit FIRST -> Compact Framed Visual */}
-          <div className="lg:col-start-1 lg:col-span-7 lg:row-start-1 space-y-4">
-            <div className="space-y-2.5">
-              <div className="flex flex-wrap items-center gap-2.5">
-                <h1 className="font-heading text-2xl sm:text-[28px] font-bold tracking-tight text-foreground leading-tight break-words">
-                  {product.name}
-                </h1>
-                <span
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border shrink-0 ${
-                    isAllOutOfStock
-                      ? "bg-rose-500/10 text-rose-300 border-rose-500/30"
-                      : product.deliveryType === "contact"
-                      ? "bg-secondary text-foreground border-border"
-                      : "bg-emerald-500/10 text-emerald-300 border-emerald-500/30"
-                  }`}
-                >
-                  <span
-                    className={`size-1.5 rounded-full ${
-                      isAllOutOfStock
-                        ? "bg-rose-400"
+        <div className="grid grid-cols-1 gap-3.5 sm:gap-5 lg:gap-6 lg:grid-cols-12 lg:grid-rows-[auto_1fr] items-start">
+          {/* 1. Product Header: Compact App-Store Row on Mobile (< lg), Editorial Header + Banner on Desktop (lg+) */}
+          <div className="lg:col-start-1 lg:col-span-7 lg:row-start-1 min-w-0 w-full space-y-2.5 sm:space-y-4">
+            {/* MOBILE (< lg): Ultra-clean Horizontal Product Header + Lead Summary */}
+            <div className="lg:hidden space-y-2 min-w-0">
+              <div className="flex items-start gap-3 min-w-0">
+                <div className="w-24 sm:w-32 aspect-[16/9] rounded-xl overflow-hidden bg-card border border-border/80 shrink-0 mt-0.5">
+                  {primaryImage ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={primaryImage}
+                      alt={product.name}
+                      className="w-full h-full object-cover"
+                      loading="eager"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-[10px] font-semibold text-muted-foreground uppercase">
+                      {product.group?.name || "CAPYGO"}
+                    </div>
+                  )}
+                </div>
+
+                <div className="min-w-0 flex-1 space-y-1">
+                  <h1 className="font-heading text-base sm:text-xl font-bold tracking-tight text-foreground leading-snug line-clamp-2 break-words">
+                    {product.name}
+                  </h1>
+                  <div className="flex items-center gap-1.5 min-w-0 text-[11px]">
+                    <span
+                      className={`inline-flex items-center gap-1 font-medium shrink-0 ${
+                        isAllOutOfStock
+                          ? "text-rose-300"
+                          : product.deliveryType === "contact"
+                          ? "text-primary"
+                          : "text-emerald-400"
+                      }`}
+                    >
+                      <span
+                        className={`size-1.5 rounded-full ${
+                          isAllOutOfStock
+                            ? "bg-rose-400"
+                            : product.deliveryType === "contact"
+                            ? "bg-primary"
+                            : "bg-emerald-400"
+                        }`}
+                      />
+                      {isAllOutOfStock
+                        ? "Tạm hết hàng"
                         : product.deliveryType === "contact"
-                        ? "bg-primary"
-                        : "bg-emerald-400"
-                    }`}
-                  />
-                  <span>
-                    {isAllOutOfStock
-                      ? "Tạm hết hàng"
-                      : product.deliveryType === "contact"
-                      ? "Đặt qua Zalo"
-                      : "Còn hàng"}
-                  </span>
-                </span>
+                        ? "Đặt qua Zalo"
+                        : "Còn hàng"}
+                    </span>
+                    <span className="text-border shrink-0">·</span>
+                    <span className="text-muted-foreground truncate min-w-0">
+                      {mobileDeliverySummary}
+                    </span>
+                  </div>
+                </div>
               </div>
 
               {leadSummary && (
-                <p className="text-sm sm:text-[15px] text-muted-foreground leading-relaxed">
+                <p className="text-[13px] text-muted-foreground leading-relaxed break-words [overflow-wrap:anywhere]">
                   {renderFormattedText(leadSummary)}
                 </p>
               )}
-
-              <p className="text-xs text-muted-foreground">
-                Bàn giao: <span className="text-foreground font-medium">{deliverySummary}</span>
-              </p>
             </div>
 
-            <ProductDetailImage
-              imageUrl={primaryImage}
-              name={product.name}
-              groupName={product.group?.name}
-            />
+            {/* DESKTOP (lg+): Full Editorial Title + Lead + Banner */}
+            <div className="hidden lg:block space-y-4">
+              <div className="space-y-2.5">
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <h1 className="font-heading text-[28px] font-bold tracking-tight text-foreground leading-tight break-words">
+                    {product.name}
+                  </h1>
+                  <span
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border shrink-0 ${
+                      isAllOutOfStock
+                        ? "bg-rose-500/10 text-rose-300 border-rose-500/30"
+                        : product.deliveryType === "contact"
+                        ? "bg-secondary text-foreground border-border"
+                        : "bg-emerald-500/10 text-emerald-300 border-emerald-500/30"
+                    }`}
+                  >
+                    <span
+                      className={`size-1.5 rounded-full ${
+                        isAllOutOfStock
+                          ? "bg-rose-400"
+                          : product.deliveryType === "contact"
+                          ? "bg-primary"
+                          : "bg-emerald-400"
+                      }`}
+                    />
+                    <span>
+                      {isAllOutOfStock
+                        ? "Tạm hết hàng"
+                        : product.deliveryType === "contact"
+                        ? "Đặt qua Zalo"
+                        : "Còn hàng"}
+                    </span>
+                  </span>
+                </div>
+
+                {leadSummary && (
+                  <p className="text-[15px] text-muted-foreground leading-relaxed">
+                    {renderFormattedText(leadSummary)}
+                  </p>
+                )}
+
+                <p className="text-xs text-muted-foreground">
+                  Bàn giao: <span className="text-foreground font-medium">{deliverySummary}</span>
+                </p>
+              </div>
+
+              <ProductDetailImage
+                imageUrl={primaryImage}
+                name={product.name}
+                groupName={product.group?.name}
+              />
+            </div>
 
             {isKBH && !showSeparateNotice && (
-              <div className="flex items-start gap-2.5 p-3.5 rounded-xl border border-amber-500/30 bg-amber-500/10 text-xs sm:text-[13px] text-amber-200 leading-relaxed">
+              <div className="flex items-start gap-2 p-2.5 sm:p-3.5 rounded-xl border border-amber-500/30 bg-amber-500/10 text-[11.5px] sm:text-[13px] text-amber-200 leading-relaxed">
                 <AlertCircle className="size-4 text-amber-400 shrink-0 mt-0.5" />
                 <span>
                   <strong>Lưu ý bảo hành:</strong> Sản phẩm thuộc diện không bảo hành (KBH) hoặc bảo hành giới hạn. Vui lòng đọc kỹ điều kiện trước khi thanh toán.
@@ -262,8 +336,17 @@ export default async function ProductPage({ params }: Props) {
             )}
           </div>
 
-          {/* 2. Sticky Purchase Form (Right Column on Desktop) */}
-          <div className="lg:col-start-8 lg:col-span-5 lg:row-start-1 lg:row-span-2 lg:sticky lg:top-20">
+          {/* 2. Structured Details (Compact Tabs right under Product Title on Mobile, Open Editorial on Desktop) */}
+          <ProductDetailSections
+            highlights={cleanHighlights}
+            instructions={normalizedInstructions}
+            descriptionParagraphs={remainingDescParagraphs}
+            notice={showSeparateNotice ? normalizedNotice : ""}
+            warranty={normalizedWarranty}
+          />
+
+          {/* 3. Sticky Purchase Form (Below Details on Mobile, Right Column on Desktop) */}
+          <div className="lg:col-start-8 lg:col-span-5 lg:row-start-1 lg:row-span-2 lg:sticky lg:top-20 min-w-0 w-full">
             <PurchaseForm
               product={{
                 id: product.id,
@@ -278,88 +361,6 @@ export default async function ProductPage({ params }: Props) {
               }}
               variants={variantsWithStock}
             />
-          </div>
-
-          {/* 3. Non-Repeating Structured Details (Left Column Bottom) */}
-          <div className="lg:col-start-1 lg:col-span-7 lg:row-start-2 space-y-6 pt-2">
-            {(cleanHighlights.length > 0 || normalizedInstructions.length > 0) && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-border">
-                {cleanHighlights.length > 0 && (
-                  <section className="space-y-2.5">
-                    <h2 className="text-sm font-semibold text-foreground uppercase tracking-wide">
-                      Điểm nổi bật
-                    </h2>
-                    <ul className="space-y-2 text-sm text-muted-foreground leading-relaxed">
-                      {cleanHighlights.map((item, idx) => (
-                        <li key={idx} className="flex items-start gap-2">
-                          <span className="size-1.5 rounded-full bg-primary mt-2 shrink-0" />
-                          <span>{renderFormattedText(item)}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </section>
-                )}
-
-                {normalizedInstructions.length > 0 && (
-                  <section className="space-y-2.5">
-                    <h2 className="text-sm font-semibold text-foreground uppercase tracking-wide">
-                      Hướng dẫn kích hoạt
-                    </h2>
-                    <div className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">
-                      {normalizedInstructions}
-                    </div>
-                  </section>
-                )}
-              </div>
-            )}
-
-            {remainingDescParagraphs.length > 0 && (
-              <section className="pt-5 border-t border-border space-y-2.5">
-                <h2 className="text-sm font-semibold text-foreground uppercase tracking-wide">
-                  Thông tin chi tiết
-                </h2>
-                <div className="space-y-2 text-sm text-muted-foreground leading-relaxed">
-                  {remainingDescParagraphs.map((para, i) => (
-                    <p key={i}>{renderFormattedText(para)}</p>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {showSeparateNotice && (
-              <section className="pt-5 border-t border-border space-y-2.5">
-                <h2 className="text-sm font-semibold text-amber-300 uppercase tracking-wide flex items-center gap-1.5">
-                  <AlertCircle className="size-4 text-amber-400" />
-                  <span>Lưu ý quan trọng</span>
-                </h2>
-                <div className="text-sm text-amber-200/90 leading-relaxed whitespace-pre-line">
-                  {normalizedNotice}
-                </div>
-              </section>
-            )}
-
-            <section className="pt-5 border-t border-border space-y-2.5">
-              <h2 className="text-sm font-semibold text-foreground uppercase tracking-wide flex items-center gap-1.5">
-                <ShieldCheck className="size-4 text-primary" />
-                <span>Chính sách bảo hành</span>
-              </h2>
-              {normalizedWarranty ? (
-                <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">
-                  {normalizedWarranty}
-                </p>
-              ) : (
-                <ul className="space-y-2 text-sm text-muted-foreground leading-relaxed">
-                  <li className="flex items-start gap-2">
-                    <span className="size-1.5 rounded-full bg-primary mt-2 shrink-0" />
-                    <span>Chính sách bảo hành áp dụng theo từng gói cụ thể đã ghi rõ trên sản phẩm.</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="size-1.5 rounded-full bg-primary mt-2 shrink-0" />
-                    <span>Thông tin bàn giao và hóa đơn điện tử được lưu trực tiếp tại trang chi tiết đơn hàng.</span>
-                  </li>
-                </ul>
-              )}
-            </section>
           </div>
         </div>
       </main>

@@ -28,22 +28,22 @@ export default async function HomePage() {
         {/* 3. How It Works (Interactive 4-Step Pipeline with Travelling Light) */}
         <HowItWorksSection />
 
-        {/* 4. FAQ Section (2-Column Editorial Split from md+ screens) */}
-        <section id="faq" className="pt-8 border-t border-border scroll-mt-20">
-          <div className="grid gap-6 md:grid-cols-12 items-start">
+        {/* 4. FAQ Section (Compact on Mobile, 2-Column Editorial Split from md+) */}
+        <section id="faq" className="pt-6 sm:pt-8 border-t border-border scroll-mt-20">
+          <div className="grid gap-4 md:gap-6 md:grid-cols-12 items-start">
             {/* Left: Heading + Clean Support Actions */}
-            <div className="md:col-span-4 space-y-4 md:sticky md:top-24">
-              <div className="space-y-1.5">
-                <h2 className="font-heading font-bold text-xl sm:text-2xl tracking-tight text-foreground">
+            <div className="md:col-span-4 space-y-3 md:space-y-4 md:sticky md:top-24">
+              <div className="space-y-1">
+                <h2 className="font-heading font-bold text-lg sm:text-2xl tracking-tight text-foreground">
                   Câu hỏi thường gặp
                 </h2>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  Giải đáp nhanh về cách nhận hàng, thời gian xử lý và chính sách bảo hành theo từng gói.
+                <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
+                  Giải đáp nhanh về nhận hàng, thời gian xử lý và bảo hành.
                 </p>
               </div>
 
-              <div className="space-y-2.5 pt-1">
-                <p className="text-xs text-muted-foreground/85 leading-relaxed">
+              <div className="space-y-2.5 pt-0.5">
+                <p className="hidden md:block text-xs text-muted-foreground/85 leading-relaxed">
                   Cần hỗ trợ trực tiếp hoặc kiểm tra nhanh tình trạng đơn hàng?
                 </p>
 
@@ -52,14 +52,14 @@ export default async function HomePage() {
                     href={`https://zalo.me/${(process.env.NEXT_PUBLIC_ZALO_PHONE_1 || "0356970964").replace(/\D/g, "")}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center justify-center gap-1.5 h-9 px-4 rounded-full bg-primary text-primary-foreground hover:bg-caramel-light active:scale-[0.97] text-xs font-semibold transition-btn"
+                    className="inline-flex items-center justify-center gap-1.5 h-8 sm:h-9 px-3.5 sm:px-4 rounded-full bg-primary text-primary-foreground hover:bg-caramel-light active:scale-[0.97] text-[11.5px] sm:text-xs font-semibold transition-btn"
                   >
                     <MessageCircle className="size-3.5" />
                     <span>Nhắn Zalo hỗ trợ</span>
                   </a>
                   <Link
                     href="/lookup"
-                    className="inline-flex items-center justify-center gap-1.5 h-9 px-4 rounded-full border border-border bg-card/70 hover:bg-secondary hover:border-primary/40 active:scale-[0.97] text-foreground text-xs font-medium transition-btn"
+                    className="inline-flex items-center justify-center gap-1.5 h-8 sm:h-9 px-3.5 sm:px-4 rounded-full border border-border bg-card/70 hover:bg-secondary hover:border-primary/40 active:scale-[0.97] text-foreground text-[11.5px] sm:text-xs font-medium transition-btn"
                   >
                     <Search className="size-3.5 text-muted-foreground" />
                     <span>Tra cứu đơn</span>

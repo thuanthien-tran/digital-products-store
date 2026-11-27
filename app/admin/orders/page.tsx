@@ -21,6 +21,7 @@ export default async function AdminOrdersPage() {
               },
             },
             serials: { select: { content: true } },
+            buffFulfillment: { select: { status: true, usedMethod: true, tokenAmountB: true } },
           },
         },
         payments: {
@@ -108,10 +109,12 @@ export default async function AdminOrdersPage() {
                 priceCents: i.priceCents,
                 serials: serialList,
                 serial: serialList.length > 0 ? serialList.join("\n") : null,
-                connectionName: i.connectionName || (i.variant as any)?.connection?.name || (i.variant as any)?.provider,
-                provider: (i.variant as any)?.provider || (i.variant as any)?.connection?.provider,
+                connectionName: i.connectionName || i.variant.connection?.name || i.variant.provider,
+                provider: i.variant.provider || i.variant.connection?.provider,
                 inviteCode: i.inviteCode || o.inviteCode,
                 tokenAmountB: i.tokenAmountB,
+                buffStatus: i.buffFulfillment?.status || null,
+                buffUsedMethod: i.buffFulfillment?.usedMethod || null,
               }
             }),
           }

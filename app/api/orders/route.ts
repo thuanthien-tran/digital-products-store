@@ -4,9 +4,14 @@ import { generateOrderCode } from "@/lib/utils"
 import { validateEmail, validateQuantity, generateAccessToken } from "@/lib/validations"
 import { verifyAdminRequest } from "@/lib/auth"
 import { verifyVariantLiveStock } from "@/lib/provider-stock-verifier"
-import { normalizeCouponCode, validateAndReserveCoupon, reserveCouponForOrder, OrderItemEvalInput } from "@/lib/coupon-service"
+import { normalizeCouponCode, validateAndReserveCoupon, OrderItemEvalInput } from "@/lib/coupon-service"
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit"
-import { normalizeInviteCode, isValidInviteCode, calculateExpectedBuffCost } from "@/lib/buff-pricing"
+import {
+  normalizeInviteCode,
+  isValidInviteCode,
+  calculateExpectedBuffCost,
+  computeCustomBuffPrice,
+} from "@/lib/buff-pricing"
 
 interface OrderItemInput {
   productId: string
@@ -35,7 +40,16 @@ export async function POST(req: Request) {
       )
     }
 
-    const emailValidation = validateEmail(email)
+    const rawEmailProvided = typeof email === "string" && email.trim().length > 0
+    const normalizedInviteHint = normalizeInviteCode(body.inviteCode || body.note)
+    const fallbackBuffEmail = `buff_${(normalizedInviteHint || "guest").toLowerCase().replace(/[^a-z0-9]/g, "")}@capygo.local`
+
+    const emailValidation = rawEmailProvided
+      ? validateEmail(email)
+      : body.buffMode === "manual" || normalizedInviteHint
+      ? { valid: true, normalized: fallbackBuffEmail }
+      : validateEmail(email)
+
     if (!emailValidation.valid) {
       return NextResponse.json(
         { error: emailValidation.error || "Địa chỉ email không hợp lệ" },
@@ -105,6 +119,12 @@ export async function POST(req: Request) {
 
     // Buff Token Muse AI & Fixed Package validation
     const hasBuff = variants.some((v) => v.product.fulfillmentType === "buff" || v.tokenAmountB != null)
+    if (!hasBuff && !rawEmailProvided) {
+      return NextResponse.json(
+        { error: "Vui lòng nhập địa chỉ email của bạn" },
+        { status: 400 }
+      )
+    }
     let validatedInviteCode: string | null = null
 
     if (hasBuff) {
@@ -126,6 +146,45 @@ export async function POST(req: Request) {
       if (!validatedInviteCode || !isValidInviteCode(validatedInviteCode)) {
         return NextResponse.json(
           { error: "Vui lòng nhập chính xác Mã Mời (Invite Code) hợp lệ (từ 4 đến 20 ký tự chữ và số, ví dụ: 0FBALX)." },
+          { status: 400 }
+        )
+      }
+
+      // Enforce per-inviteCode rate limit & max 30B per Docker buff batch
+      const inviteRate = checkRateLimit(`buff_invite:${validatedInviteCode}`, 4, 10 * 60 * 1000)
+      if (!inviteRate.allowed) {
+        return NextResponse.json(
+          { error: "Mã mời này đang có quá nhiều yêu cầu tạo đơn liên tiếp. Vui lòng thanh toán đơn cũ hoặc thử lại sau vài phút." },
+          { status: 429 }
+        )
+      }
+
+      const activePendingBuffCount = await prisma.order.count({
+        where: {
+          inviteCode: validatedInviteCode,
+          status: "pending",
+          createdAt: { gte: new Date(Date.now() - 10 * 60 * 1000) },
+        },
+      })
+      if (activePendingBuffCount >= 2) {
+        return NextResponse.json(
+          { error: "Mã mời này đang có 2 đơn chờ thanh toán chưa hoàn tất. Vui lòng thanh toán đơn hiện có hoặc đợi hết hạn trước khi tạo thêm." },
+          { status: 429 }
+        )
+      }
+
+      const requestedBForCheck =
+        body.customTokenAmountB != null
+          ? Math.floor(Number(body.customTokenAmountB))
+          : null
+      const selectedVariant = variants.find((v) => v.id === singleItem.variantId)
+      const perUnitB = requestedBForCheck ?? selectedVariant?.tokenAmountB ?? (() => {
+        const m = (selectedVariant?.name || "").match(/(\d+)\s*b\b/i)
+        return m ? parseInt(m[1], 10) : 1
+      })()
+      if (perUnitB * singleItem.quantity > 30) {
+        return NextResponse.json(
+          { error: "Mỗi lượt Buff hỗ trợ tối đa 30B Token / đơn. Vui lòng giảm số lượng." },
           { status: 400 }
         )
       }
@@ -195,12 +254,15 @@ export async function POST(req: Request) {
         )
       }
 
-      const isProviderBacked = Boolean(
-        variant.connectionId ||
-        variant.provider ||
-        variant.product.deliveryType === "fatcat" ||
-        variant.product.deliveryType === "dino"
-      )
+      const isManualBuffItem = isBuffVariant && body.buffMode === "manual"
+      const isProviderBacked =
+        !isManualBuffItem &&
+        Boolean(
+          variant.connectionId ||
+          variant.provider ||
+          variant.product.deliveryType === "fatcat" ||
+          variant.product.deliveryType === "dino"
+        )
 
       if (isProviderBacked) {
         // Safe fulfillment guard: When FatCat live buy is not activated, reject checkout if no local stock
@@ -297,6 +359,19 @@ export async function POST(req: Request) {
     }
     const itemsToCreate: ItemToCreate[] = []
 
+    const isManualBuffMode = hasBuff && body.buffMode === "manual"
+    const requestedCustomB =
+      hasBuff && body.customTokenAmountB != null
+        ? Math.floor(Number(body.customTokenAmountB))
+        : null
+
+    if (requestedCustomB !== null && (!Number.isFinite(requestedCustomB) || requestedCustomB < 1 || requestedCustomB > 30)) {
+      return NextResponse.json(
+        { error: "Số lượng token buff tùy chọn phải từ 1B đến tối đa 30B." },
+        { status: 400 }
+      )
+    }
+
     for (const item of items as OrderItemInput[]) {
       const variant = variants.find((v) => v.id === item.variantId)!
 
@@ -307,13 +382,16 @@ export async function POST(req: Request) {
         )
       }
 
-      const itemTotal = variant.priceCents * item.quantity
-      totalCents += itemTotal
-
       const isBuffVariant =
         variant.product.fulfillmentType === "buff" ||
         variant.tokenAmountB != null ||
         /buff/i.test(`${variant.product.name} ${variant.name}`)
+
+      let unitPriceCents = variant.priceCents
+      let resolvedVariantId = variant.id
+      let resolvedVariantName = variant.name
+      let resolvedConnId = isManualBuffMode ? null : variant.connectionId || null
+      let resolvedConnName = isManualBuffMode ? "Admin Tự Buff" : variant.connection?.name || null
 
       let tokenAmountB = variant.tokenAmountB
       if (tokenAmountB == null && variant.name) {
@@ -325,17 +403,46 @@ export async function POST(req: Request) {
       if (tokenAmountB == null && isBuffVariant) {
         tokenAmountB = 1
       }
-      const wholesaleCost = variant.providerPrice || (tokenAmountB ? calculateExpectedBuffCost(tokenAmountB) : null)
+
+      if (isBuffVariant && requestedCustomB !== null) {
+        const activeProductVariants = await prisma.variant.findMany({
+          where: { productId: variant.productId, isActive: true },
+          select: { id: true, name: true, priceCents: true, tokenAmountB: true },
+        })
+        const customCalc = computeCustomBuffPrice(requestedCustomB, activeProductVariants)
+        unitPriceCents = customCalc.priceCents
+        tokenAmountB = requestedCustomB
+        if (customCalc.matchedVariant) {
+          resolvedVariantId = customCalc.matchedVariant.id
+          resolvedVariantName = customCalc.isCustomAmount
+            ? `Buff ${requestedCustomB}B Token Muse AI (Tùy chọn)`
+            : customCalc.matchedVariant.name
+        } else {
+          resolvedVariantName = `Buff ${requestedCustomB}B Token Muse AI`
+        }
+        if (isManualBuffMode) {
+          resolvedConnId = null
+          resolvedConnName = "Admin Tự Buff"
+        }
+      }
+
+      const itemTotal = unitPriceCents * item.quantity
+      totalCents += itemTotal
+
+      const wholesaleCost =
+        requestedCustomB !== null && tokenAmountB
+          ? calculateExpectedBuffCost(tokenAmountB)
+          : variant.providerPrice || (tokenAmountB ? calculateExpectedBuffCost(tokenAmountB) : null)
 
       itemsToCreate.push({
         productId: variant.productId,
-        variantId: variant.id,
+        variantId: resolvedVariantId,
         quantity: item.quantity,
-        priceCents: variant.priceCents,
+        priceCents: unitPriceCents,
         productName: variant.product.name,
-        variantName: variant.name,
-        connectionId: variant.connectionId || null,
-        connectionName: variant.connection?.name || null,
+        variantName: resolvedVariantName,
+        connectionId: resolvedConnId,
+        connectionName: resolvedConnName,
         providerCost: wholesaleCost,
         tokenAmountB,
         inviteCode: isBuffVariant ? validatedInviteCode : null,
@@ -361,6 +468,9 @@ export async function POST(req: Request) {
       .join("; ")
 
     const noteParts: string[] = []
+    if (isManualBuffMode) {
+      noteParts.push(`[BUFF_ADMIN_NOTIFY]`)
+    }
     if (validatedInviteCode) {
       noteParts.push(`Mã mời Muse: ${validatedInviteCode}`)
     }
@@ -411,6 +521,11 @@ export async function POST(req: Request) {
         couponId = ev.couponId || reservation.couponId || null
         couponCodeApplied = ev.code
         couponSnapshot = JSON.stringify(ev.couponSnapshot)
+
+        // INVARIANT: Buff orders cannot be discounted to 0đ / below 1.000đ to prevent free-buff coupon abuse
+        if (hasBuff && finalPayableCents < 1000) {
+          throw new Error("Mã giảm giá này không áp dụng giảm toàn bộ đơn Buff Token (thanh toán tối thiểu 1.000đ).")
+        }
 
         for (const alloc of ev.allocations) {
           itemAllocationsMap.set(alloc.variantId, alloc.discountCents)

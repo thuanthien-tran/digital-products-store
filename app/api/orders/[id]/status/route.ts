@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db"
 import { verifyOrderAccess } from "@/lib/order-auth"
 import { cancelIfExpired, ORDER_EXPIRY_MS } from "@/lib/order-expiry"
 import { reconcileOrderWithSepay } from "@/lib/sepay"
+import { extractBuffDoneNote } from "@/lib/buff-stats"
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -68,7 +69,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
             remainingCents = Math.max(0, refreshed.totalCents - totalPaid)
           }
         }
-      } catch (recErr) {
+      } catch {
         // Fallback silently if SePay API is momentarily unreachable
       }
     }
@@ -80,8 +81,13 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     })
     const hasOrderAccess = authResult.authorized
 
-    // Self-healing: if order is fully paid but fulfillment is pending or interrupted, auto-fulfill
-    if (!isExpired && (currentStatus === "pending" || currentStatus === "processing") && totalPaid >= order.totalCents) {
+    // Self-healing: require a real positive payment before auto-fulfilling (never trigger on 0đ / unpaid orders)
+    if (
+      !isExpired &&
+      (currentStatus === "pending" || currentStatus === "processing") &&
+      order.totalCents > 0 &&
+      totalPaid >= order.totalCents
+    ) {
       try {
         const { fulfillOrder, syncBuffFulfillmentsForOrder } = await import("@/lib/fulfillment")
         const fRes = await fulfillOrder(order.id)
@@ -109,11 +115,32 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       } catch (fErr) {
         console.error("[Auto-Fulfillment on Status Poll Error]:", fErr)
       }
-    } else if (currentStatus === "paid") {
-      try {
-        const { syncBuffFulfillmentsForOrder } = await import("@/lib/fulfillment")
-        await syncBuffFulfillmentsForOrder(order.id)
-      } catch {}
+    } else if (currentStatus === "paid" && totalPaid >= order.totalCents && order.totalCents > 0) {
+      const hasActiveBuff = currentItems.some(
+        (it) => it.buffFulfillment && (it.buffFulfillment.status === "submitting" || it.buffFulfillment.status === "processing")
+      )
+      if (hasActiveBuff) {
+        try {
+          const { syncBuffFulfillmentsForOrder } = await import("@/lib/fulfillment")
+          await syncBuffFulfillmentsForOrder(order.id)
+          const refreshed = await prisma.order.findUnique({
+            where: { id: order.id },
+            include: {
+              items: {
+                include: {
+                  product: { select: { name: true, serviceInstructions: true } },
+                  variant: { select: { name: true } },
+                  buffFulfillment: true,
+                  serials: { select: { content: true } },
+                },
+              },
+            },
+          })
+          if (refreshed) {
+            currentItems = refreshed.items
+          }
+        } catch {}
+      }
     }
 
     const expiresAt = new Date(new Date(order.createdAt).getTime() + ORDER_EXPIRY_MS).toISOString()
@@ -132,21 +159,23 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         const serialContents = item.serials.map((s) => s.content)
         // INVARIANT: Reveal serials only if order is paid AND requester is verified owner or admin
         const isPaid = currentStatus === "paid"
-        const buff = (item as any).buffFulfillment
+        const buff = item.buffFulfillment
         return {
           productName: item.product.name,
           variantName: item.variant.name,
           priceCents: item.priceCents,
           quantity: item.quantity,
-          tokenAmountB: (item as any).tokenAmountB ?? null,
-          inviteCode: hasOrderAccess ? (item as any).inviteCode : ((item as any).inviteCode ? `${(item as any).inviteCode.slice(0, 2)}***` : null),
+          tokenAmountB: item.tokenAmountB ?? null,
+          inviteCode: hasOrderAccess ? item.inviteCode : (item.inviteCode ? `${item.inviteCode.slice(0, 2)}***` : null),
           buffFulfillment: buff ? {
             status: buff.status,
+            usedMethod: buff.usedMethod,
             tokenAmountB: buff.tokenAmountB,
             completedB: buff.completedB,
             providerOrderCode: buff.providerOrderCode,
             inviteCode: hasOrderAccess ? buff.inviteCode : `${buff.inviteCode.slice(0, 2)}***`,
             errorMessage: buff.errorMessage,
+            buffNote: extractBuffDoneNote(order.note),
           } : null,
           serials: isPaid && hasOrderAccess ? serialContents : [],
           serial: isPaid && hasOrderAccess ? serialContents.join("\n") || null : null,

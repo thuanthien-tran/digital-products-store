@@ -17,7 +17,7 @@ export function ProductDetailImage({
   const [hasError, setHasError] = useState(false)
 
   return (
-    <div className="relative aspect-[16/9] max-h-[300px] w-full overflow-hidden rounded-xl bg-background border border-border/70 select-none">
+    <div className="relative aspect-[16/9] max-h-[155px] sm:max-h-[240px] lg:max-h-[300px] w-full overflow-hidden rounded-xl bg-background border border-border/70 select-none">
       {imageUrl && !hasError ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img

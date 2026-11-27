@@ -225,6 +225,19 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ success: true, order, fulfillment: fulfillRes })
     }
 
+    if (action === "complete_buff") {
+      const { completeBuffOrder } = await import("@/lib/buff-stats")
+      const res = await completeBuffOrder({
+        orderIdOrCode: orderId,
+        note: body.note ? String(body.note).trim() : null,
+        actor: `Admin ${auth.username || "admin"}`,
+      })
+      if (!res.ok) {
+        return NextResponse.json({ error: res.error || "Lỗi hoàn tất Buff" }, { status: 400 })
+      }
+      return NextResponse.json({ success: true })
+    }
+
     if (!status) {
       return NextResponse.json({ error: "Thiếu status" }, { status: 400 })
     }
@@ -495,6 +508,7 @@ export async function GET(req: Request) {
               },
             },
             serials: { select: { content: true } },
+            buffFulfillment: { select: { status: true, usedMethod: true, tokenAmountB: true } },
           },
         },
         payments: {
@@ -540,6 +554,8 @@ export async function GET(req: Request) {
             provider: i.variant.provider || i.variant.connection?.provider,
             inviteCode: i.inviteCode || o.inviteCode,
             tokenAmountB: i.tokenAmountB,
+            buffStatus: i.buffFulfillment?.status || null,
+            buffUsedMethod: i.buffFulfillment?.usedMethod || null,
           }
         }),
       }
