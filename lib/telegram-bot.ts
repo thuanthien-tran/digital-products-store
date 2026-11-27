@@ -1,4 +1,5 @@
 import { prisma } from "./db"
+import { getTelegramConfig } from "./telegram-config"
 import {
   addBuffNoteToOrder,
   completeBuffOrder,
@@ -34,7 +35,7 @@ interface TelegramUpdate {
 }
 
 async function callTgApi(method: string, payload: Record<string, unknown>): Promise<Record<string, unknown> | null> {
-  const botToken = (process.env.TELEGRAM_BOT_TOKEN || "").trim()
+  const { botToken } = await getTelegramConfig()
   if (!botToken) return null
   try {
     const res = await fetch(`https://api.telegram.org/bot${botToken}/${method}`, {
@@ -173,7 +174,7 @@ function parseDateArgToKey(rawArg?: string): { valid: boolean; dateKey: string }
  * Processes a single Telegram update strictly authorized against TELEGRAM_CHAT_ID.
  */
 export async function processTelegramUpdate(update: TelegramUpdate): Promise<{ handled: boolean; action?: string }> {
-  const expectedChatId = (process.env.TELEGRAM_CHAT_ID || "").trim()
+  const { chatId: expectedChatId } = await getTelegramConfig()
   if (!expectedChatId) return { handled: false }
 
   // 1. Inline Button Callbacks
@@ -436,10 +437,12 @@ export async function syncTelegramBotUpdates(): Promise<{
   actions: string[]
   error?: string
 }> {
-  const botToken = (process.env.TELEGRAM_BOT_TOKEN || "").trim()
-  const chatId = (process.env.TELEGRAM_CHAT_ID || "").trim()
+  const { botToken, chatId, webhookUrl } = await getTelegramConfig()
   if (!botToken || !chatId) {
     return { ok: false, processed: 0, actions: [], error: "Chưa cấu hình Telegram Bot" }
+  }
+  if (webhookUrl && webhookUrl.startsWith("https://")) {
+    return { ok: true, processed: 0, actions: [] }
   }
 
   const metricKey = "telegram_last_update_id"
@@ -507,22 +510,24 @@ const globalForTg = globalThis as unknown as {
 export function startTelegramBotPoller(): void {
   if (globalForTg.__capygoTgPollerStarted) return
   if (process.env.TELEGRAM_WEBHOOK_ENABLED === "true") return
-  const botToken = (process.env.TELEGRAM_BOT_TOKEN || "").trim()
-  const chatId = (process.env.TELEGRAM_CHAT_ID || "").trim()
-  if (!botToken || !chatId) return
 
   globalForTg.__capygoTgPollerStarted = true
 
-  // Register menu commands on Telegram so "/" autocomplete shows immediately
-  void callTgApi("setMyCommands", {
-    commands: [
-      { command: "today", description: "Tổng đơn, tổng Token B & tiền thu về hôm nay" },
-      { command: "pending", description: "Xem các đơn Buff đang chờ nạp" },
-      { command: "done", description: "Xác nhận xong đơn: /done MÃ_ĐƠN [ghi chú]" },
-      { command: "note", description: "Lưu ghi chú đơn: /note MÃ_ĐƠN nội dung" },
-      { command: "help", description: "Xem menu hướng dẫn lệnh Bot" },
-    ],
-  })
+  void (async () => {
+    const cfg = await getTelegramConfig()
+    if (!cfg.botToken || !cfg.chatId) return
+    if (cfg.webhookUrl && cfg.webhookUrl.startsWith("https://")) return
+
+    await callTgApi("setMyCommands", {
+      commands: [
+        { command: "today", description: "Tổng đơn, tổng Token B & tiền thu về hôm nay" },
+        { command: "pending", description: "Xem các đơn Buff đang chờ nạp" },
+        { command: "done", description: "Xác nhận xong đơn: /done MÃ_ĐƠN [ghi chú]" },
+        { command: "note", description: "Lưu ghi chú đơn: /note MÃ_ĐƠN nội dung" },
+        { command: "help", description: "Xem menu hướng dẫn lệnh Bot" },
+      ],
+    })
+  })().catch(() => {})
 
   setInterval(() => {
     if (globalForTg.__capygoTgSyncRunning) return

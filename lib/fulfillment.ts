@@ -261,13 +261,25 @@ export async function fulfillOrder(
             continue
           }
         } else {
-          // Already recorded in manual queue
+          // Retry Telegram delivery if a previous manual_queue attempt failed or hadn't sent yet
+          if (buffRec.status === 'pending' && buffRec.usedMethod === 'manual_queue') {
+            await notifyAdminNewBuffOrder({
+              orderId: order.id,
+              orderCode: order.code,
+              email: order.email,
+              totalCents: order.totalCents,
+              inviteCode: buffRec.inviteCode,
+              tokenAmountB: buffRec.tokenAmountB,
+            }).catch((err) => {
+              console.error('[Fulfillment Buff Retry Notify Error]:', err)
+            })
+          }
           totalDelivered += item.quantity
           continue
         }
 
         if (!shopToolConfig) {
-          // Manual Admin Buff Flow: mark order paid, notify Admin immediately with Invite Code + Token B
+          // Manual Admin Buff Flow: mark order paid, await Telegram/Admin notification immediately
           totalDelivered += item.quantity
           await updateOrderNote(
             db,
@@ -275,14 +287,16 @@ export async function fulfillOrder(
             order.note,
             `[Chờ Admin Buff ${tokenAmountB}B]: Mã mời ${inviteCode} · Đã gửi thông báo để Admin tiến hành nạp.`
           )
-          notifyAdminNewBuffOrder({
+          await notifyAdminNewBuffOrder({
             orderId: order.id,
             orderCode: order.code,
             email: order.email,
             totalCents: order.totalCents,
             inviteCode,
             tokenAmountB,
-          }).catch(() => {})
+          }).catch((err) => {
+            console.error('[Fulfillment Buff Notify Error]:', err)
+          })
           continue
         }
 

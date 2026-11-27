@@ -12,6 +12,9 @@ import {
   CheckCircle2,
   AlertCircle,
   Power,
+  Send,
+  Bell,
+  Search,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -22,7 +25,21 @@ import type { BuffMuseAdminConfig, BuffMuseTierConfig } from "@/lib/buff-config"
 
 const PREVIEW_AMOUNTS = [1, 2, 5, 7, 10, 15, 20, 25, 31] as const
 
-export function BuffMuseAdminClient({ initialConfig }: { initialConfig: BuffMuseAdminConfig }) {
+export interface TelegramAdminSummary {
+  configured: boolean
+  source: "db" | "env" | "none"
+  maskedToken: string
+  chatId: string
+  webhookUrl: string | null
+}
+
+export function BuffMuseAdminClient({
+  initialConfig,
+  initialTelegram,
+}: {
+  initialConfig: BuffMuseAdminConfig
+  initialTelegram: TelegramAdminSummary
+}) {
   const router = useRouter()
   const { toast } = useToast()
 
@@ -32,6 +49,61 @@ export function BuffMuseAdminClient({ initialConfig }: { initialConfig: BuffMuse
   const [tiers, setTiers] = useState<BuffMuseTierConfig[]>(initialConfig.tiers)
   const [saving, setSaving] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+
+  // Telegram Bot Config State
+  const [tgConfigured, setTgConfigured] = useState(initialTelegram.configured)
+  const [tgSource, setTgSource] = useState(initialTelegram.source)
+  const [tgMaskedToken, setTgMaskedToken] = useState(initialTelegram.maskedToken)
+  const [tgWebhookUrl, setTgWebhookUrl] = useState<string | null>(initialTelegram.webhookUrl)
+  const [tgTokenInput, setTgTokenInput] = useState("")
+  const [tgChatIdInput, setTgChatIdInput] = useState(initialTelegram.chatId)
+  const [tgBusy, setTgBusy] = useState<string | null>(null)
+  const [tgFeedback, setTgFeedback] = useState<{ type: "ok" | "err"; text: string } | null>(null)
+
+  const handleTelegramAction = async (
+    action: "save" | "detect_chat_id" | "test" | "resend_pending"
+  ) => {
+    if (tgBusy) return
+    setTgBusy(action)
+    setTgFeedback(null)
+
+    try {
+      const origin = typeof window !== "undefined" ? window.location.origin : ""
+      const res = await fetch("/api/admin/telegram/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action,
+          botToken: tgTokenInput.trim() || undefined,
+          chatId: tgChatIdInput.trim(),
+          origin,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) {
+        setTgFeedback({ type: "err", text: json.error || "Thao tác Telegram thất bại" })
+        return
+      }
+
+      if (json.chatId) setTgChatIdInput(json.chatId)
+      if (json.config) {
+        setTgConfigured(json.config.configured)
+        setTgSource(json.config.source)
+        setTgMaskedToken(json.config.maskedToken)
+        setTgWebhookUrl(json.config.webhookUrl)
+      }
+      if (action === "save") {
+        setTgTokenInput("")
+      }
+
+      setTgFeedback({ type: "ok", text: json.message || "Thành công!" })
+      toast({ title: "Telegram Bot", description: json.message || "Thao tác thành công" })
+    } catch {
+      setTgFeedback({ type: "err", text: "Lỗi kết nối máy chủ" })
+    } finally {
+      setTgBusy(null)
+    }
+  }
 
   const updateTier = (
     tokenAmountB: number,
@@ -386,6 +458,153 @@ export function BuffMuseAdminClient({ initialConfig }: { initialConfig: BuffMuse
             </>
           )}
         </Button>
+      </div>
+
+      {/* Telegram Bot Configuration Card (Persists in DB so production works even without editing .env) */}
+      <div className="rounded-2xl border border-border bg-card p-4 sm:p-5 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-border/70">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex size-8 items-center justify-center rounded-xl bg-primary/15 border border-primary/30 text-primary">
+              <Bell className="size-4" />
+            </span>
+            <div>
+              <h2 className="text-sm font-bold text-foreground">
+                Thông báo &amp; Bot Telegram nhận đơn Buff
+              </h2>
+              <p className="text-[11px] text-muted-foreground">
+                Lưu trực tiếp vào Database (mã hóa AES-256) và tự gắn Webhook cho domain thật.
+              </p>
+            </div>
+          </div>
+
+          <span
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border ${
+              tgConfigured
+                ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/30"
+                : "bg-rose-500/10 text-rose-300 border-rose-500/30"
+            }`}
+          >
+            <span
+              className={`size-1.5 rounded-full ${
+                tgConfigured ? "bg-emerald-400 animate-pulse" : "bg-rose-400"
+              }`}
+            />
+            {tgConfigured
+              ? `Đã kết nối (${tgSource === "db" ? "Database" : ".env"})`
+              : "Chưa cấu hình trên server này!"}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div className="space-y-1.5">
+            <label htmlFor="tg-bot-token" className="text-xs font-semibold text-foreground block">
+              Bot Token (@BotFather)
+            </label>
+            <Input
+              id="tg-bot-token"
+              type="password"
+              value={tgTokenInput}
+              onChange={(e) => setTgTokenInput(e.target.value)}
+              placeholder={
+                tgMaskedToken ? `Đang lưu: ${tgMaskedToken} (để trống nếu giữ nguyên)` : "VD: 9102505205:AAFw..."
+              }
+              className="font-mono text-xs"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label htmlFor="tg-chat-id" className="text-xs font-semibold text-foreground block">
+              Telegram Chat ID nhận thông báo
+            </label>
+            <div className="flex gap-2">
+              <Input
+                id="tg-chat-id"
+                type="text"
+                value={tgChatIdInput}
+                onChange={(e) => setTgChatIdInput(e.target.value)}
+                placeholder="VD: 5890711288"
+                className="font-mono text-xs flex-1"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={Boolean(tgBusy)}
+                onClick={() => handleTelegramAction("detect_chat_id")}
+                className="h-9 text-xs gap-1 shrink-0 cursor-pointer"
+                title="Tự lấy Chat ID từ tin nhắn /start mới nhất gửi cho bot"
+              >
+                {tgBusy === "detect_chat_id" ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <Search className="size-3.5" />
+                )}
+                <span>Tự lấy ID</span>
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {tgWebhookUrl && (
+          <p className="text-[11px] text-muted-foreground font-mono truncate">
+            Webhook đang gắn: <span className="text-emerald-400">{tgWebhookUrl}</span>
+          </p>
+        )}
+
+        {tgFeedback && (
+          <div
+            className={`p-3 rounded-xl border text-xs flex items-start gap-2 ${
+              tgFeedback.type === "ok"
+                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                : "border-rose-500/30 bg-rose-500/10 text-rose-300"
+            }`}
+          >
+            {tgFeedback.type === "ok" ? (
+              <CheckCircle2 className="size-4 shrink-0 mt-0.5" />
+            ) : (
+              <AlertCircle className="size-4 shrink-0 mt-0.5" />
+            )}
+            <span>{tgFeedback.text}</span>
+          </div>
+        )}
+
+        <div className="flex flex-wrap items-center gap-2 pt-1">
+          <Button
+            type="button"
+            disabled={Boolean(tgBusy)}
+            onClick={() => handleTelegramAction("save")}
+            className="h-9 px-4 text-xs font-semibold bg-primary hover:bg-caramel-light text-primary-foreground gap-1.5 cursor-pointer"
+          >
+            {tgBusy === "save" ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
+            <span>Lưu &amp; Kết nối Telegram</span>
+          </Button>
+
+          <Button
+            type="button"
+            variant="outline"
+            disabled={Boolean(tgBusy) || !tgConfigured}
+            onClick={() => handleTelegramAction("test")}
+            className="h-9 px-3.5 text-xs font-semibold gap-1.5 cursor-pointer"
+          >
+            {tgBusy === "test" ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5 text-primary" />}
+            <span>Gửi tin nhắn Test</span>
+          </Button>
+
+          <Button
+            type="button"
+            variant="outline"
+            disabled={Boolean(tgBusy) || !tgConfigured}
+            onClick={() => handleTelegramAction("resend_pending")}
+            className="h-9 px-3.5 text-xs font-semibold gap-1.5 cursor-pointer"
+          >
+            {tgBusy === "resend_pending" ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <RotateCcw className="size-3.5 text-amber-400" />
+            )}
+            <span>Gửi lại các đơn Buff đang chờ</span>
+          </Button>
+        </div>
       </div>
     </form>
   )

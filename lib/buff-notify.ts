@@ -1,6 +1,7 @@
 import { prisma } from "./db"
 import type { BuffSummaryStats } from "./buff-stats"
 import { formatVnDateLabel } from "./buff-stats"
+import { getTelegramConfig } from "./telegram-config"
 
 export interface BuffOrderAlertPayload {
   orderId: string
@@ -23,19 +24,94 @@ export function escapeHtml(text: string): string {
     .replace(/"/g, "&quot;")
 }
 
+async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs = 5000): Promise<Response> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    return await fetch(url, { ...init, signal: controller.signal, cache: "no-store" })
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+export async function sendTelegramBuffOrderMessage(
+  botToken: string,
+  chatId: string,
+  payload: BuffOrderAlertPayload
+): Promise<{ ok: boolean; error?: string }> {
+  const { orderCode, email, totalCents, inviteCode, tokenAmountB } = payload
+  const isPlaceholderEmail = !email || email.endsWith("@capygo.local")
+  const emailLine = isPlaceholderEmail ? "" : `📧 Email KH: ${escapeHtml(email)}\n`
+  const tgMsg =
+    `🚀 <b>ĐƠN BUFF TOKEN MUSE ĐÃ THANH TOÁN</b>\n\n` +
+    `🔑 Mã mời: <code>${escapeHtml(inviteCode)}</code>\n` +
+    `⚡ Số lượng: <b>${tokenAmountB}B Token</b>\n` +
+    `📦 Mã đơn: <code>${escapeHtml(orderCode)}</code>\n` +
+    `💰 Đã nhận: <b>${escapeHtml(formatVnd(totalCents))}</b>\n` +
+    `${emailLine}\n` +
+    `💡 Xong bấm nút dưới hoặc gõ:\n<code>/done ${escapeHtml(orderCode)} Đã buff đủ ${tokenAmountB}B</code>`
+
+  try {
+    const tgRes = await fetchWithTimeout(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: tgMsg,
+        parse_mode: "HTML",
+        reply_markup: {
+          inline_keyboard: [
+            [
+              {
+                text: `📋 Copy Mã mời (${inviteCode})`,
+                copy_text: { text: inviteCode },
+              },
+              {
+                text: `📋 Copy Mã đơn`,
+                copy_text: { text: orderCode },
+              },
+            ],
+            [
+              {
+                text: `✅ Đã Buff xong (${tokenAmountB}B)`,
+                callback_data: `buff_done:${orderCode}`,
+              },
+              {
+                text: `📝 Xong + Ghi chú`,
+                callback_data: `buff_ask_note:${orderCode}`,
+              },
+            ],
+          ],
+        },
+      }),
+    })
+
+    if (!tgRes.ok) {
+      const errText = await tgRes.text()
+      console.error("[BuffNotify Telegram HTTP Error]:", tgRes.status, errText)
+      return { ok: false, error: errText }
+    }
+    return { ok: true }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Telegram send error"
+    console.error("[BuffNotify Telegram Error]:", msg)
+    return { ok: false, error: msg }
+  }
+}
+
 /**
- * Dispatches multi-channel instant notifications when a Buff Token Muse order is paid:
- * 1. CAPYGO In-App AdminNotification (always active, zero config, idempotent per orderId)
- * 2. Email alert via Resend REST API (if RESEND_API_KEY + ADMIN_NOTIFY_EMAIL are set)
- * 3. Telegram Bot alert with inline "Đã Buff xong" action button (if TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID are set)
- * 4. Optional custom Webhook / Discord / Apps Script relay (if ADMIN_BUFF_WEBHOOK_URL is set)
+ * Dispatches multi-channel instant notifications when a Buff Token Muse order is paid.
+ * Tracks telegramSent independently inside AdminNotification.metadata so failed/unawaited runs retry cleanly.
  */
 export async function notifyAdminNewBuffOrder(payload: BuffOrderAlertPayload): Promise<void> {
   const { orderId, orderCode, email, totalCents, inviteCode, tokenAmountB } = payload
   const title = `🚀 Đơn Buff ${tokenAmountB}B mới · Mã mời: ${inviteCode}`
-  const summaryText = `Đơn #${orderCode} đã thanh toán ${formatVnd(totalCents)} · Mã mời: ${inviteCode} · Số lượng: ${tokenAmountB}B Token · KH: ${email}`
+  const summaryText = `Đơn #${orderCode} đã thanh toán ${formatVnd(totalCents)} · Mã mời: ${inviteCode} · Số lượng: ${tokenAmountB}B Token`
 
-  // 1. In-app AdminNotification (idempotent check by metadata marker)
+  let notifId: string | null = null
+  let existingMeta: Record<string, unknown> = {}
+  let isFirstNotification = true
+
   try {
     const marker = `"orderId":"${orderId}"`
     const existing = await prisma.adminNotification.findFirst({
@@ -46,7 +122,7 @@ export async function notifyAdminNewBuffOrder(payload: BuffOrderAlertPayload): P
     })
 
     if (!existing) {
-      await prisma.adminNotification.create({
+      const created = await prisma.adminNotification.create({
         data: {
           type: "buff_order_paid",
           title,
@@ -58,12 +134,24 @@ export async function notifyAdminNewBuffOrder(payload: BuffOrderAlertPayload): P
             tokenAmountB,
             totalCents,
             email,
+            telegramSent: false,
           }),
           link: "/admin/orders",
         },
       })
+      notifId = created.id
+      existingMeta = { orderId, orderCode, inviteCode, tokenAmountB, totalCents, email, telegramSent: false }
     } else {
-      return
+      notifId = existing.id
+      isFirstNotification = false
+      try {
+        existingMeta = existing.metadata ? JSON.parse(existing.metadata) : {}
+      } catch {
+        existingMeta = { orderId, orderCode, inviteCode, tokenAmountB, totalCents, email }
+      }
+      if (existingMeta.telegramSent === true) {
+        return
+      }
     }
   } catch (err) {
     console.error("[BuffNotify AdminNotification Error]:", err)
@@ -72,7 +160,38 @@ export async function notifyAdminNewBuffOrder(payload: BuffOrderAlertPayload): P
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/+$/, "")
   const adminOrdersUrl = appUrl ? `${appUrl}/admin/orders` : "/admin/orders"
 
-  // 2. Resend Email Alert
+  // Send Telegram alert (awaited so serverless runtimes never kill it before completion)
+  const tgConfig = await getTelegramConfig()
+  let telegramSent = false
+  let telegramError: string | null = null
+
+  if (tgConfig.botToken && tgConfig.chatId) {
+    const tgSend = await sendTelegramBuffOrderMessage(tgConfig.botToken, tgConfig.chatId, payload)
+    telegramSent = tgSend.ok
+    telegramError = tgSend.error || null
+  } else {
+    telegramError = "Chưa cấu hình Telegram Bot Token hoặc Chat ID"
+    console.warn("[BuffNotify] Skipped Telegram alert:", telegramError)
+  }
+
+  if (notifId) {
+    try {
+      await prisma.adminNotification.update({
+        where: { id: notifId },
+        data: {
+          metadata: JSON.stringify({
+            ...existingMeta,
+            telegramSent,
+            ...(telegramError ? { telegramError } : {}),
+          }),
+        },
+      })
+    } catch {}
+  }
+
+  // Only fire Resend email and generic webhook on the first notification
+  if (!isFirstNotification) return
+
   const resendApiKey = (process.env.RESEND_API_KEY || "").trim()
   const adminEmail = (process.env.ADMIN_NOTIFY_EMAIL || "").trim()
   const fromEmail = (process.env.RESEND_FROM_EMAIL || "CAPYGO <onboarding@resend.dev>").trim()
@@ -88,12 +207,11 @@ export async function notifyAdminNewBuffOrder(payload: BuffOrderAlertPayload): P
             <p style="margin:6px 0;font-size:14px;"><strong>Số lượng cần buff:</strong> <strong style="color:#4ade80;font-size:16px;">${tokenAmountB}B Token</strong></p>
             <p style="margin:6px 0;font-size:13px;color:#d4d4d8;"><strong>Mã đơn:</strong> #${escapeHtml(orderCode)}</p>
             <p style="margin:6px 0;font-size:13px;color:#d4d4d8;"><strong>Số tiền đã nhận:</strong> ${escapeHtml(formatVnd(totalCents))}</p>
-            <p style="margin:6px 0;font-size:13px;color:#d4d4d8;"><strong>Email khách:</strong> ${escapeHtml(email)}</p>
           </div>
           <a href="${escapeHtml(adminOrdersUrl)}" style="display:inline-block;background:#e6a66f;color:#141416;font-weight:700;text-decoration:none;padding:10px 18px;border-radius:8px;font-size:14px;">Mở trang Quản lý Đơn hàng</a>
         </div>
       `
-      const emailRes = await fetch("https://api.resend.com/emails", {
+      const emailRes = await fetchWithTimeout("https://api.resend.com/emails", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${resendApiKey}`,
@@ -114,68 +232,10 @@ export async function notifyAdminNewBuffOrder(payload: BuffOrderAlertPayload): P
     }
   }
 
-  // 3. Telegram Instant Alert with Inline Button
-  const botToken = (process.env.TELEGRAM_BOT_TOKEN || "").trim()
-  const chatId = (process.env.TELEGRAM_CHAT_ID || "").trim()
-  if (botToken && chatId) {
-    try {
-      const isPlaceholderEmail = !email || email.endsWith("@capygo.local")
-      const emailLine = isPlaceholderEmail ? "" : `📧 Email KH: ${escapeHtml(email)}\n`
-      const tgMsg =
-        `🚀 <b>ĐƠN BUFF TOKEN MUSE ĐÃ THANH TOÁN</b>\n\n` +
-        `🔑 Mã mời: <code>${escapeHtml(inviteCode)}</code>\n` +
-        `⚡ Số lượng: <b>${tokenAmountB}B Token</b>\n` +
-        `📦 Mã đơn: <code>${escapeHtml(orderCode)}</code>\n` +
-        `💰 Đã nhận: <b>${escapeHtml(formatVnd(totalCents))}</b>\n` +
-        `${emailLine}\n` +
-        `💡 Xong bấm nút dưới hoặc gõ:\n<code>/done ${escapeHtml(orderCode)} Đã buff đủ ${tokenAmountB}B</code>`
-
-      const tgRes = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chat_id: chatId,
-          text: tgMsg,
-          parse_mode: "HTML",
-          reply_markup: {
-            inline_keyboard: [
-              [
-                {
-                  text: `📋 Copy Mã mời (${inviteCode})`,
-                  copy_text: { text: inviteCode },
-                },
-                {
-                  text: `📋 Copy Mã đơn`,
-                  copy_text: { text: orderCode },
-                },
-              ],
-              [
-                {
-                  text: `✅ Đã Buff xong (${tokenAmountB}B)`,
-                  callback_data: `buff_done:${orderCode}`,
-                },
-                {
-                  text: `📝 Xong + Ghi chú`,
-                  callback_data: `buff_ask_note:${orderCode}`,
-                },
-              ],
-            ],
-          },
-        }),
-      })
-      if (!tgRes.ok) {
-        console.error("[BuffNotify Telegram HTTP Error]:", tgRes.status, await tgRes.text())
-      }
-    } catch (err) {
-      console.error("[BuffNotify Telegram Error]:", err)
-    }
-  }
-
-  // 4. Optional Custom Webhook
   const webhookUrl = (process.env.ADMIN_BUFF_WEBHOOK_URL || "").trim()
   if (webhookUrl && webhookUrl.startsWith("https://")) {
     try {
-      await fetch(webhookUrl, {
+      await fetchWithTimeout(webhookUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -236,10 +296,9 @@ export async function sendTelegramBuffCompleted(params: {
   note?: string | null
   stats: BuffSummaryStats
 }): Promise<{ ok: boolean; error?: string }> {
-  const botToken = (process.env.TELEGRAM_BOT_TOKEN || "").trim()
-  const chatId = (process.env.TELEGRAM_CHAT_ID || "").trim()
+  const { botToken, chatId } = await getTelegramConfig()
   if (!botToken || !chatId) {
-    return { ok: false, error: "Chưa cấu hình TELEGRAM_BOT_TOKEN hoặc TELEGRAM_CHAT_ID" }
+    return { ok: false, error: "Chưa cấu hình Telegram Bot Token hoặc Chat ID" }
   }
 
   const noteLine = params.note ? `\n📝 Ghi chú: <i>${escapeHtml(params.note)}</i>` : ""
@@ -250,7 +309,7 @@ export async function sendTelegramBuffCompleted(params: {
     buildDailyBuffSummaryHtml(params.stats)
 
   try {
-    const res = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+    const res = await fetchWithTimeout(`https://api.telegram.org/bot${botToken}/sendMessage`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ chat_id: chatId, text: msg, parse_mode: "HTML" }),
@@ -265,14 +324,13 @@ export async function sendTelegramBuffCompleted(params: {
 }
 
 export async function sendTelegramDailySummary(stats: BuffSummaryStats): Promise<{ ok: boolean; error?: string }> {
-  const botToken = (process.env.TELEGRAM_BOT_TOKEN || "").trim()
-  const chatId = (process.env.TELEGRAM_CHAT_ID || "").trim()
+  const { botToken, chatId } = await getTelegramConfig()
   if (!botToken || !chatId) {
-    return { ok: false, error: "Chưa cấu hình TELEGRAM_BOT_TOKEN hoặc TELEGRAM_CHAT_ID" }
+    return { ok: false, error: "Chưa cấu hình Telegram Bot Token hoặc Chat ID" }
   }
 
   try {
-    const res = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+    const res = await fetchWithTimeout(`https://api.telegram.org/bot${botToken}/sendMessage`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

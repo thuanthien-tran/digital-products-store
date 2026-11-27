@@ -246,7 +246,7 @@ export async function POST(req: Request) {
     })
 
     // 10. Step 2: Now that DB transaction has COMMITTED and payment is permanently saved:
-    // Call fulfillment (Dino or FatCat API) outside of DB transaction
+    // Call fulfillment (including awaited buff notifications) outside of DB transaction
     if (isFullyPaid) {
       try {
         console.log(`[SePay Webhook] Triggering live fulfillment for order ${order.code}...`)
@@ -257,8 +257,11 @@ export async function POST(req: Request) {
       }
     }
 
-    // Safe non-blocking Telegram notification
-    notifyTelegram(order.code, currentTransferAmount, order.email, isFullyPaid ? "paid" : "partially_paid").catch(() => {})
+    // Await Telegram notification for non-buff orders (buff orders already sent rich Buff alert inside fulfillOrder)
+    const isBuffOrder = Boolean(order.inviteCode || order.note?.includes("[BUFF_ADMIN_NOTIFY]"))
+    if (!isBuffOrder || !isFullyPaid) {
+      await notifyTelegram(order.code, currentTransferAmount, order.email, isFullyPaid ? "paid" : "partially_paid").catch(() => {})
+    }
 
     try {
       revalidatePath("/admin")
@@ -282,8 +285,8 @@ export async function POST(req: Request) {
 }
 
 async function notifyTelegram(orderCode: string, amount: number, email: string, status: string) {
-  const botToken = process.env.TELEGRAM_BOT_TOKEN
-  const chatId = process.env.TELEGRAM_CHAT_ID
+  const { getTelegramConfig } = await import("@/lib/telegram-config")
+  const { botToken, chatId } = await getTelegramConfig()
   if (!botToken || !chatId) return
 
   try {
