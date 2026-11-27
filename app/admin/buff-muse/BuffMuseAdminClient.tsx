@@ -20,7 +20,7 @@ import { formatPrice } from "@/lib/utils"
 import { computeCustomBuffPrice, MUSE_BUFF_STANDARD_PACKAGES } from "@/lib/buff-pricing"
 import type { BuffMuseAdminConfig, BuffMuseTierConfig } from "@/lib/buff-config"
 
-const PREVIEW_AMOUNTS = [1, 2, 5, 7, 10, 15, 20, 25, 30] as const
+const PREVIEW_AMOUNTS = [1, 2, 5, 7, 10, 15, 20, 25, 31] as const
 
 export function BuffMuseAdminClient({ initialConfig }: { initialConfig: BuffMuseAdminConfig }) {
   const router = useRouter()
@@ -135,7 +135,7 @@ export function BuffMuseAdminClient({ initialConfig }: { initialConfig: BuffMuse
             <span>Quản Lý Giá Buff Token Muse (/buff-muse)</span>
           </h1>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Điều chỉnh trạng thái nhận đơn, giá các gói 5B – 10B – 30B và mức tính giá Tùy chọn (1B – 30B).
+            Điều chỉnh trạng thái nhận đơn, giá các gói 5B – 10B – 31B và mức tính giá Tùy chọn (1B – 31B).
           </p>
         </div>
 
@@ -218,7 +218,7 @@ export function BuffMuseAdminClient({ initialConfig }: { initialConfig: BuffMuse
           <div>
             <h2 className="text-sm font-bold text-foreground">Bảng giá các mức Token (VND)</h2>
             <p className="text-[11px] text-muted-foreground">
-              Các nút chọn nhanh trên <code className="font-mono">/buff-muse</code> dùng <strong>5B, 10B, 30B</strong>; chế độ <strong>Tùy chọn (1–30B)</strong> tự nội suy theo mốc gần nhất bên dưới.
+              Các nút chọn nhanh trên <code className="font-mono">/buff-muse</code> dùng <strong>5B, 10B, 31B</strong>; chế độ <strong>Tùy chọn (1–31B)</strong> tự nội suy theo mốc gần nhất bên dưới.
             </p>
           </div>
           <Button
@@ -235,7 +235,7 @@ export function BuffMuseAdminClient({ initialConfig }: { initialConfig: BuffMuse
 
         <div className="divide-y divide-border/70">
           {tiers.map((tier) => {
-            const isQuickPreset = [5, 10, 30].includes(tier.tokenAmountB)
+            const isQuickPreset = [5, 10, 31].includes(tier.tokenAmountB)
             const unitRate = Math.round(tier.priceCents / tier.tokenAmountB)
 
             return (
@@ -339,7 +339,7 @@ export function BuffMuseAdminClient({ initialConfig }: { initialConfig: BuffMuse
       <div className="rounded-2xl border border-border bg-card/80 p-4 sm:p-5 space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-            Xem trước giá hiển thị trên /buff-muse (kể cả chế độ Tùy chọn 1–30B)
+            Xem trước giá hiển thị trên /buff-muse (kể cả chế độ Tùy chọn 1–31B)
           </h3>
         </div>
         <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-2 text-xs">
@@ -347,7 +347,7 @@ export function BuffMuseAdminClient({ initialConfig }: { initialConfig: BuffMuse
             <div
               key={b}
               className={`p-2 rounded-xl border text-center ${
-                [5, 10, 30].includes(b)
+                [5, 10, 31].includes(b)
                   ? "border-primary/40 bg-primary/10"
                   : "border-border bg-background/60"
               }`}

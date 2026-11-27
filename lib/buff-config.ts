@@ -1,7 +1,7 @@
 import { prisma } from "./db"
 import { calculateExpectedBuffCost, MUSE_BUFF_STANDARD_PACKAGES } from "./buff-pricing"
 
-export const BUFF_MUSE_TIERS = [1, 5, 10, 20, 30] as const
+export const BUFF_MUSE_TIERS = [1, 5, 10, 20, 31] as const
 
 export interface BuffMuseTierConfig {
   tokenAmountB: number
@@ -54,16 +54,24 @@ export async function getBuffMuseAdminConfig(): Promise<BuffMuseAdminConfig> {
 
   const tiers: BuffMuseTierConfig[] = BUFF_MUSE_TIERS.map((b) => {
     const std = MUSE_BUFF_STANDARD_PACKAGES.find((p) => p.tokenAmountB === b)
-    const matchedVariant = product?.variants.find((v) => {
-      if (v.tokenAmountB === b) return true
-      const m = v.name.match(/\b(\d+)\s*b\b/i)
-      return m ? parseInt(m[1], 10) === b : false
-    })
+    const matchedVariant =
+      product?.variants.find((v) => {
+        if (v.tokenAmountB === b) return true
+        const m = v.name.match(/\b(\d+)\s*b\b/i)
+        return m ? parseInt(m[1], 10) === b : false
+      }) ||
+      (b === 31
+        ? product?.variants.find((v) => {
+            if (v.tokenAmountB === 30) return true
+            const m = v.name.match(/\b(\d+)\s*b\b/i)
+            return m ? parseInt(m[1], 10) === 30 : false
+          })
+        : undefined)
 
     return {
       tokenAmountB: b,
       variantId: matchedVariant?.id || null,
-      name: matchedVariant?.name || std?.name || `Nạp ${b}B Token Muse AI`,
+      name: b === 31 ? std?.name || "Nạp 31B Token Muse AI" : matchedVariant?.name || std?.name || `Nạp ${b}B Token Muse AI`,
       priceCents: matchedVariant?.priceCents ?? std?.defaultPrice ?? b * 5000,
       compareAtPriceCents: matchedVariant?.compareAtPriceCents ?? std?.defaultComparePrice ?? null,
       isActive: matchedVariant ? matchedVariant.isActive : true,
@@ -167,16 +175,25 @@ export async function saveBuffMuseAdminConfig(input: SaveBuffMuseInput): Promise
     for (let idx = 0; idx < input.tiers.length; idx++) {
       const t = input.tiers[idx]
       const std = MUSE_BUFF_STANDARD_PACKAGES.find((p) => p.tokenAmountB === t.tokenAmountB)
-      const matched = existingVariants.find((v) => {
-        if (v.tokenAmountB === t.tokenAmountB) return true
-        const m = v.name.match(/\b(\d+)\s*b\b/i)
-        return m ? parseInt(m[1], 10) === t.tokenAmountB : false
-      })
+      const matched =
+        existingVariants.find((v) => {
+          if (v.tokenAmountB === t.tokenAmountB) return true
+          const m = v.name.match(/\b(\d+)\s*b\b/i)
+          return m ? parseInt(m[1], 10) === t.tokenAmountB : false
+        }) ||
+        (t.tokenAmountB === 31
+          ? existingVariants.find((v) => {
+              if (v.tokenAmountB === 30) return true
+              const m = v.name.match(/\b(\d+)\s*b\b/i)
+              return m ? parseInt(m[1], 10) === 30 : false
+            })
+          : undefined)
 
       if (matched) {
         await tx.variant.update({
           where: { id: matched.id },
           data: {
+            name: t.tokenAmountB === 31 ? std?.name || "Nạp 31B Token Muse AI" : matched.name,
             priceCents: t.priceCents,
             compareAtPriceCents: t.compareAtPriceCents,
             tokenAmountB: t.tokenAmountB,

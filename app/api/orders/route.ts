@@ -182,9 +182,9 @@ export async function POST(req: Request) {
         const m = (selectedVariant?.name || "").match(/(\d+)\s*b\b/i)
         return m ? parseInt(m[1], 10) : 1
       })()
-      if (perUnitB * singleItem.quantity > 30) {
+      if (perUnitB * singleItem.quantity > 31) {
         return NextResponse.json(
-          { error: "Mỗi lượt Buff hỗ trợ tối đa 30B Token / đơn. Vui lòng giảm số lượng." },
+          { error: "Mỗi lượt Buff hỗ trợ tối đa 31B Token / đơn. Vui lòng giảm số lượng." },
           { status: 400 }
         )
       }
@@ -365,9 +365,9 @@ export async function POST(req: Request) {
         ? Math.floor(Number(body.customTokenAmountB))
         : null
 
-    if (requestedCustomB !== null && (!Number.isFinite(requestedCustomB) || requestedCustomB < 1 || requestedCustomB > 30)) {
+    if (requestedCustomB !== null && (!Number.isFinite(requestedCustomB) || requestedCustomB < 1 || requestedCustomB > 31)) {
       return NextResponse.json(
-        { error: "Số lượng token buff tùy chọn phải từ 1B đến tối đa 30B." },
+        { error: "Số lượng token buff tùy chọn phải từ 1B đến tối đa 31B." },
         { status: 400 }
       )
     }

@@ -10,6 +10,8 @@ export interface BuffPackageConfig {
   defaultComparePrice?: number // Suggested compare-at price
 }
 
+export const MAX_BUFF_TOKEN_B = 31
+
 export const MUSE_BUFF_STANDARD_PACKAGES: BuffPackageConfig[] = [
   {
     name: 'Nạp 1B Token Muse AI',
@@ -40,11 +42,11 @@ export const MUSE_BUFF_STANDARD_PACKAGES: BuffPackageConfig[] = [
     defaultComparePrice: 110000,
   },
   {
-    name: 'Nạp 30B Token Muse AI',
-    tokenAmountB: 30,
-    expectedCost: 60000,
-    defaultPrice: 109000,
-    defaultComparePrice: 160000,
+    name: 'Nạp 31B Token Muse AI',
+    tokenAmountB: 31,
+    expectedCost: 62000,
+    defaultPrice: 113000,
+    defaultComparePrice: 165000,
   },
 ]
 
@@ -81,14 +83,14 @@ export interface BuffVariantRateSource {
 }
 
 /**
- * Computes deterministic, server-authoritative VND price for any 1..30B buff amount
+ * Computes deterministic, server-authoritative VND price for any 1..31B buff amount
  * using active product variants from the database.
  */
 export function computeCustomBuffPrice(
   tokenAmountB: number,
   variants: BuffVariantRateSource[]
 ): { priceCents: number; matchedVariant: BuffVariantRateSource | null; isCustomAmount: boolean } {
-  const clampedB = Math.min(Math.max(1, Math.floor(tokenAmountB)), 30)
+  const clampedB = Math.min(Math.max(1, Math.floor(tokenAmountB)), MAX_BUFF_TOKEN_B)
   const withB = variants
     .map((v) => {
       const parsedB =

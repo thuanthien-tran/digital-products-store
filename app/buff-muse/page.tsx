@@ -16,7 +16,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const siteName = settings?.siteName || "CAPYGO"
   return {
     title: `Buff Token Muse AI | ${siteName}`,
-    description: `Nhập mã mời Muse AI, chọn số lượng Token (5B - 10B - 30B hoặc tùy chọn) và thanh toán nhanh qua VietQR tại ${siteName}.`,
+    description: `Nhập mã mời Muse AI, chọn số lượng Token (5B - 10B - 31B hoặc tùy chọn) và thanh toán nhanh qua VietQR tại ${siteName}.`,
   }
 }
 
@@ -43,7 +43,7 @@ export default async function BuffMusePage() {
         tokenAmountB: parsedB,
       }
     })
-    .filter((v) => v.tokenAmountB > 0 && v.tokenAmountB <= 30)
+    .filter((v) => v.tokenAmountB > 0 && v.tokenAmountB <= 31)
     .sort((a, b) => a.tokenAmountB - b.tokenAmountB)
 
   const isOutOfStock = Boolean(
@@ -71,7 +71,7 @@ export default async function BuffMusePage() {
             Buff Token Muse AI
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground">
-            Nhập mã mời, chọn số lượng buff (5B – 10B – 30B hoặc tùy chọn) rồi quét VietQR thanh toán để shop tiến hành buff ngay.
+            Nhập mã mời, chọn số lượng buff (5B – 10B – 31B hoặc tùy chọn) rồi quét VietQR thanh toán để shop tiến hành buff ngay.
           </p>
         </div>
 

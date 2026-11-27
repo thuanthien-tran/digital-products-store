@@ -226,7 +226,7 @@ export async function completeBuffOrder(params: {
     "N/A"
   const finalCompletedB =
     params.completedB && params.completedB > 0
-      ? Math.min(30, Math.floor(params.completedB))
+      ? Math.min(31, Math.floor(params.completedB))
       : targetTokenB
 
   for (const it of buffItems) {

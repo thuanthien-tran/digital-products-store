@@ -39,7 +39,7 @@ interface BuffMuseClientProps {
   variants: BuffMuseVariant[]
 }
 
-const QUICK_PRESETS = [5, 10, 30] as const
+const QUICK_PRESETS = [5, 10, 31] as const
 
 function makeClientOrderKey(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -95,7 +95,7 @@ export function BuffMuseClient({
   const effectiveB = useMemo(() => {
     const raw = selectionMode === "custom" ? parseInt(customInput, 10) : selectedB
     if (!Number.isFinite(raw) || raw < 1) return 1
-    return Math.min(30, raw)
+    return Math.min(31, raw)
   }, [selectionMode, customInput, selectedB])
 
   const pricing = useMemo(
@@ -137,7 +137,7 @@ export function BuffMuseClient({
       setCustomInput("")
       return
     }
-    const num = Math.min(30, Math.max(1, parseInt(digitsOnly, 10)))
+    const num = Math.min(31, Math.max(1, parseInt(digitsOnly, 10)))
     setCustomInput(String(num))
     setSelectedB(num)
     if (appliedCoupon) {
@@ -147,7 +147,7 @@ export function BuffMuseClient({
   }
 
   const adjustCustomB = (delta: number) => {
-    const next = Math.min(30, Math.max(1, effectiveB + delta))
+    const next = Math.min(31, Math.max(1, effectiveB + delta))
     setSelectionMode("custom")
     setSelectedB(next)
     setCustomInput(String(next))
@@ -287,7 +287,7 @@ export function BuffMuseClient({
                 {productName}
               </h2>
               <p className="text-[11px] sm:text-xs text-muted-foreground">
-                Hỗ trợ mọi mức từ 1B – 30B Token · Thanh toán VietQR
+                Hỗ trợ mọi mức từ 1B – 31B Token · Thanh toán VietQR
               </p>
             </div>
           </div>
@@ -377,13 +377,13 @@ export function BuffMuseClient({
           )}
         </div>
 
-        {/* 2. Amount Selector: 5B - 10B - 30B - Tùy chọn (1..30B) */}
+        {/* 2. Amount Selector: 5B - 10B - 31B - Tùy chọn (1..31B) */}
         <div className="space-y-2.5">
           <div className="flex items-center justify-between">
             <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-foreground">
               2. Chọn số lượng Token muốn Buff <span className="text-primary">*</span>
             </span>
-            <span className="text-[11px] text-muted-foreground">Tối đa 30B / đơn</span>
+            <span className="text-[11px] text-muted-foreground">Tối đa 31B / đơn</span>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -455,7 +455,7 @@ export function BuffMuseClient({
                 </span>
               </div>
               <span className="text-[11px] text-muted-foreground block">
-                {selectionMode === "custom" ? `${effectiveB}B · Tự nhập` : "1B – 30B"}
+                {selectionMode === "custom" ? `${effectiveB}B · Tự nhập` : "1B – 31B"}
               </span>
             </button>
           </div>
@@ -476,7 +476,7 @@ export function BuffMuseClient({
                     Nhập số lượng Token (B):
                   </label>
                   <p className="text-[11px] text-muted-foreground">
-                    Chọn từ 1B đến 30B Token (1B = 1 tỷ Token)
+                    Chọn từ 1B đến 31B Token (1B = 1 tỷ Token)
                   </p>
                 </div>
 
@@ -507,7 +507,7 @@ export function BuffMuseClient({
                   </div>
                   <button
                     type="button"
-                    disabled={effectiveB >= 30}
+                    disabled={effectiveB >= 31}
                     onClick={() => adjustCustomB(1)}
                     className="size-9 rounded-lg border border-border bg-card hover:bg-secondary text-foreground font-bold disabled:opacity-40 cursor-pointer"
                   >
@@ -682,7 +682,7 @@ export function BuffMuseClient({
             </span>
             <span>
               Nhập chính xác <strong className="text-foreground">Mã mời Muse AI</strong> &amp; chọn
-              số lượng (5B, 10B, 30B hoặc số B tùy chọn từ 1–30B).
+              số lượng (5B, 10B, 31B hoặc số B tùy chọn từ 1–31B).
             </span>
           </li>
           <li className="flex gap-2.5">
