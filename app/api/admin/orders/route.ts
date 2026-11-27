@@ -1,8 +1,34 @@
 import { NextResponse } from "next/server"
+import { revalidatePath } from "next/cache"
 import { prisma } from "@/lib/db"
 import { verifyAdminRequest } from "@/lib/auth"
 import { validateStatusTransition, fulfillOrder, releaseOrderSerials } from "@/lib/fulfillment"
 import { redeemCouponReservation, releaseCouponReservation } from "@/lib/coupon-service"
+import { getVietnamDateKey } from "@/lib/buff-stats"
+
+const ORDER_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/
+
+function httpError(message: string, status: number): Error & { status: number } {
+  return Object.assign(new Error(message), { status })
+}
+
+function resolveOrderCreatedAt(orderDateInput: unknown, fallbackNow = new Date()): Date {
+  if (typeof orderDateInput === "string") {
+    const clean = orderDateInput.trim()
+    if (ORDER_DATE_REGEX.test(clean)) {
+      const todayVn = getVietnamDateKey(fallbackNow)
+      if (clean === todayVn) {
+        return fallbackNow
+      }
+      const base = new Date(`${clean}T12:00:00+07:00`)
+      if (!Number.isNaN(base.getTime())) {
+        // Keep chronological ordering when entering multiple backdated orders within the same day
+        return new Date(base.getTime() + (fallbackNow.getTime() % 3600000))
+      }
+    }
+  }
+  return fallbackNow
+}
 
 export async function POST(req: Request) {
   try {
@@ -23,6 +49,7 @@ export async function POST(req: Request) {
       note,
       deductSerial,
       serialContent,
+      orderDate,
     } = body
 
     const qty = Math.max(1, parseInt(String(quantity || 1), 10) || 1)
@@ -87,8 +114,10 @@ export async function POST(req: Request) {
       }
     }
 
-    // Generate unique manual order code
+    // Generate unique manual order code & effective accounting date
     const now = new Date()
+    const effectiveCreatedAt = resolveOrderCreatedAt(orderDate, now)
+    const effectiveDateLabel = getVietnamDateKey(effectiveCreatedAt).split("-").reverse().join("/")
     const randSuffix = Math.random().toString(36).substring(2, 6).toUpperCase()
     const orderCode = `M_${randSuffix}`
 
@@ -128,6 +157,7 @@ export async function POST(req: Request) {
           totalCents: amount,
           status: "paid",
           note: orderNote,
+          createdAt: effectiveCreatedAt,
           items: {
             create: {
               productId: resolvedProduct!.id,
@@ -136,6 +166,7 @@ export async function POST(req: Request) {
               priceCents: Math.round(amount / qty),
               productName: resolvedProduct!.name,
               variantName: finalItemName,
+              createdAt: effectiveCreatedAt,
             },
           },
         },
@@ -150,9 +181,10 @@ export async function POST(req: Request) {
           orderId: o.id,
           gateway: "manual_admin",
           amount: amount,
-          content: `Bán ngoài: ${methodLabel} - Ghi nhận bởi ${auth.username || "admin"}`,
+          content: `Bán ngoài (${effectiveDateLabel}): ${methodLabel} - Ghi nhận bởi ${auth.username || "admin"}`,
           idempotencyKey: `manual-order-${o.id}-${Date.now()}`,
           transactionId: `manual-tx-${o.code}-${Date.now()}`,
+          createdAt: effectiveCreatedAt,
         },
       })
 
@@ -189,9 +221,14 @@ export async function POST(req: Request) {
       return o
     })
 
+    try {
+      revalidatePath("/admin")
+      revalidatePath("/admin/orders")
+    } catch {}
+
     return NextResponse.json({
       success: true,
-      message: `Tạo đơn bán ngoài #${newOrder.code} thành công (+${amount.toLocaleString("vi-VN")}đ vào doanh thu)`,
+      message: `Tạo đơn bán ngoài #${newOrder.code} thành công (+${amount.toLocaleString("vi-VN")}đ vào ngày ${effectiveDateLabel})`,
       order: newOrder,
     })
   } catch (err: unknown) {
@@ -236,6 +273,46 @@ export async function PATCH(req: Request) {
         return NextResponse.json({ error: res.error || "Lỗi hoàn tất Buff" }, { status: 400 })
       }
       return NextResponse.json({ success: true })
+    }
+
+    if (action === "update_date") {
+      const rawOrderDate = typeof body.orderDate === "string" ? body.orderDate.trim() : ""
+      if (!ORDER_DATE_REGEX.test(rawOrderDate)) {
+        return NextResponse.json({ error: "Ngày ghi nhận không hợp lệ (YYYY-MM-DD)" }, { status: 400 })
+      }
+      const existing = await prisma.order.findUnique({ where: { id: orderId } })
+      if (!existing) {
+        return NextResponse.json({ error: "Không tìm thấy đơn hàng" }, { status: 404 })
+      }
+      const updatedCreatedAt = resolveOrderCreatedAt(rawOrderDate, new Date())
+      const dateLabel = rawOrderDate.split("-").reverse().join("/")
+
+      await prisma.$transaction([
+        prisma.order.update({
+          where: { id: orderId },
+          data: { createdAt: updatedCreatedAt },
+        }),
+        prisma.orderItem.updateMany({
+          where: { orderId },
+          data: { createdAt: updatedCreatedAt },
+        }),
+        prisma.payment.updateMany({
+          where: { orderId },
+          data: { createdAt: updatedCreatedAt },
+        }),
+      ])
+
+      try {
+        revalidatePath("/admin")
+        revalidatePath("/admin/orders")
+      } catch {}
+
+      return NextResponse.json({
+        success: true,
+        createdAt: updatedCreatedAt.toISOString(),
+        orderDate: rawOrderDate,
+        message: `Đã chuyển đơn #${existing.code} sang ngày ${dateLabel}`,
+      })
     }
 
     if (!status) {
@@ -301,9 +378,10 @@ export async function PATCH(req: Request) {
         if (existingPayment) {
           // Check business payload matching
           if (existingPayment.orderId !== orderId || existingPayment.amount !== parsedAmount) {
-            const err: any = new Error(`Xung đột Idempotency (HTTP 409): Khóa "${cleanKey}" đã được sử dụng cho giao dịch khác với thông tin không khớp`)
-            err.status = 409
-            throw err
+            throw httpError(
+              `Xung đột Idempotency (HTTP 409): Khóa "${cleanKey}" đã được sử dụng cho giao dịch khác với thông tin không khớp`,
+              409
+            )
           }
 
           // Valid idempotent replay: return current consistent order state without duplicating money or fulfillment
@@ -318,16 +396,15 @@ export async function PATCH(req: Request) {
       })
 
       if (!currentOrder) {
-        const err: any = new Error("Không tìm thấy đơn hàng")
-        err.status = 404
-        throw err
+        throw httpError("Không tìm thấy đơn hàng", 404)
       }
 
       // Strict terminal state invariant: cancelled or refunded orders cannot be mutated by new payments
       if ((currentOrder.status === "cancelled" || currentOrder.status === "refunded") && isSettlement) {
-        const err: any = new Error(`Đơn hàng đã ở trạng thái kết thúc (${currentOrder.status}) và không thể ghi nhận thêm tiền`)
-        err.status = 400
-        throw err
+        throw httpError(
+          `Đơn hàng đã ở trạng thái kết thúc (${currentOrder.status}) và không thể ghi nhận thêm tiền`,
+          400
+        )
       }
 
       // CASE 1: Settling payment manually (status === "paid" or "partially_paid")
@@ -344,14 +421,21 @@ export async function PATCH(req: Request) {
               content: `Admin ${auth.username || "admin"} duyệt: ${cleanReason}`,
             },
           })
-        } catch (dbErr: any) {
-          if (dbErr.code === "P2002" && dbErr.meta?.target?.includes("idempotencyKey")) {
+        } catch (dbErr: unknown) {
+          const prismaErr = dbErr as { code?: string; meta?: { target?: string | string[] } }
+          const targetMeta = prismaErr?.meta?.target
+          const isIdempotencyTarget = Array.isArray(targetMeta)
+            ? targetMeta.includes("idempotencyKey")
+            : typeof targetMeta === "string" && targetMeta.includes("idempotencyKey")
+
+          if (prismaErr?.code === "P2002" && isIdempotencyTarget) {
             // Concurrent race condition: another concurrent worker created this payment
             const raced = await tx.payment.findUnique({ where: { idempotencyKey: cleanKey } })
             if (raced && (raced.orderId !== orderId || raced.amount !== parsedAmount)) {
-              const err: any = new Error(`Xung đột Idempotency (HTTP 409): Khóa "${cleanKey}" đã được xử lý với nội dung không khớp`)
-              err.status = 409
-              throw err
+              throw httpError(
+                `Xung đột Idempotency (HTTP 409): Khóa "${cleanKey}" đã được xử lý với nội dung không khớp`,
+                409
+              )
             }
             return currentOrder
           }
@@ -385,9 +469,10 @@ export async function PATCH(req: Request) {
       // CASE 2: Cancelling an order
       if (status === "cancelled") {
         if (currentOrder.status === "paid") {
-          const err: any = new Error("Đơn hàng đã thanh toán thành công và đã bàn giao tài khoản cho khách. Theo chuẩn thương mại điện tử, đơn đã hoàn tất không thể hủy.")
-          err.status = 400
-          throw err
+          throw httpError(
+            "Đơn hàng đã thanh toán thành công và đã bàn giao tài khoản cho khách. Theo chuẩn thương mại điện tử, đơn đã hoàn tất không thể hủy.",
+            400
+          )
         }
 
         if (currentOrder.status === "cancelled") {
@@ -396,9 +481,7 @@ export async function PATCH(req: Request) {
 
         const transitionCheck = validateStatusTransition(currentOrder.status, "cancelled")
         if (!transitionCheck.valid) {
-          const err: any = new Error(transitionCheck.error)
-          err.status = 400
-          throw err
+          throw httpError(transitionCheck.error || "Chuyển trạng thái không hợp lệ", 400)
         }
 
         // Quarantine serials if order was paid, refunded, or processing (assigned/delivered)
@@ -423,9 +506,7 @@ export async function PATCH(req: Request) {
 
         const transitionCheck = validateStatusTransition(currentOrder.status, "refunded")
         if (!transitionCheck.valid) {
-          const err: any = new Error(transitionCheck.error)
-          err.status = 400
-          throw err
+          throw httpError(transitionCheck.error || "Chuyển trạng thái không hợp lệ", 400)
         }
 
         // Force revoke any disclosed serials
@@ -444,9 +525,7 @@ export async function PATCH(req: Request) {
       // Other lifecycle status transitions
       const transitionCheck = validateStatusTransition(currentOrder.status, status)
       if (!transitionCheck.valid) {
-        const err: any = new Error(transitionCheck.error)
-        err.status = 400
-        throw err
+        throw httpError(transitionCheck.error || "Chuyển trạng thái không hợp lệ", 400)
       }
 
       return tx.order.update({
@@ -472,7 +551,10 @@ export async function PATCH(req: Request) {
 
     return NextResponse.json({ success: true, order: updated })
   } catch (err: unknown) {
-    const status = (err as any)?.status || 500
+    const status =
+      err && typeof err === "object" && "status" in err
+        ? Number((err as { status: unknown }).status) || 500
+        : 500
     const message = err instanceof Error ? err.message : "Internal server error"
     return NextResponse.json({ error: message }, { status: status >= 400 && status < 600 ? status : 500 })
   }
@@ -488,7 +570,7 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url)
     const status = searchParams.get("status")
 
-    const whereClause: any = {}
+    const whereClause: { status?: string } = {}
     if (status && status !== "all") {
       whereClause.status = status
     }
@@ -576,7 +658,7 @@ export async function DELETE(req: Request) {
     }
 
     const body = await req.json().catch(() => ({}))
-    const { orderId, action } = body
+    const { orderId, action, restoreSerials } = body
 
     if (action === "clean_test_orders") {
       const testCodes = [
@@ -584,7 +666,7 @@ export async function DELETE(req: Request) {
         "PAR599568", "RSA599584", "RSB599589", "RET599593", "AMB599606"
       ]
 
-      const deleteRes = await prisma.order.deleteMany({
+      const matchingTestOrders = await prisma.order.findMany({
         where: {
           OR: [
             { code: { in: testCodes } },
@@ -601,12 +683,39 @@ export async function DELETE(req: Request) {
             { email: { contains: "tester@" } },
           ],
         },
+        select: { id: true, items: { select: { id: true } } },
       })
+
+      const testOrderIds = matchingTestOrders.map((o) => o.id)
+      const testItemIds = matchingTestOrders.flatMap((o) => o.items.map((i) => i.id))
+
+      if (testOrderIds.length > 0) {
+        await prisma.$transaction(async (tx) => {
+          if (testItemIds.length > 0) {
+            await tx.serial.updateMany({
+              where: { orderItemId: { in: testItemIds } },
+              data: { orderItemId: null },
+            })
+            await tx.buffFulfillment.deleteMany({
+              where: { orderItemId: { in: testItemIds } },
+            })
+          }
+          await tx.couponRedemption.deleteMany({ where: { orderId: { in: testOrderIds } } })
+          await tx.payment.deleteMany({ where: { orderId: { in: testOrderIds } } })
+          await tx.orderItem.deleteMany({ where: { orderId: { in: testOrderIds } } })
+          await tx.order.deleteMany({ where: { id: { in: testOrderIds } } })
+        })
+      }
+
+      try {
+        revalidatePath("/admin")
+        revalidatePath("/admin/orders")
+      } catch {}
 
       return NextResponse.json({
         success: true,
-        deletedCount: deleteRes.count,
-        message: `Đã xóa ${deleteRes.count} đơn hàng test.`,
+        deletedCount: testOrderIds.length,
+        message: `Đã xóa ${testOrderIds.length} đơn hàng test.`,
       })
     }
 
@@ -616,24 +725,87 @@ export async function DELETE(req: Request) {
 
     const orderToDelete = await prisma.order.findUnique({
       where: { id: orderId },
+      include: {
+        items: {
+          include: {
+            product: { select: { slug: true } },
+            serials: { select: { id: true } },
+          },
+        },
+        redemption: true,
+      },
     })
 
     if (!orderToDelete) {
       return NextResponse.json({ error: "Không tìm thấy đơn hàng cần xóa" }, { status: 404 })
     }
 
-    if (orderToDelete.status === "paid") {
-      return NextResponse.json(
-        { error: "Đơn hàng đã thanh toán thành công được bảo vệ vĩnh viễn cho mục đích kế toán và kiểm toán, không thể xóa." },
-        { status: 400 }
-      )
-    }
+    await prisma.$transaction(async (tx) => {
+      const itemIds = orderToDelete.items.map((i) => i.id)
+      const manualPlaceholderItemIds = orderToDelete.items
+        .filter((i) => i.product.slug === "don-ban-ngoai-thu-cong")
+        .map((i) => i.id)
+      const storeItemIds = orderToDelete.items
+        .filter((i) => i.product.slug !== "don-ban-ngoai-thu-cong")
+        .map((i) => i.id)
 
-    await prisma.order.delete({
-      where: { id: orderId },
+      // 1. Clean or unlink Serial foreign keys so OrderItem deletion never fails
+      if (manualPlaceholderItemIds.length > 0) {
+        await tx.serial.deleteMany({
+          where: { orderItemId: { in: manualPlaceholderItemIds } },
+        })
+      }
+      if (storeItemIds.length > 0) {
+        await tx.serial.updateMany({
+          where: { orderItemId: { in: storeItemIds } },
+          data: restoreSerials
+            ? { orderItemId: null, status: "available" }
+            : { orderItemId: null },
+        })
+      }
+
+      // 2. Clean BuffFulfillment, CouponRedemption, Payment, OrderItem, Notification, then Order
+      if (itemIds.length > 0) {
+        await tx.buffFulfillment.deleteMany({
+          where: { orderItemId: { in: itemIds } },
+        })
+      }
+
+      if (orderToDelete.redemption) {
+        if (orderToDelete.redemption.status === "redeemed" && orderToDelete.couponId) {
+          const coupon = await tx.coupon.findUnique({
+            where: { id: orderToDelete.couponId },
+            select: { usedCount: true },
+          })
+          if (coupon && coupon.usedCount > 0) {
+            await tx.coupon.update({
+              where: { id: orderToDelete.couponId },
+              data: { usedCount: { decrement: 1 } },
+            })
+          }
+        }
+        await tx.couponRedemption.delete({
+          where: { id: orderToDelete.redemption.id },
+        })
+      }
+
+      await tx.payment.deleteMany({ where: { orderId } })
+      await tx.orderItem.deleteMany({ where: { orderId } })
+      await tx.adminNotification.deleteMany({
+        where: { metadata: { contains: `"orderId":"${orderId}"` } },
+      })
+      await tx.order.delete({ where: { id: orderId } })
     })
 
-    return NextResponse.json({ success: true, message: "Đã xóa đơn hàng thành công" })
+    try {
+      revalidatePath("/admin")
+      revalidatePath("/admin/orders")
+    } catch {}
+
+    return NextResponse.json({
+      success: true,
+      message: `Đã xóa đơn hàng #${orderToDelete.code} thành công`,
+    })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Error deleting order"
     return NextResponse.json({ error: message }, { status: 500 })

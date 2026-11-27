@@ -15,7 +15,6 @@ import {
   Clock,
   AlertCircle,
   FileText,
-  Lock,
   X,
   CheckCircle2,
   Ticket,
@@ -25,6 +24,8 @@ import {
   PackagePlus,
   Calendar,
   Copy,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react"
 
 export interface StockImportItem {
@@ -44,6 +45,19 @@ function getLocalDateKey(dateInput: Date | string): string {
   const m = String(d.getMonth() + 1).padStart(2, "0")
   const day = String(d.getDate()).padStart(2, "0")
   return `${y}-${m}-${day}`
+}
+
+function shiftDateKey(dateKey: string, deltaDays: number): string {
+  const parts = dateKey.split("-").map(Number)
+  if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n))) {
+    return getLocalDateKey(new Date())
+  }
+  const dt = new Date(parts[0], parts[1] - 1, parts[2] + deltaDays)
+  return getLocalDateKey(dt)
+}
+
+function formatDateKeyVi(dateKey: string): string {
+  return dateKey.split("-").reverse().join("/")
 }
 
 export interface ProductOptionVariant {
@@ -113,9 +127,13 @@ export function OrderManagerClient({
   const [currentOrders, setCurrentOrders] = useState<OrderItem[]>(orders)
   const [stockImports, setStockImports] = useState<StockImportItem[]>(initialStockImports)
   const [activeView, setActiveView] = useState<"orders" | "imports">("orders")
+  const todayDateKey = getLocalDateKey(new Date())
+  const yesterdayDateKey = shiftDateKey(todayDateKey, -1)
   const [selectedDate, setSelectedDate] = useState<string>(() => getLocalDateKey(new Date()))
+  const [showOnlySelectedOrderDate, setShowOnlySelectedOrderDate] = useState<boolean>(false)
   const [showAllImportDates, setShowAllImportDates] = useState<boolean>(false)
   const [deletingImportId, setDeletingImportId] = useState<string | null>(null)
+  const [confirmDeleteImport, setConfirmDeleteImport] = useState<StockImportItem | null>(null)
   const [importModal, setImportModal] = useState<{
     isOpen: boolean
     importDate: string
@@ -142,6 +160,7 @@ export function OrderManagerClient({
   // Modal State for Manual Order Creation (Bán Ngoài)
   const [createManualModal, setCreateManualModal] = useState<{
     isOpen: boolean
+    orderDate: string
     customerName: string
     customerContact: string
     selectedVariantId: string
@@ -156,6 +175,7 @@ export function OrderManagerClient({
     error?: string
   }>({
     isOpen: false,
+    orderDate: getLocalDateKey(new Date()),
     customerName: "",
     customerContact: "",
     selectedVariantId: "",
@@ -166,6 +186,34 @@ export function OrderManagerClient({
     note: "",
     deductSerial: false,
     serialContent: "",
+    isSubmitting: false,
+  })
+
+  // Modal State for Confirming Order Deletion (prevents accidental deletion)
+  const [deleteOrderModal, setDeleteOrderModal] = useState<{
+    isOpen: boolean
+    order: OrderItem | null
+    restoreSerials: boolean
+    isSubmitting: boolean
+    error?: string
+  }>({
+    isOpen: false,
+    order: null,
+    restoreSerials: false,
+    isSubmitting: false,
+  })
+
+  // Modal State for Moving / Backdating an Existing Order's Accounting Date
+  const [changeDateModal, setChangeDateModal] = useState<{
+    isOpen: boolean
+    order: OrderItem | null
+    orderDate: string
+    isSubmitting: boolean
+    error?: string
+  }>({
+    isOpen: false,
+    order: null,
+    orderDate: getLocalDateKey(new Date()),
     isSubmitting: false,
   })
 
@@ -205,8 +253,6 @@ export function OrderManagerClient({
   const [historyOrder, setHistoryOrder] = useState<OrderItem | null>(null)
 
   const isSubmittingRef = useRef(false)
-
-  const [fulfillingId, setFulfillingId] = useState<string | null>(null)
 
   const refreshOrders = async () => {
     setRefreshing(true)
@@ -251,25 +297,123 @@ export function OrderManagerClient({
     }
   }
 
-  const handleDeleteOrder = async (orderId: string, orderCode: string) => {
-    const confirmed = window.confirm(`Xác nhận xóa vĩnh viễn đơn hàng #${orderCode}?`)
-    if (!confirmed) return
+  const openDeleteOrderModal = (order: OrderItem) => {
+    setDeleteOrderModal({
+      isOpen: true,
+      order,
+      restoreSerials: false,
+      isSubmitting: false,
+      error: undefined,
+    })
+  }
+
+  const handleConfirmDeleteOrder = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!deleteOrderModal.order || deleteOrderModal.isSubmitting) return
+
+    const targetOrder = deleteOrderModal.order
+    setDeleteOrderModal((prev) => ({ ...prev, isSubmitting: true, error: undefined }))
 
     try {
       const res = await fetch("/api/admin/orders", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId }),
+        body: JSON.stringify({
+          orderId: targetOrder.id,
+          restoreSerials: deleteOrderModal.restoreSerials,
+        }),
       })
-      const json = await res.json()
+      const json = await res.json().catch(() => ({}))
       if (res.ok && json.success) {
-        toast({ title: "Đã xóa", description: `Đã xóa đơn hàng #${orderCode}` })
-        setCurrentOrders((prev) => prev.filter((o) => o.id !== orderId))
+        toast({
+          title: "Đã xóa đơn hàng",
+          description: `Đã xóa vĩnh viễn đơn #${targetOrder.code} (${formatPrice(targetOrder.totalCents)})`,
+        })
+        setCurrentOrders((prev) => prev.filter((o) => o.id !== targetOrder.id))
+        setDeleteOrderModal({
+          isOpen: false,
+          order: null,
+          restoreSerials: false,
+          isSubmitting: false,
+        })
+        router.refresh()
       } else {
-        toast({ title: "Lỗi", description: json.error || "Không thể xóa đơn", variant: "destructive" })
+        setDeleteOrderModal((prev) => ({
+          ...prev,
+          isSubmitting: false,
+          error: json.error || "Không thể xóa đơn hàng",
+        }))
       }
     } catch (err: unknown) {
-      toast({ title: "Lỗi", description: err instanceof Error ? err.message : "Lỗi mạng", variant: "destructive" })
+      setDeleteOrderModal((prev) => ({
+        ...prev,
+        isSubmitting: false,
+        error: err instanceof Error ? err.message : "Lỗi kết nối máy chủ",
+      }))
+    }
+  }
+
+  const openChangeDateModal = (order: OrderItem) => {
+    setChangeDateModal({
+      isOpen: true,
+      order,
+      orderDate: getLocalDateKey(order.createdAt),
+      isSubmitting: false,
+      error: undefined,
+    })
+  }
+
+  const handleConfirmChangeDate = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!changeDateModal.order || changeDateModal.isSubmitting || !changeDateModal.orderDate) return
+
+    const targetOrder = changeDateModal.order
+    setChangeDateModal((prev) => ({ ...prev, isSubmitting: true, error: undefined }))
+
+    try {
+      const res = await fetch("/api/admin/orders", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderId: targetOrder.id,
+          action: "update_date",
+          orderDate: changeDateModal.orderDate,
+        }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (res.ok && json.success) {
+        toast({
+          title: "Đã cập nhật ngày ghi nhận",
+          description: json.message || `Đã chuyển đơn #${targetOrder.code} sang ngày ${formatDateKeyVi(changeDateModal.orderDate)}`,
+        })
+        setCurrentOrders((prev) =>
+          prev.map((o) =>
+            o.id === targetOrder.id
+              ? { ...o, createdAt: json.createdAt || `${changeDateModal.orderDate}T12:00:00+07:00` }
+              : o
+          )
+        )
+        setSelectedDate(changeDateModal.orderDate)
+        setChangeDateModal({
+          isOpen: false,
+          order: null,
+          orderDate: todayDateKey,
+          isSubmitting: false,
+        })
+        router.refresh()
+      } else {
+        setChangeDateModal((prev) => ({
+          ...prev,
+          isSubmitting: false,
+          error: json.error || "Không thể cập nhật ngày ghi nhận",
+        }))
+      }
+    } catch (err: unknown) {
+      setChangeDateModal((prev) => ({
+        ...prev,
+        isSubmitting: false,
+        error: err instanceof Error ? err.message : "Lỗi kết nối máy chủ",
+      }))
     }
   }
 
@@ -283,28 +427,6 @@ export function OrderManagerClient({
       idempotencyKey: key,
       isSubmitting: false,
     })
-  }
-
-  const handleTriggerFulfill = async (orderId: string) => {
-    setFulfillingId(orderId)
-    try {
-      const res = await fetch("/api/admin/orders", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId, action: "fulfill" }),
-      })
-      const json = await res.json()
-      if (res.ok && json.success) {
-        toast({ title: "Thành công", description: "Đã giao hàng qua đại lý thành công!" })
-        window.location.reload()
-      } else {
-        toast({ title: "Lỗi giao hàng", description: json.error || "Giao hàng thất bại", variant: "destructive" })
-      }
-    } catch (err: unknown) {
-      toast({ title: "Lỗi", description: err instanceof Error ? err.message : "Lỗi mạng", variant: "destructive" })
-    } finally {
-      setFulfillingId(null)
-    }
   }
 
   const openCancelModal = (order: OrderItem) => {
@@ -425,6 +547,7 @@ export function OrderManagerClient({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          orderDate: createManualModal.orderDate,
           customerName: createManualModal.customerName.trim(),
           customerContact: createManualModal.customerContact.trim(),
           variantId: createManualModal.selectedVariantId || null,
@@ -443,14 +566,17 @@ export function OrderManagerClient({
         throw new Error(json.error || "Không thể tạo đơn bán ngoài")
       }
 
+      const savedDate = createManualModal.orderDate || selectedDate
       toast({
         title: "Tạo đơn thành công",
         description: json.message || "Đã ghi nhận đơn hàng và cộng vào doanh thu!",
         variant: "default",
       })
 
+      setSelectedDate(savedDate)
       setCreateManualModal({
         isOpen: false,
+        orderDate: savedDate,
         customerName: "",
         customerContact: "",
         selectedVariantId: "",
@@ -478,9 +604,11 @@ export function OrderManagerClient({
   const filteredOrders = currentOrders.filter((o) => {
     const matchSearch =
       o.code.toLowerCase().includes(search.toLowerCase()) ||
-      o.email.toLowerCase().includes(search.toLowerCase())
+      o.email.toLowerCase().includes(search.toLowerCase()) ||
+      (o.note || "").toLowerCase().includes(search.toLowerCase())
     const matchStatus = filterStatus === "all" || o.status === filterStatus
-    return matchSearch && matchStatus
+    const matchDate = !showOnlySelectedOrderDate || getLocalDateKey(o.createdAt) === selectedDate
+    return matchSearch && matchStatus && matchDate
   })
 
   // Daily revenue & stock import calculations
@@ -573,15 +701,20 @@ export function OrderManagerClient({
     }
   }
 
-  const handleDeleteStockImport = async (item: StockImportItem) => {
-    if (!window.confirm(`Xóa phiếu nhập "${item.itemInfo}" (${formatPrice(item.totalCents)})?`)) return
+  const handleConfirmDeleteStockImport = async () => {
+    if (!confirmDeleteImport) return
+    const item = confirmDeleteImport
     setDeletingImportId(item.id)
     try {
       const res = await fetch(`/api/admin/stock-imports/${item.id}`, { method: "DELETE" })
       const json = await res.json()
       if (res.ok && json.success) {
         setStockImports((prev) => prev.filter((s) => s.id !== item.id))
-        toast({ title: "Đã xóa phiếu nhập hàng" })
+        setConfirmDeleteImport(null)
+        toast({
+          title: "Đã xóa phiếu nhập hàng",
+          description: `${item.itemInfo} (${formatPrice(item.totalCents)})`,
+        })
         router.refresh()
       } else {
         toast({ title: "Lỗi", description: json.error || "Xóa thất bại", variant: "destructive" })
@@ -598,9 +731,20 @@ export function OrderManagerClient({
       {/* Daily Revenue & Stock Import Summary Strip */}
       <div className="rounded-2xl border border-border bg-card p-4 space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-3 border-b border-border/70">
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5 flex-wrap">
             <Calendar className="size-4 text-primary shrink-0" />
-            <span className="text-xs font-semibold text-foreground">Theo dõi ngày:</span>
+            <span className="text-xs font-semibold text-foreground mr-0.5">Sổ ngày:</span>
+
+            <button
+              type="button"
+              onClick={() => setSelectedDate((prev) => shiftDateKey(prev, -1))}
+              className="inline-flex size-8 items-center justify-center rounded-lg border border-border bg-background hover:bg-secondary text-muted-foreground hover:text-foreground transition-btn cursor-pointer"
+              title="Lùi về ngày trước"
+              aria-label="Lùi về ngày trước"
+            >
+              <ChevronLeft className="size-4" />
+            </button>
+
             <input
               type="date"
               value={selectedDate}
@@ -608,6 +752,46 @@ export function OrderManagerClient({
               aria-label="Chọn ngày xem doanh thu và nhập hàng"
               className="h-8 px-2.5 rounded-lg border border-border bg-background text-xs font-medium text-foreground focus:outline-none focus:border-primary"
             />
+
+            <button
+              type="button"
+              onClick={() => setSelectedDate((prev) => shiftDateKey(prev, 1))}
+              className="inline-flex size-8 items-center justify-center rounded-lg border border-border bg-background hover:bg-secondary text-muted-foreground hover:text-foreground transition-btn cursor-pointer"
+              title="Tiến tới ngày sau"
+              aria-label="Tiến tới ngày sau"
+            >
+              <ChevronRight className="size-4" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSelectedDate(yesterdayDateKey)}
+              className={`h-8 px-2.5 rounded-lg text-xs font-semibold border transition-btn cursor-pointer ${
+                selectedDate === yesterdayDateKey
+                  ? "bg-amber-500/15 text-amber-300 border-amber-500/40"
+                  : "bg-background text-muted-foreground hover:text-foreground border-border"
+              }`}
+            >
+              Hôm qua ({yesterdayDateKey.slice(8, 10)}/{yesterdayDateKey.slice(5, 7)})
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSelectedDate(todayDateKey)}
+              className={`h-8 px-2.5 rounded-lg text-xs font-semibold border transition-btn cursor-pointer ${
+                selectedDate === todayDateKey
+                  ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/40"
+                  : "bg-background text-muted-foreground hover:text-foreground border-border"
+              }`}
+            >
+              Hôm nay
+            </button>
+
+            {selectedDate !== todayDateKey && (
+              <span className="text-[11px] font-medium text-amber-300 bg-amber-500/10 border border-amber-500/25 px-2 py-1 rounded-lg">
+                Đang xem ngày {formatDateKeyVi(selectedDate)} · Bấm Thu/Chi bên dưới sẽ tự ghi vào ngày này
+              </span>
+            )}
           </div>
 
           <div className="flex items-center gap-1.5">
@@ -704,9 +888,16 @@ export function OrderManagerClient({
 
           <Button
             size="sm"
-            onClick={() => setCreateManualModal((prev) => ({ ...prev, isOpen: true, error: undefined }))}
+            onClick={() =>
+              setCreateManualModal((prev) => ({
+                ...prev,
+                isOpen: true,
+                orderDate: selectedDate,
+                error: undefined,
+              }))
+            }
             className="text-xs bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-1.5 cursor-pointer shrink-0 shadow-xs"
-            title="Ghi nhận đơn bán ngoài (Zalo, Facebook, trực tiếp) để tính vào doanh thu"
+            title="Ghi nhận đơn bán ngoài (Zalo, Facebook, trực tiếp) để tính vào doanh thu ngày đang chọn"
           >
             <PlusCircle className="size-3.5" />
             <span>Tạo đơn bán ngoài</span>
@@ -740,7 +931,21 @@ export function OrderManagerClient({
         </div>
 
         {activeView === "orders" ? (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowOnlySelectedOrderDate((v) => !v)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                showOnlySelectedOrderDate
+                  ? "bg-amber-500/15 text-amber-300 border-amber-500/40 shadow-sm"
+                  : "bg-card/60 text-muted-foreground hover:bg-card hover:text-foreground border-border/60"
+              }`}
+              title="Lọc danh sách đơn theo ngày đang chọn trên lịch"
+            >
+              {showOnlySelectedOrderDate
+                ? `Đang lọc ngày ${formatDateKeyVi(selectedDate)}`
+                : `Lọc ngày ${formatDateKeyVi(selectedDate)}`}
+            </button>
             {["all", "pending", "paid", "cancelled"].map((st) => (
               <button
                 key={st}
@@ -843,9 +1048,10 @@ export function OrderManagerClient({
                         <button
                           type="button"
                           disabled={deletingImportId === item.id}
-                          onClick={() => handleDeleteStockImport(item)}
+                          onClick={() => setConfirmDeleteImport(item)}
                           className="inline-flex size-8 items-center justify-center rounded-lg text-rose-400 hover:bg-rose-500/10 disabled:opacity-40 transition-btn cursor-pointer"
                           aria-label={`Xóa phiếu nhập ${item.itemInfo}`}
+                          title="Xóa phiếu nhập hàng này"
                         >
                           <Trash2 className="size-3.5" />
                         </button>
@@ -1055,8 +1261,8 @@ export function OrderManagerClient({
                 {/* Status-specific advisory note */}
                 {order.status === "paid" ? (
                   <div className="flex items-center gap-1.5 text-[11px] font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-lg">
-                    <Lock className="size-3.5 text-emerald-400 shrink-0" />
-                    <span>Đã thanh toán · Khóa thao tác</span>
+                    <CheckCircle2 className="size-3.5 text-emerald-400 shrink-0" />
+                    <span>Đã thanh toán · Đã cộng doanh thu</span>
                   </div>
                 ) : order.status === "cancelled" ? (
                   <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground bg-muted/40 border border-border/50 px-2.5 py-1 rounded-lg">
@@ -1070,7 +1276,7 @@ export function OrderManagerClient({
                   </div>
                 )}
 
-                <div className="flex items-center gap-2 ml-auto">
+                <div className="flex flex-wrap items-center gap-2 ml-auto">
                   {/* Nút Xem Lịch Sử & Chi Tiết (Luôn có cho tất cả các đơn) */}
                   <Button
                     size="sm"
@@ -1081,6 +1287,18 @@ export function OrderManagerClient({
                   >
                     <FileText className="size-3.5 text-primary" />
                     <span>Lịch sử đơn</span>
+                  </Button>
+
+                  {/* Nút Đổi ngày ghi nhận (Cho phép lùi đơn sang ngày trước nếu nhập qua 00:00) */}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-xs text-amber-300 border-amber-500/30 hover:bg-amber-500/10 cursor-pointer flex items-center gap-1.5 h-8 px-2.5"
+                    onClick={() => openChangeDateModal(order)}
+                    title="Đổi ngày ghi nhận doanh thu của đơn này (VD: chuyển về hôm qua)"
+                  >
+                    <Calendar className="size-3.5" />
+                    <span>Đổi ngày</span>
                   </Button>
 
                   {/* Nút Duyệt đã TT: CHỈ HIỂN THỊ KHI CHƯA THANH TOÁN */}
@@ -1095,7 +1313,7 @@ export function OrderManagerClient({
                     </Button>
                   )}
 
-                  {/* Nút Hủy đơn: CHỈ HIỂN THỊ KHI CHƯA THANH TOÁN (Tuyệt đối không hủy đơn đã TT) */}
+                  {/* Nút Hủy đơn: CHỈ HIỂN THỊ KHI CHƯA THANH TOÁN */}
                   {(order.status === "pending" || order.status === "partially_paid") && (
                     <Button
                       size="sm"
@@ -1107,18 +1325,17 @@ export function OrderManagerClient({
                     </Button>
                   )}
 
-                  {/* Nút Xóa đơn: CHỈ CHO PHÉP XÓA ĐƠN CHƯA PAID (Đơn paid bị khóa vĩnh viễn) */}
-                  {order.status !== "paid" && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 p-2 cursor-pointer h-8 w-8"
-                      title="Xóa đơn hàng này"
-                      onClick={() => handleDeleteOrder(order.id, order.code)}
-                    >
-                      <Trash2 className="size-3.5" />
-                    </Button>
-                  )}
+                  {/* Nút Xóa đơn: Có hộp thoại xác nhận rõ ràng để tránh xóa nhầm */}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-xs text-rose-400 border-rose-500/30 hover:bg-rose-500/10 cursor-pointer flex items-center gap-1 h-8 px-2.5"
+                    title="Xóa đơn hàng này (có bước xác nhận trước khi xóa)"
+                    onClick={() => openDeleteOrderModal(order)}
+                  >
+                    <Trash2 className="size-3.5" />
+                    <span>Xóa đơn</span>
+                  </Button>
                 </div>
               </div>
             </div>
@@ -1531,6 +1748,68 @@ export function OrderManagerClient({
                 </div>
               )}
 
+              {/* Chọn ngày ghi nhận doanh thu (cho phép quay lại ngày trước / hôm qua) */}
+              <div className="p-3 rounded-xl border border-emerald-500/30 bg-emerald-500/5 space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <label htmlFor="manual-order-date" className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                    <Calendar className="size-3.5 text-emerald-400" />
+                    <span>Ngày ghi nhận doanh thu (Thu) <span className="text-rose-400">*</span></span>
+                  </label>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setCreateManualModal((p) => ({ ...p, orderDate: shiftDateKey(p.orderDate, -1) }))}
+                      className="px-2 py-1 rounded-lg border border-border bg-background hover:bg-secondary text-[11px] font-semibold text-muted-foreground hover:text-foreground cursor-pointer"
+                    >
+                      ◀ Ngày trước
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCreateManualModal((p) => ({ ...p, orderDate: yesterdayDateKey }))}
+                      className={`px-2 py-1 rounded-lg border text-[11px] font-semibold cursor-pointer ${
+                        createManualModal.orderDate === yesterdayDateKey
+                          ? "bg-amber-500/15 text-amber-300 border-amber-500/40"
+                          : "border-border bg-background hover:bg-secondary text-muted-foreground"
+                      }`}
+                    >
+                      Hôm qua
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCreateManualModal((p) => ({ ...p, orderDate: todayDateKey }))}
+                      className={`px-2 py-1 rounded-lg border text-[11px] font-semibold cursor-pointer ${
+                        createManualModal.orderDate === todayDateKey
+                          ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/40"
+                          : "border-border bg-background hover:bg-secondary text-muted-foreground"
+                      }`}
+                    >
+                      Hôm nay
+                    </button>
+                  </div>
+                </div>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <Input
+                    id="manual-order-date"
+                    type="date"
+                    required
+                    value={createManualModal.orderDate}
+                    onChange={(e) =>
+                      setCreateManualModal((p) => ({
+                        ...p,
+                        orderDate: e.target.value || todayDateKey,
+                      }))
+                    }
+                    className="text-xs h-9 sm:max-w-[200px] bg-background"
+                  />
+                  <span className="text-xs text-muted-foreground">
+                    Cộng vào ngày <strong className="text-foreground">{formatDateKeyVi(createManualModal.orderDate)}</strong>:{" "}
+                    <strong className="text-emerald-400 tabular-nums">
+                      +{formatPrice(parseInt(createManualModal.amountVnd.replace(/\D/g, ""), 10) || 0)}
+                    </strong>
+                  </span>
+                </div>
+              </div>
+
               {/* Thông tin khách hàng */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
@@ -1664,16 +1943,18 @@ export function OrderManagerClient({
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-foreground">Hình thức thanh toán thực tế</label>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {[
-                    { id: "bank", label: "Chuyển khoản" },
-                    { id: "cash", label: "Tiền mặt" },
-                    { id: "momo", label: "Momo / Ví" },
-                    { id: "zalo", label: "ZaloPay" },
-                  ].map((m) => (
+                  {(
+                    [
+                      { id: "bank", label: "Chuyển khoản" },
+                      { id: "cash", label: "Tiền mặt" },
+                      { id: "momo", label: "Momo / Ví" },
+                      { id: "zalo", label: "ZaloPay" },
+                    ] as const
+                  ).map((m) => (
                     <button
                       key={m.id}
                       type="button"
-                      onClick={() => setCreateManualModal((p) => ({ ...p, paymentMethod: m.id as any }))}
+                      onClick={() => setCreateManualModal((p) => ({ ...p, paymentMethod: m.id }))}
                       className={`p-2 rounded-xl border text-xs font-medium transition-all cursor-pointer ${
                         createManualModal.paymentMethod === m.id
                           ? "bg-primary/10 border-primary text-primary font-bold shadow-xs"
@@ -1796,15 +2077,48 @@ export function OrderManagerClient({
                 </div>
               )}
 
-              <div className="space-y-1">
-                <label htmlFor="import-date" className="font-semibold text-foreground block">
-                  Ngày nhập hàng *
-                </label>
+              <div className="space-y-1.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <label htmlFor="import-date" className="font-semibold text-foreground block">
+                    Ngày nhập hàng (Chi) *
+                  </label>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setImportModal((p) => ({ ...p, importDate: shiftDateKey(p.importDate, -1) }))}
+                      className="px-2 py-1 rounded-lg border border-border bg-background hover:bg-secondary text-[11px] font-semibold text-muted-foreground hover:text-foreground cursor-pointer"
+                    >
+                      ◀ Ngày trước
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setImportModal((p) => ({ ...p, importDate: yesterdayDateKey }))}
+                      className={`px-2 py-1 rounded-lg border text-[11px] font-semibold cursor-pointer ${
+                        importModal.importDate === yesterdayDateKey
+                          ? "bg-amber-500/15 text-amber-300 border-amber-500/40"
+                          : "border-border bg-background hover:bg-secondary text-muted-foreground"
+                      }`}
+                    >
+                      Hôm qua
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setImportModal((p) => ({ ...p, importDate: todayDateKey }))}
+                      className={`px-2 py-1 rounded-lg border text-[11px] font-semibold cursor-pointer ${
+                        importModal.importDate === todayDateKey
+                          ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/40"
+                          : "border-border bg-background hover:bg-secondary text-muted-foreground"
+                      }`}
+                    >
+                      Hôm nay
+                    </button>
+                  </div>
+                </div>
                 <Input
                   id="import-date"
                   type="date"
                   value={importModal.importDate}
-                  onChange={(e) => setImportModal((p) => ({ ...p, importDate: e.target.value }))}
+                  onChange={(e) => setImportModal((p) => ({ ...p, importDate: e.target.value || todayDateKey }))}
                   required
                   className="text-xs h-10"
                 />
@@ -1907,6 +2221,313 @@ export function OrderManagerClient({
                 </Button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Đổi ngày ghi nhận doanh thu của đơn hàng */}
+      {changeDateModal.isOpen && changeDateModal.order && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 animate-in fade-in duration-150">
+          <div className="w-full max-w-md rounded-2xl border border-border bg-card shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+              <div className="flex items-center gap-2">
+                <Calendar className="size-4 text-amber-400" />
+                <div>
+                  <h2 className="text-sm font-bold text-foreground">
+                    Đổi Ngày Ghi Nhận Đơn #{changeDateModal.order.code}
+                  </h2>
+                  <p className="text-[11px] text-muted-foreground">
+                    Chuyển doanh thu {formatPrice(changeDateModal.order.totalCents)} sang đúng ngày bán thực tế
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setChangeDateModal((p) => ({ ...p, isOpen: false }))}
+                className="p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer"
+                aria-label="Đóng"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleConfirmChangeDate} className="p-5 space-y-4 text-xs">
+              {changeDateModal.error && (
+                <div className="p-3 rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-300 font-medium flex items-center gap-2">
+                  <AlertCircle className="size-4 shrink-0" />
+                  <span>{changeDateModal.error}</span>
+                </div>
+              )}
+
+              <div className="p-3 rounded-xl border border-border/70 bg-background/60 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Ngày đang ghi nhận:</span>
+                  <strong className="text-foreground font-mono">
+                    {new Date(changeDateModal.order.createdAt).toLocaleString("vi-VN")}
+                  </strong>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Giá trị đơn:</span>
+                  <strong className="text-primary font-mono">{formatPrice(changeDateModal.order.totalCents)}</strong>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <label htmlFor="change-order-date" className="font-semibold text-foreground">
+                    Chọn ngày ghi nhận mới *
+                  </label>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setChangeDateModal((p) => ({ ...p, orderDate: shiftDateKey(p.orderDate, -1) }))}
+                      className="px-2 py-1 rounded-lg border border-border bg-background hover:bg-secondary text-[11px] font-semibold text-muted-foreground hover:text-foreground cursor-pointer"
+                    >
+                      ◀ Ngày trước
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setChangeDateModal((p) => ({ ...p, orderDate: yesterdayDateKey }))}
+                      className={`px-2 py-1 rounded-lg border text-[11px] font-semibold cursor-pointer ${
+                        changeDateModal.orderDate === yesterdayDateKey
+                          ? "bg-amber-500/15 text-amber-300 border-amber-500/40"
+                          : "border-border bg-background hover:bg-secondary text-muted-foreground"
+                      }`}
+                    >
+                      Hôm qua
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setChangeDateModal((p) => ({ ...p, orderDate: todayDateKey }))}
+                      className={`px-2 py-1 rounded-lg border text-[11px] font-semibold cursor-pointer ${
+                        changeDateModal.orderDate === todayDateKey
+                          ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/40"
+                          : "border-border bg-background hover:bg-secondary text-muted-foreground"
+                      }`}
+                    >
+                      Hôm nay
+                    </button>
+                  </div>
+                </div>
+                <Input
+                  id="change-order-date"
+                  type="date"
+                  required
+                  value={changeDateModal.orderDate}
+                  onChange={(e) => setChangeDateModal((p) => ({ ...p, orderDate: e.target.value || todayDateKey }))}
+                  className="text-xs h-10"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={changeDateModal.isSubmitting}
+                  onClick={() => setChangeDateModal((p) => ({ ...p, isOpen: false }))}
+                  className="text-xs cursor-pointer"
+                >
+                  Hủy
+                </Button>
+                <Button
+                  type="submit"
+                  size="sm"
+                  disabled={changeDateModal.isSubmitting}
+                  className="text-xs bg-amber-500 hover:bg-amber-400 text-black font-bold cursor-pointer"
+                >
+                  {changeDateModal.isSubmitting
+                    ? "Đang lưu..."
+                    : `Chuyển sang ngày ${formatDateKeyVi(changeDateModal.orderDate)}`}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Xác nhận xóa đơn hàng (chống xóa nhầm) */}
+      {deleteOrderModal.isOpen && deleteOrderModal.order && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 animate-in fade-in duration-150">
+          <div className="w-full max-w-md rounded-2xl border border-rose-500/40 bg-card shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-rose-500/10">
+              <div className="flex items-center gap-2">
+                <Trash2 className="size-4 text-rose-400" />
+                <h2 className="text-sm font-bold text-rose-200">
+                  Xác Nhận Xóa Đơn Hàng #{deleteOrderModal.order.code}
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDeleteOrderModal((p) => ({ ...p, isOpen: false }))}
+                className="p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer"
+                aria-label="Đóng"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleConfirmDeleteOrder} className="p-5 space-y-4 text-xs">
+              {deleteOrderModal.error && (
+                <div className="p-3 rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-300 font-medium flex items-center gap-2">
+                  <AlertCircle className="size-4 shrink-0" />
+                  <span>{deleteOrderModal.error}</span>
+                </div>
+              )}
+
+              <div className="p-3.5 rounded-xl border border-border bg-background/60 space-y-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-muted-foreground">Mã đơn:</span>
+                  <strong className="font-mono text-foreground">#{deleteOrderModal.order.code}</strong>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-muted-foreground">Khách hàng:</span>
+                  <span className="font-medium text-foreground truncate max-w-[230px]">
+                    {deleteOrderModal.order.email}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-muted-foreground">Thời gian:</span>
+                  <span className="font-mono text-foreground">
+                    {new Date(deleteOrderModal.order.createdAt).toLocaleString("vi-VN")}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-2 pt-1 border-t border-border/50">
+                  <span className="text-muted-foreground">Số tiền đơn:</span>
+                  <strong className="text-sm font-bold text-rose-400 tabular-nums">
+                    {formatPrice(deleteOrderModal.order.totalCents)}
+                  </strong>
+                </div>
+              </div>
+
+              {(deleteOrderModal.order.status === "paid" || deleteOrderModal.order.status === "processing") && (
+                <div className="p-3 rounded-xl border border-amber-500/35 bg-amber-500/10 text-amber-200 flex items-start gap-2">
+                  <AlertCircle className="size-4 text-amber-400 shrink-0 mt-0.5" />
+                  <span>
+                    Đơn này đang ở trạng thái <strong>Đã thanh toán</strong>. Sau khi xóa, số tiền{" "}
+                    <strong>{formatPrice(deleteOrderModal.order.totalCents)}</strong> sẽ được trừ khỏi doanh thu ngày{" "}
+                    <strong>{formatDateKeyVi(getLocalDateKey(deleteOrderModal.order.createdAt))}</strong> và tổng doanh thu.
+                  </span>
+                </div>
+              )}
+
+              {deleteOrderModal.order.items.some(
+                (it) =>
+                  ((it.serials && it.serials.length > 0) || Boolean(it.serial)) &&
+                  !it.name.startsWith("Đơn Bán Ngoài Thủ Công")
+              ) && (
+                <label className="flex items-start gap-2 p-3 rounded-xl border border-border bg-secondary/20 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={deleteOrderModal.restoreSerials}
+                    onChange={(e) =>
+                      setDeleteOrderModal((p) => ({ ...p, restoreSerials: e.target.checked }))
+                    }
+                    className="size-4 mt-0.5 rounded text-primary focus:ring-primary cursor-pointer"
+                  />
+                  <span className="text-muted-foreground">
+                    <strong className="text-foreground block">Hoàn lại serial về Kho Serials để bán tiếp</strong>
+                    Chỉ bật nếu đây là đơn bấm nhầm và khách chưa nhận tài khoản/key.
+                  </span>
+                </label>
+              )}
+
+              <p className="text-[11px] text-muted-foreground">
+                Thao tác này sẽ xóa vĩnh viễn đơn hàng và không thể hoàn tác. Bạn chắc chắn muốn xóa?
+              </p>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={deleteOrderModal.isSubmitting}
+                  onClick={() => setDeleteOrderModal((p) => ({ ...p, isOpen: false }))}
+                  className="text-xs cursor-pointer"
+                >
+                  Giữ lại (Không xóa)
+                </Button>
+                <Button
+                  type="submit"
+                  size="sm"
+                  variant="destructive"
+                  disabled={deleteOrderModal.isSubmitting}
+                  className="text-xs font-bold cursor-pointer"
+                >
+                  {deleteOrderModal.isSubmitting ? "Đang xóa..." : "Xác nhận xóa vĩnh viễn"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Xác nhận xóa phiếu nhập hàng (Chi) */}
+      {confirmDeleteImport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 animate-in fade-in duration-150">
+          <div className="w-full max-w-md rounded-2xl border border-rose-500/40 bg-card shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-rose-500/10">
+              <div className="flex items-center gap-2">
+                <Trash2 className="size-4 text-rose-400" />
+                <h2 className="text-sm font-bold text-rose-200">Xác Nhận Xóa Phiếu Chi Nhập Hàng</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setConfirmDeleteImport(null)}
+                className="p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer"
+                aria-label="Đóng"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4 text-xs">
+              <div className="p-3.5 rounded-xl border border-border bg-background/60 space-y-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-muted-foreground">Hàng nhập:</span>
+                  <strong className="text-foreground text-right">{confirmDeleteImport.itemInfo}</strong>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-muted-foreground">Ngày nhập:</span>
+                  <span className="font-mono text-foreground">{formatDateKeyVi(confirmDeleteImport.importDate)}</span>
+                </div>
+                <div className="flex items-center justify-between gap-2 pt-1 border-t border-border/50">
+                  <span className="text-muted-foreground">Chi phí đã trừ:</span>
+                  <strong className="text-sm font-bold text-amber-300 tabular-nums">
+                    -{formatPrice(confirmDeleteImport.totalCents)}
+                  </strong>
+                </div>
+              </div>
+
+              <p className="text-[11px] text-muted-foreground">
+                Khi xóa phiếu nhập này, doanh thu ròng ngày{" "}
+                <strong className="text-foreground">{formatDateKeyVi(confirmDeleteImport.importDate)}</strong> sẽ được cộng hoàn lại{" "}
+                <strong className="text-emerald-400">+{formatPrice(confirmDeleteImport.totalCents)}</strong>.
+              </p>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={Boolean(deletingImportId)}
+                  onClick={() => setConfirmDeleteImport(null)}
+                  className="text-xs cursor-pointer"
+                >
+                  Giữ lại
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="destructive"
+                  disabled={Boolean(deletingImportId)}
+                  onClick={handleConfirmDeleteStockImport}
+                  className="text-xs font-bold cursor-pointer"
+                >
+                  {deletingImportId ? "Đang xóa..." : "Xác nhận xóa phiếu nhập"}
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
       )}
