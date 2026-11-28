@@ -19,6 +19,7 @@ import {
   ExternalLink,
   AlertCircle,
   X,
+  MessageCircle,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -380,15 +381,28 @@ export function CtvNotesAdminClient({ initialItems }: { initialItems: CtvOrderNo
           </p>
         </div>
 
-        <Link
-          href="/ktv"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-xl border border-border bg-card hover:bg-secondary text-xs font-semibold text-foreground transition-btn shrink-0 self-start sm:self-auto"
-        >
-          <span>Mở cổng CTV (/ktv)</span>
-          <ExternalLink className="size-3.5 text-primary" />
-        </Link>
+        <div className="flex flex-wrap items-center gap-2 shrink-0 self-start sm:self-auto">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => window.dispatchEvent(new Event("capygo-open-ktv-chat"))}
+            className="h-9 px-3.5 text-xs font-semibold gap-1.5 cursor-pointer"
+          >
+            <MessageCircle className="size-3.5 text-primary" />
+            <span>Chat với KTV</span>
+          </Button>
+
+          <Link
+            href="/ktv"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-xl border border-border bg-card hover:bg-secondary text-xs font-semibold text-foreground transition-btn"
+          >
+            <span>Mở cổng CTV (/ktv)</span>
+            <ExternalLink className="size-3.5 text-primary" />
+          </Link>
+        </div>
       </div>
 
       {/* Date Strip & Daily Summary Cards */}

@@ -21,6 +21,7 @@ import {
   ClipboardList,
 } from "lucide-react"
 import { NotificationBell } from "@/components/admin/NotificationBell"
+import { AdminKtvChatButton } from "@/components/admin/AdminKtvChatButton"
 import { ChangePasswordModal } from "@/components/admin/ChangePasswordModal"
 import { AdminAutoLogoutListener } from "@/components/admin/AdminAutoLogoutListener"
 
@@ -309,6 +310,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </div>
 
           <div className="flex items-center gap-2.5 shrink-0">
+            <AdminKtvChatButton />
             <button
               type="button"
               onClick={() => setIsChangePasswordOpen(true)}

@@ -220,3 +220,20 @@ export async function saveProductImage(buffer: Buffer, extension: string): Promi
   // Returns URL for the custom serving endpoint
   return `/api/uploads/products/${filename}`
 }
+
+/**
+ * Saves validated chat attachment image buffer to disk under public/uploads/chat/
+ * with a secure random filename.
+ */
+export async function saveChatImage(buffer: Buffer, extension: string): Promise<string> {
+  const uploadDir = path.join(process.cwd(), "public", "uploads", "chat")
+  await fs.mkdir(uploadDir, { recursive: true })
+
+  const uniqueId = crypto.randomUUID()
+  const filename = `chat-${uniqueId}.${extension}`
+  const filePath = path.join(uploadDir, filename)
+
+  await fs.writeFile(filePath, buffer)
+
+  return `/api/uploads/chat/${filename}`
+}

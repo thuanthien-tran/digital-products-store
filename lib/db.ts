@@ -330,6 +330,25 @@ export async function ensureDatabaseSchema(): Promise<void> {
           )
         } catch {}
 
+        // Ensure KtvChatMessage table exists for KTV <-> Admin web chat
+        try {
+          await prisma.$executeRawUnsafe(`
+            CREATE TABLE IF NOT EXISTS "KtvChatMessage" (
+              "id" TEXT NOT NULL PRIMARY KEY,
+              "sender" TEXT NOT NULL,
+              "senderLabel" TEXT,
+              "message" TEXT,
+              "imageUrl" TEXT,
+              "isReadByAdmin" BOOLEAN NOT NULL DEFAULT 0,
+              "isReadByKtv" BOOLEAN NOT NULL DEFAULT 0,
+              "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+          `)
+          await prisma.$executeRawUnsafe(
+            `CREATE INDEX IF NOT EXISTS "KtvChatMessage_createdAt_idx" ON "KtvChatMessage"("createdAt");`
+          )
+        } catch {}
+
         globalForPrisma.schemaEnsured = true
       } catch (err) {
         console.error('[AutoMigration] Failed to verify/migrate schema:', err)

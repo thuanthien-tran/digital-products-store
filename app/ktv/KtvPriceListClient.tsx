@@ -11,6 +11,7 @@ import {
   LayoutList,
 } from "lucide-react"
 import { CtvOrderNotesTab } from "./CtvOrderNotesTab"
+import { KtvChatWidget } from "./KtvChatWidget"
 import { 
   KtvGroup, 
   KtvMeta, 
@@ -736,6 +737,18 @@ export function KtvPriceListClient({ initialAuth, initialData }: KtvPriceListCli
         </div>
         )}
       </main>
+
+      <KtvChatWidget
+        activeTheme={activeTheme}
+        onSessionExpired={() => setIsAuthenticated(false)}
+        onActivity={() => {
+          const now = Date.now()
+          lastActiveRef.current = now
+          try {
+            localStorage.setItem("ktv_last_active_at", String(now))
+          } catch {}
+        }}
+      />
     </div>
   )
 }

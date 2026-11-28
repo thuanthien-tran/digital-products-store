@@ -478,3 +478,16 @@ model CtvOrderNote {
   @@index([noteDate])
   @@index([status])
 }
+
+model KtvChatMessage {
+  id            String   @id @default(cuid())
+  sender        String   // "admin" | "ktv"
+  senderLabel   String?
+  message       String?
+  imageUrl      String?
+  isReadByAdmin Boolean  @default(false)
+  isReadByKtv   Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  @@index([createdAt])
+}
