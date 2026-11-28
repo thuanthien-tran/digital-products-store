@@ -14,6 +14,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { ensureAudioUnlocked, playAdminAlertSound } from "@/lib/sound-notify"
+import { ChatSoundToggle } from "@/components/chat/SoundControls"
 
 interface NotificationItem {
   id: string
@@ -187,15 +188,18 @@ export function NotificationBell() {
               )}
             </div>
 
-            <button
-              type="button"
-              onClick={markAllAsRead}
-              className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1 px-2 py-1 rounded hover:bg-secondary transition-colors font-medium"
-              title="Đánh dấu tất cả thông báo trong kho là đã đọc"
-            >
-              <CheckCheck className="size-3 text-primary" />
-              <span>Đọc tất cả</span>
-            </button>
+            <div className="flex items-center gap-1.5">
+              <ChatSoundToggle viewer="admin" />
+              <button
+                type="button"
+                onClick={markAllAsRead}
+                className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1 px-2 py-1 rounded hover:bg-secondary transition-colors font-medium cursor-pointer"
+                title="Đánh dấu tất cả thông báo trong kho là đã đọc"
+              >
+                <CheckCheck className="size-3 text-primary" />
+                <span>Đọc tất cả</span>
+              </button>
+            </div>
           </div>
 
           {/* Filter Tabs */}

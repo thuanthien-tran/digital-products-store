@@ -12,6 +12,7 @@ import {
 } from "lucide-react"
 import { CtvOrderNotesTab } from "./CtvOrderNotesTab"
 import { KtvChatWidget } from "./KtvChatWidget"
+import { ChatSoundToggle } from "@/components/chat/SoundControls"
 import { 
   KtvGroup, 
   KtvMeta, 
@@ -497,8 +498,10 @@ export function KtvPriceListClient({ initialAuth, initialData }: KtvPriceListCli
             </div>
           </div>
 
-          {/* Refresh & Logout Controls */}
+          {/* Refresh & Sound & Logout Controls */}
           <div className="flex items-center gap-1.5 shrink-0">
+            <ChatSoundToggle viewer="ktv" />
+
             <button
               type="button"
               onClick={fetchLiveMenu}
