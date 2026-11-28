@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, useMemo, useCallback } from "react"
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import {
   Calendar,
   ChevronLeft,
@@ -19,6 +19,7 @@ import {
 } from "lucide-react"
 import type { ThemeConfig } from "@/lib/ktv"
 import type { CtvOrderNoteDto } from "@/lib/ctv-notes"
+import { ensureAudioUnlocked, playNotificationSound } from "@/lib/sound-notify"
 
 function getLocalDateKey(d = new Date()): string {
   const y = d.getFullYear()
@@ -41,6 +42,29 @@ function formatDateVi(dateKey: string): string {
 
 function formatVnd(amount: number): string {
   return `${amount.toLocaleString("vi-VN")}đ`
+}
+
+function formatTimeHmS(iso: string): string {
+  try {
+    return new Date(iso).toLocaleTimeString("vi-VN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    })
+  } catch {
+    return ""
+  }
+}
+
+function formatTimeAndDay(iso: string): string {
+  try {
+    const d = new Date(iso)
+    const t = d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })
+    const day = d.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" })
+    return `${t} · ${day}`
+  } catch {
+    return ""
+  }
 }
 
 interface CtvOrderNotesTabProps {
@@ -88,6 +112,32 @@ export function CtvOrderNotesTab({ activeTheme, onSessionExpired }: CtvOrderNote
   const [submittingDelete, setSubmittingDelete] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
 
+  const statusMapRef = useRef<Map<string, string> | null>(null)
+
+  const syncNotesSnapshot = useCallback((nextItems: CtvOrderNoteDto[]) => {
+    const prevMap = statusMapRef.current
+    if (prevMap) {
+      let newlySettledCustomer: string | null = null
+      for (const item of nextItems) {
+        if (prevMap.get(item.id) === "pending" && item.status === "settled") {
+          newlySettledCustomer = item.customerName
+          break
+        }
+      }
+      if (newlySettledCustomer) {
+        playNotificationSound("ktv_chat")
+        setSuccessBanner(`Admin vừa xác nhận đã nhận tiền đơn "${newlySettledCustomer}"`)
+        setTimeout(() => setSuccessBanner(null), 5000)
+      }
+    }
+    const nextMap = new Map<string, string>()
+    for (const it of nextItems) {
+      nextMap.set(it.id, it.status)
+    }
+    statusMapRef.current = nextMap
+    setItems(nextItems)
+  }, [])
+
   const handleRefresh = useCallback(async () => {
     setRefreshing(true)
     try {
@@ -98,18 +148,19 @@ export function CtvOrderNotesTab({ activeTheme, onSessionExpired }: CtvOrderNote
       }
       const json = await res.json().catch(() => ({}))
       if (res.ok && json.success) {
-        setItems(json.items || [])
+        syncNotesSnapshot(json.items || [])
       }
     } catch {
       // Ignore transient network glitches
     } finally {
       setRefreshing(false)
     }
-  }, [onSessionExpired])
+  }, [onSessionExpired, syncNotesSnapshot])
 
   useEffect(() => {
+    ensureAudioUnlocked()
     let cancelled = false
-    void (async () => {
+    const runFetch = async () => {
       try {
         const res = await fetch(`/api/ctv/notes?t=${Date.now()}`, { cache: "no-store" })
         if (cancelled) return
@@ -119,19 +170,25 @@ export function CtvOrderNotesTab({ activeTheme, onSessionExpired }: CtvOrderNote
         }
         const json = await res.json().catch(() => ({}))
         if (!cancelled && res.ok && json.success) {
-          setItems(json.items || [])
+          syncNotesSnapshot(json.items || [])
         }
       } catch {
         // Ignore transient network glitches
       } finally {
         if (!cancelled) setLoading(false)
       }
-    })()
+    }
+
+    void runFetch()
+    const timer = setInterval(() => {
+      void runFetch()
+    }, 10000)
 
     return () => {
       cancelled = true
+      clearInterval(timer)
     }
-  }, [onSessionExpired])
+  }, [onSessionExpired, syncNotesSnapshot])
 
   const summary = useMemo(() => {
     const dayItems = items.filter((i) => i.noteDate === selectedDate)
@@ -206,7 +263,14 @@ export function CtvOrderNotesTab({ activeTheme, onSessionExpired }: CtvOrderNote
         return
       }
 
-      setItems((prev) => [json.item, ...prev])
+      setItems((prev) => {
+        const next = [json.item, ...prev]
+        const nextMap = new Map<string, string>()
+        for (const it of next) nextMap.set(it.id, it.status)
+        statusMapRef.current = nextMap
+        return next
+      })
+      playNotificationSound("ktv_chat")
       changeSelectedDate(json.item.noteDate)
       setCustomerName("")
       setContent("")
@@ -614,13 +678,19 @@ export function CtvOrderNotesTab({ activeTheme, onSessionExpired }: CtvOrderNote
                       <span className="font-bold text-xs sm:text-sm text-white">
                         {item.customerName}
                       </span>
-                      <span className="text-[10.5px] font-mono px-1.5 py-0.5 rounded bg-white/10 text-white/75">
-                        {formatDateVi(item.noteDate)}
+                      <span
+                        className="text-[10.5px] font-mono px-1.5 py-0.5 rounded bg-white/10 text-white/75"
+                        title={`Nhập lúc ${new Date(item.createdAt).toLocaleString("vi-VN")}`}
+                      >
+                        {formatTimeHmS(item.createdAt)} · {formatDateVi(item.noteDate)}
                       </span>
                       {isSettled ? (
                         <span className="inline-flex items-center gap-1 text-[10.5px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                           <CheckCircle2 className="size-3" />
-                          Admin đã nhận
+                          <span>
+                            Admin đã nhận
+                            {item.settledAt ? ` (${formatTimeAndDay(item.settledAt)})` : ""}
+                          </span>
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 text-[10.5px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">

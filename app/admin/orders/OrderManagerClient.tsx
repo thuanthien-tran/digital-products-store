@@ -6,6 +6,7 @@ import { formatPrice } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/hooks/use-toast"
+import { playAdminAlertSound } from "@/lib/sound-notify"
 import {
   Search,
   ExternalLink,
@@ -567,6 +568,7 @@ export function OrderManagerClient({
       }
 
       const savedDate = createManualModal.orderDate || selectedDate
+      playAdminAlertSound()
       toast({
         title: "Tạo đơn thành công",
         description: json.message || "Đã ghi nhận đơn hàng và cộng vào doanh thu!",

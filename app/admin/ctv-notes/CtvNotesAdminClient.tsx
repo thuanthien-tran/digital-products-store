@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useMemo } from "react"
+import React, { useState, useMemo, useEffect, useRef, useCallback } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
@@ -26,6 +26,8 @@ import { Input } from "@/components/ui/input"
 import { useToast } from "@/hooks/use-toast"
 import { formatPrice } from "@/lib/utils"
 import type { CtvOrderNoteDto } from "@/lib/ctv-notes"
+import { ensureAudioUnlocked, playAdminAlertSound } from "@/lib/sound-notify"
+import { ChatSoundToggle } from "@/components/chat/SoundControls"
 
 function getLocalDateKey(d = new Date()): string {
   const y = d.getFullYear()
@@ -46,6 +48,29 @@ function formatDateVi(dateKey: string): string {
   return dateKey.split("-").reverse().join("/")
 }
 
+function formatTimeHmS(iso: string): string {
+  try {
+    return new Date(iso).toLocaleTimeString("vi-VN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    })
+  } catch {
+    return ""
+  }
+}
+
+function formatTimeAndDay(iso: string): string {
+  try {
+    const d = new Date(iso)
+    const t = d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })
+    const day = d.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" })
+    return `${t} · ${day}`
+  } catch {
+    return ""
+  }
+}
+
 export function CtvNotesAdminClient({ initialItems }: { initialItems: CtvOrderNoteDto[] }) {
   const router = useRouter()
   const { toast } = useToast()
@@ -60,6 +85,47 @@ export function CtvNotesAdminClient({ initialItems }: { initialItems: CtvOrderNo
   const [search, setSearch] = useState("")
   const [refreshing, setRefreshing] = useState(false)
   const [togglingId, setTogglingId] = useState<string | null>(null)
+  const knownIdsRef = useRef<Set<string>>(new Set(initialItems.map((i) => i.id)))
+
+  const applySyncedItems = useCallback(
+    (nextItems: CtvOrderNoteDto[], notifyIfNew: boolean) => {
+      const newlyArrived = nextItems.filter((i) => !knownIdsRef.current.has(i.id))
+      knownIdsRef.current = new Set(nextItems.map((i) => i.id))
+      setItems(nextItems)
+
+      if (notifyIfNew && newlyArrived.length > 0) {
+        playAdminAlertSound()
+        const first = newlyArrived[0]
+        toast({
+          title:
+            newlyArrived.length === 1
+              ? "📝 KTV vừa nhập đơn mới"
+              : `📝 KTV vừa nhập ${newlyArrived.length} đơn mới`,
+          description: `${first.customerName} — ${first.content} (${formatPrice(first.amount)})`,
+        })
+      }
+    },
+    [toast]
+  )
+
+  useEffect(() => {
+    ensureAudioUnlocked()
+    const timer = setInterval(() => {
+      void (async () => {
+        try {
+          const res = await fetch(`/api/admin/ctv-notes?t=${Date.now()}`, { cache: "no-store" })
+          const json = await res.json().catch(() => ({}))
+          if (res.ok && json.success && Array.isArray(json.items)) {
+            applySyncedItems(json.items, true)
+          }
+        } catch {
+          // silent background sync
+        }
+      })()
+    }, 6000)
+
+    return () => clearInterval(timer)
+  }, [applySyncedItems])
 
   // Create / Edit Modal
   const [formModal, setFormModal] = useState<{
@@ -105,7 +171,7 @@ export function CtvNotesAdminClient({ initialItems }: { initialItems: CtvOrderNo
       const res = await fetch(`/api/admin/ctv-notes?t=${Date.now()}`, { cache: "no-store" })
       const json = await res.json().catch(() => ({}))
       if (res.ok && json.success) {
-        setItems(json.items || [])
+        applySyncedItems(json.items || [], false)
         toast({
           title: "Đã đồng bộ sổ CTV",
           description: `Hiện có ${json.items?.length || 0} bản ghi.`,
@@ -232,8 +298,10 @@ export function CtvNotesAdminClient({ initialItems }: { initialItems: CtvOrderNo
         setItems((prev) => prev.map((x) => (x.id === formModal.targetId ? json.item : x)))
         toast({ title: "Đã cập nhật ghi chú CTV" })
       } else {
+        knownIdsRef.current.add(json.item.id)
         setItems((prev) => [json.item, ...prev])
         setSelectedDate(json.item.noteDate)
+        playAdminAlertSound()
         toast({
           title: "Đã thêm ghi chú CTV",
           description: `${json.item.customerName} — ${formatPrice(json.item.amount)}`,
@@ -268,6 +336,9 @@ export function CtvNotesAdminClient({ initialItems }: { initialItems: CtvOrderNo
       const json = await res.json().catch(() => ({}))
       if (res.ok && json.success) {
         setItems((prev) => prev.map((x) => (x.id === item.id ? json.item : x)))
+        if (nextStatus === "settled") {
+          playAdminAlertSound()
+        }
         toast({
           title:
             nextStatus === "settled"
@@ -317,6 +388,9 @@ export function CtvNotesAdminClient({ initialItems }: { initialItems: CtvOrderNo
               : x
           )
         )
+        if (targetStatus === "settled") {
+          playAdminAlertSound()
+        }
         toast({
           title: "Thành công",
           description: json.message,
@@ -382,6 +456,8 @@ export function CtvNotesAdminClient({ initialItems }: { initialItems: CtvOrderNo
         </div>
 
         <div className="flex flex-wrap items-center gap-2 shrink-0 self-start sm:self-auto">
+          <ChatSoundToggle viewer="admin" />
+
           <Button
             type="button"
             variant="outline"
@@ -626,7 +702,7 @@ export function CtvNotesAdminClient({ initialItems }: { initialItems: CtvOrderNo
             <table className="w-full text-xs text-left">
               <thead className="border-b border-border bg-secondary/40 text-muted-foreground">
                 <tr>
-                  <th className="py-3 px-4 font-semibold whitespace-nowrap">Ngày</th>
+                  <th className="py-3 px-4 font-semibold whitespace-nowrap">Ngày / Giờ nhập</th>
                   <th className="py-3 px-4 font-semibold">Tên khách</th>
                   <th className="py-3 px-4 font-semibold">Nội dung đơn &amp; Ghi chú</th>
                   <th className="py-3 px-4 font-semibold text-right whitespace-nowrap">Số tiền</th>
@@ -640,7 +716,12 @@ export function CtvNotesAdminClient({ initialItems }: { initialItems: CtvOrderNo
                   return (
                     <tr key={item.id} className="hover:bg-secondary/25">
                       <td className="py-3 px-4 font-mono text-muted-foreground whitespace-nowrap">
-                        {formatDateVi(item.noteDate)}
+                        <span className="font-semibold text-foreground/90 block">
+                          {formatDateVi(item.noteDate)}
+                        </span>
+                        <span className="text-[11px] text-muted-foreground block">
+                          {formatTimeHmS(item.createdAt)}
+                        </span>
                       </td>
                       <td className="py-3 px-4 font-bold text-foreground whitespace-nowrap">
                         {item.customerName}
@@ -658,10 +739,17 @@ export function CtvNotesAdminClient({ initialItems }: { initialItems: CtvOrderNo
                       </td>
                       <td className="py-3 px-4 whitespace-nowrap">
                         {isSettled ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                            <CheckCircle2 className="size-3" />
-                            Đã đối soát
-                          </span>
+                          <div className="space-y-0.5">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                              <CheckCircle2 className="size-3" />
+                              Đã đối soát
+                            </span>
+                            {item.settledAt && (
+                              <span className="text-[10.5px] font-mono text-emerald-300/75 block pl-1">
+                                Lúc {formatTimeAndDay(item.settledAt)}
+                              </span>
+                            )}
+                          </div>
                         ) : (
                           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
                             <Clock className="size-3" />

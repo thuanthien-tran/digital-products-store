@@ -56,6 +56,19 @@ export async function POST(req: Request) {
       },
     })
 
+    // Surface new CTV order in Admin notification bell across all /admin pages
+    try {
+      await prisma.adminNotification.create({
+        data: {
+          type: "ctv_note_created",
+          title: `📝 Đơn CTV mới: ${created.customerName} (${created.amount.toLocaleString("vi-VN")}đ)`,
+          message: `${created.content} · Ngày ${created.noteDate.split("-").reverse().join("/")}`,
+          link: "/admin/ctv-notes",
+          metadata: JSON.stringify({ ctvNoteId: created.id }),
+        },
+      })
+    } catch {}
+
     return NextResponse.json({
       success: true,
       item: serializeCtvNote(created),

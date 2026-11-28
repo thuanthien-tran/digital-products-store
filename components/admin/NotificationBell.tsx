@@ -60,7 +60,7 @@ export function NotificationBell() {
     const initTimer = setTimeout(() => {
       void fetchNotifications()
     }, 0)
-    const interval = setInterval(fetchNotifications, 30000)
+    const interval = setInterval(fetchNotifications, 15000)
     return () => {
       clearTimeout(initTimer)
       clearInterval(interval)
@@ -121,6 +121,8 @@ export function NotificationBell() {
   const getIcon = (type: string) => {
     switch (type) {
       case "new_product":
+      case "buff_order_paid":
+      case "ctv_note_created":
         return <Sparkles className="size-4 text-emerald-400 shrink-0" />
       case "price_change":
         return <TrendingUp className="size-4 text-amber-400 shrink-0" />
