@@ -1,13 +1,15 @@
 "use client"
 
-import React, { useState, useEffect, useCallback } from "react"
+import React, { useState, useEffect, useCallback, useRef } from "react"
 import { createPortal } from "react-dom"
 import { MessageCircle, X } from "lucide-react"
-import { KtvChatThread } from "@/components/chat/KtvChatThread"
+import { ChatSoundToggle, KtvChatThread } from "@/components/chat/KtvChatThread"
+import { ensureAudioUnlocked, playChatMessageSound } from "@/lib/sound-notify"
 
 export function AdminKtvChatButton() {
   const [isOpen, setIsOpen] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
+  const prevUnreadRef = useRef<number | null>(null)
 
   const pollUnread = useCallback(async () => {
     try {
@@ -17,11 +19,20 @@ export function AdminKtvChatButton() {
       if (!res.ok) return
       const json = await res.json().catch(() => ({}))
       if (json.success) {
-        setUnreadCount(json.unreadCount || 0)
+        const nextUnread = Number(json.unreadCount || 0)
+        if (prevUnreadRef.current !== null && nextUnread > prevUnreadRef.current) {
+          playChatMessageSound("admin")
+        }
+        prevUnreadRef.current = nextUnread
+        setUnreadCount(nextUnread)
       }
     } catch {
       // silent
     }
+  }, [])
+
+  useEffect(() => {
+    ensureAudioUnlocked()
   }, [])
 
   useEffect(() => {
@@ -41,6 +52,7 @@ export function AdminKtvChatButton() {
   useEffect(() => {
     const handleOpenEvent = () => {
       setIsOpen(true)
+      prevUnreadRef.current = 0
       setUnreadCount(0)
     }
     window.addEventListener("capygo-open-ktv-chat", handleOpenEvent)
@@ -53,6 +65,7 @@ export function AdminKtvChatButton() {
         type="button"
         onClick={() => {
           setIsOpen(true)
+          prevUnreadRef.current = 0
           setUnreadCount(0)
         }}
         className="relative inline-flex items-center gap-1.5 h-9 px-3 rounded-xl border border-border bg-card hover:bg-secondary text-xs font-semibold text-foreground transition-btn cursor-pointer"
@@ -96,14 +109,17 @@ export function AdminKtvChatButton() {
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => setIsOpen(false)}
-                  className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer"
-                  aria-label="Đóng khung chat KTV"
-                >
-                  <X className="size-4" />
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <ChatSoundToggle viewer="admin" />
+                  <button
+                    type="button"
+                    onClick={() => setIsOpen(false)}
+                    className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer"
+                    aria-label="Đóng khung chat KTV"
+                  >
+                    <X className="size-4" />
+                  </button>
+                </div>
               </div>
 
               <div className="flex-1 min-h-0">

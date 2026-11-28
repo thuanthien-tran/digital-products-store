@@ -12,8 +12,66 @@ import {
   Loader2,
   AlertCircle,
   CheckCheck,
+  Volume2,
+  VolumeX,
 } from "lucide-react"
 import type { ChatSender, KtvChatMessageDto } from "@/lib/ktv-chat"
+import {
+  ensureAudioUnlocked,
+  isNotificationSoundMuted,
+  playChatMessageSound,
+  setNotificationSoundMuted,
+} from "@/lib/sound-notify"
+
+export function ChatSoundToggle({
+  viewer,
+  className = "",
+}: {
+  viewer: ChatSender
+  className?: string
+}) {
+  const [muted, setMuted] = useState(false)
+
+  useEffect(() => {
+    ensureAudioUnlocked()
+    const t = setTimeout(() => {
+      setMuted(isNotificationSoundMuted())
+    }, 0)
+    const onStorageSync = () => setMuted(isNotificationSoundMuted())
+    window.addEventListener("capygo-sound-pref-changed", onStorageSync)
+    return () => {
+      clearTimeout(t)
+      window.removeEventListener("capygo-sound-pref-changed", onStorageSync)
+    }
+  }, [])
+
+  const handleToggle = () => {
+    const nextMuted = !muted
+    setMuted(nextMuted)
+    setNotificationSoundMuted(nextMuted)
+    window.dispatchEvent(new Event("capygo-sound-pref-changed"))
+    if (!nextMuted) {
+      playChatMessageSound(viewer, true)
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleToggle}
+      className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${
+        muted
+          ? "text-zinc-400 hover:text-zinc-200 hover:bg-white/10"
+          : "text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/25"
+      } ${className}`}
+      title={muted ? "Âm thanh thông báo đang tắt — bấm để bật" : "Âm thanh thông báo đang bật — bấm để tắt"}
+      aria-label={muted ? "Bật âm thanh thông báo" : "Tắt âm thanh thông báo"}
+    >
+      {muted ? <VolumeX className="size-3.5" /> : <Volume2 className="size-3.5" />}
+      <span className="hidden sm:inline">{muted ? "Tắt tiếng" : "Chuông"}</span>
+    </button>
+  )
+}
 
 interface KtvChatThreadProps {
   viewer: ChatSender
@@ -64,6 +122,8 @@ export function KtvChatThread({
   const listEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const lastCountRef = useRef(0)
+  const initializedRef = useRef(false)
+  const lastIncomingIdRef = useRef<string | null>(null)
 
   const scrollToBottom = useCallback(() => {
     listEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -79,6 +139,16 @@ export function KtvChatThread({
       const json = await res.json().catch(() => ({}))
       if (res.ok && json.success) {
         const next: KtvChatMessageDto[] = Array.isArray(json.messages) ? json.messages : []
+        const latestIncoming = [...next].reverse().find((m) => m.sender !== viewer) || null
+
+        if (!initializedRef.current) {
+          initializedRef.current = true
+          lastIncomingIdRef.current = latestIncoming?.id || null
+        } else if (latestIncoming && latestIncoming.id !== lastIncomingIdRef.current) {
+          lastIncomingIdRef.current = latestIncoming.id
+          playChatMessageSound(viewer)
+        }
+
         setMessages(next)
         onUnreadUpdate?.(json.unreadCount || 0)
         if (next.length > lastCountRef.current) {
@@ -91,7 +161,7 @@ export function KtvChatThread({
     } finally {
       setLoading(false)
     }
-  }, [fetchUrl, onUnauthorized, onUnreadUpdate, scrollToBottom])
+  }, [fetchUrl, onUnauthorized, onUnreadUpdate, scrollToBottom, viewer])
 
   useEffect(() => {
     const initTimer = setTimeout(() => {

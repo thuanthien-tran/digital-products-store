@@ -1,10 +1,11 @@
 "use client"
 
-import React, { useState, useEffect, useCallback } from "react"
+import React, { useState, useEffect, useCallback, useRef } from "react"
 import { createPortal } from "react-dom"
 import { MessageCircle, X } from "lucide-react"
 import type { ThemeConfig } from "@/lib/ktv"
-import { KtvChatThread } from "@/components/chat/KtvChatThread"
+import { ChatSoundToggle, KtvChatThread } from "@/components/chat/KtvChatThread"
+import { ensureAudioUnlocked, playChatMessageSound } from "@/lib/sound-notify"
 
 interface KtvChatWidgetProps {
   activeTheme: ThemeConfig
@@ -19,6 +20,7 @@ export function KtvChatWidget({
 }: KtvChatWidgetProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
+  const prevUnreadRef = useRef<number | null>(null)
 
   const accent = activeTheme.accentColor || "#E6A66F"
 
@@ -31,12 +33,21 @@ export function KtvChatWidget({
       }
       const json = await res.json().catch(() => ({}))
       if (res.ok && json.success) {
-        setUnreadCount(json.unreadCount || 0)
+        const nextUnread = Number(json.unreadCount || 0)
+        if (prevUnreadRef.current !== null && nextUnread > prevUnreadRef.current) {
+          playChatMessageSound("ktv")
+        }
+        prevUnreadRef.current = nextUnread
+        setUnreadCount(nextUnread)
       }
     } catch {
       // silent
     }
   }, [onSessionExpired])
+
+  useEffect(() => {
+    ensureAudioUnlocked()
+  }, [])
 
   useEffect(() => {
     if (isOpen) return
@@ -55,6 +66,7 @@ export function KtvChatWidget({
   const handleOpen = () => {
     onActivity()
     setIsOpen(true)
+    prevUnreadRef.current = 0
     setUnreadCount(0)
   }
 
@@ -104,14 +116,17 @@ export function KtvChatWidget({
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setIsOpen(false)}
-              className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 cursor-pointer"
-              aria-label="Thu gọn khung chat"
-            >
-              <X className="size-4" />
-            </button>
+            <div className="flex items-center gap-1.5">
+              <ChatSoundToggle viewer="ktv" />
+              <button
+                type="button"
+                onClick={() => setIsOpen(false)}
+                className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 cursor-pointer"
+                aria-label="Thu gọn khung chat"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
           </div>
 
           <div className="flex-1 min-h-0">

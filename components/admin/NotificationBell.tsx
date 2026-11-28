@@ -13,6 +13,7 @@ import {
   Filter,
 } from "lucide-react"
 import Link from "next/link"
+import { ensureAudioUnlocked, playAdminAlertSound } from "@/lib/sound-notify"
 
 interface NotificationItem {
   id: string
@@ -33,14 +34,20 @@ export function NotificationBell() {
   const [unreadCount, setUnreadCount] = useState(0)
   const [activeTab, setActiveTab] = useState<TabType>("all")
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const prevUnreadRef = useRef<number | null>(null)
 
   const fetchNotifications = async () => {
     try {
       const res = await fetch("/api/admin/notifications")
       if (res.ok) {
         const data = await res.json()
+        const nextUnread = Number(data.unreadCount || 0)
+        if (prevUnreadRef.current !== null && nextUnread > prevUnreadRef.current) {
+          playAdminAlertSound()
+        }
+        prevUnreadRef.current = nextUnread
         setNotifications(data.notifications || [])
-        setUnreadCount(data.unreadCount || 0)
+        setUnreadCount(nextUnread)
       }
     } catch {
       // silent
@@ -48,9 +55,15 @@ export function NotificationBell() {
   }
 
   useEffect(() => {
-    void fetchNotifications()
+    ensureAudioUnlocked()
+    const initTimer = setTimeout(() => {
+      void fetchNotifications()
+    }, 0)
     const interval = setInterval(fetchNotifications, 30000)
-    return () => clearInterval(interval)
+    return () => {
+      clearTimeout(initTimer)
+      clearInterval(interval)
+    }
   }, [])
 
   // Close dropdown when clicking outside
