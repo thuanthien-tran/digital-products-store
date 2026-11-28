@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useCallback } from "react"
+import { createPortal } from "react-dom"
 import { MessageCircle, X } from "lucide-react"
 import { KtvChatThread } from "@/components/chat/KtvChatThread"
 
@@ -66,57 +67,60 @@ export function AdminKtvChatButton() {
         )}
       </button>
 
-      {isOpen && (
-        <div className="fixed inset-0 z-50 flex justify-end">
-          <div
-            className="fixed inset-0 bg-black/60 backdrop-blur-xs"
-            onClick={() => setIsOpen(false)}
-            aria-hidden="true"
-          />
+      {isOpen &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div className="fixed inset-0 z-50 flex justify-end">
+            <div
+              className="fixed inset-0 bg-black/60 backdrop-blur-xs"
+              onClick={() => setIsOpen(false)}
+              aria-hidden="true"
+            />
 
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label="Chat với KTV"
-            className="relative z-10 w-full max-w-md h-full bg-zinc-950 border-l border-border shadow-2xl flex flex-col overflow-hidden"
-          >
-            <div className="flex items-center justify-between px-4 py-3.5 border-b border-border bg-card shrink-0">
-              <div className="flex items-center gap-2.5">
-                <span className="inline-flex size-8 items-center justify-center rounded-xl bg-primary/15 border border-primary/30 text-primary">
-                  <MessageCircle className="size-4" />
-                </span>
-                <div>
-                  <h2 className="text-sm font-bold text-foreground">Chat Trực Tiếp Với KTV</h2>
-                  <p className="text-[11px] text-muted-foreground">
-                    Đồng bộ tức thì sang màn hình /ktv · Hỗ trợ gửi ảnh (Ctrl+V)
-                  </p>
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label="Chat với KTV"
+              className="relative z-10 w-full max-w-md h-full bg-zinc-950 border-l border-border shadow-2xl flex flex-col overflow-hidden"
+            >
+              <div className="flex items-center justify-between px-4 py-3.5 border-b border-border bg-card shrink-0">
+                <div className="flex items-center gap-2.5">
+                  <span className="inline-flex size-8 items-center justify-center rounded-xl bg-primary/15 border border-primary/30 text-primary">
+                    <MessageCircle className="size-4" />
+                  </span>
+                  <div>
+                    <h2 className="text-sm font-bold text-foreground">Chat Trực Tiếp Với KTV</h2>
+                    <p className="text-[11px] text-muted-foreground">
+                      Đồng bộ tức thì sang màn hình /ktv · Hỗ trợ gửi ảnh (Ctrl+V)
+                    </p>
+                  </div>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsOpen(false)}
+                  className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer"
+                  aria-label="Đóng khung chat KTV"
+                >
+                  <X className="size-4" />
+                </button>
               </div>
 
-              <button
-                type="button"
-                onClick={() => setIsOpen(false)}
-                className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer"
-                aria-label="Đóng khung chat KTV"
-              >
-                <X className="size-4" />
-              </button>
+              <div className="flex-1 min-h-0">
+                <KtvChatThread
+                  viewer="admin"
+                  fetchUrl="/api/admin/ktv-chat"
+                  postUrl="/api/admin/ktv-chat"
+                  uploadUrl="/api/admin/ktv-chat/upload"
+                  deleteBaseUrl="/api/admin/ktv-chat"
+                  accentColor="#E6A66F"
+                  onUnreadUpdate={setUnreadCount}
+                />
+              </div>
             </div>
-
-            <div className="flex-1 min-h-0">
-              <KtvChatThread
-                viewer="admin"
-                fetchUrl="/api/admin/ktv-chat"
-                postUrl="/api/admin/ktv-chat"
-                uploadUrl="/api/admin/ktv-chat/upload"
-                deleteBaseUrl="/api/admin/ktv-chat"
-                accentColor="#E6A66F"
-                onUnreadUpdate={setUnreadCount}
-              />
-            </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body
+        )}
     </>
   )
 }

@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useRef, useCallback } from "react"
+import { createPortal } from "react-dom"
 import {
   Send,
   ImagePlus,
@@ -425,58 +426,64 @@ export function KtvChatThread({
       </form>
 
       {/* Lightbox Image Preview */}
-      {previewImageUrl && (
-        <div
-          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/90 p-4"
-          onClick={() => setPreviewImageUrl(null)}
-        >
-          <button
-            type="button"
+      {previewImageUrl &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[70] flex items-center justify-center bg-black/90 p-4"
             onClick={() => setPreviewImageUrl(null)}
-            className="absolute top-4 right-4 p-2 rounded-full bg-white/10 text-white hover:bg-white/20 cursor-pointer"
-            aria-label="Đóng ảnh"
           >
-            <X className="size-5" />
-          </button>
-          <img
-            src={previewImageUrl}
-            alt="Xem ảnh phóng to"
-            className="max-h-[90vh] max-w-[92vw] rounded-xl object-contain"
-            onClick={(e) => e.stopPropagation()}
-          />
-        </div>
-      )}
+            <button
+              type="button"
+              onClick={() => setPreviewImageUrl(null)}
+              className="absolute top-4 right-4 p-2 rounded-full bg-white/10 text-white hover:bg-white/20 cursor-pointer"
+              aria-label="Đóng ảnh"
+            >
+              <X className="size-5" />
+            </button>
+            <img
+              src={previewImageUrl}
+              alt="Xem ảnh phóng to"
+              className="max-h-[90vh] max-w-[92vw] rounded-xl object-contain"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>,
+          document.body
+        )}
 
       {/* Delete Message Confirmation */}
-      {deleteTarget && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-4">
-          <div className="w-full max-w-xs rounded-2xl border border-rose-500/40 bg-zinc-950 p-4 space-y-3 text-xs text-white shadow-2xl">
-            <h4 className="font-bold text-rose-300 flex items-center gap-1.5 text-sm">
-              <Trash2 className="size-4" />
-              <span>Xóa tin nhắn này?</span>
-            </h4>
-            <p className="text-zinc-400">Tin nhắn sẽ bị xóa khỏi đoạn chat của cả Admin và KTV.</p>
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/10">
-              <button
-                type="button"
-                disabled={deleting}
-                onClick={() => setDeleteTarget(null)}
-                className="px-3 py-1.5 rounded-lg border border-white/15 text-zinc-300 hover:bg-white/10 cursor-pointer"
-              >
-                Hủy
-              </button>
-              <button
-                type="button"
-                disabled={deleting}
-                onClick={handleConfirmDelete}
-                className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold cursor-pointer disabled:opacity-50"
-              >
-                {deleting ? "Đang xóa..." : "Xóa"}
-              </button>
+      {deleteTarget &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-4">
+            <div className="w-full max-w-xs rounded-2xl border border-rose-500/40 bg-zinc-950 p-4 space-y-3 text-xs text-white shadow-2xl">
+              <h4 className="font-bold text-rose-300 flex items-center gap-1.5 text-sm">
+                <Trash2 className="size-4" />
+                <span>Xóa tin nhắn này?</span>
+              </h4>
+              <p className="text-zinc-400">Tin nhắn sẽ bị xóa khỏi đoạn chat của cả Admin và KTV.</p>
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/10">
+                <button
+                  type="button"
+                  disabled={deleting}
+                  onClick={() => setDeleteTarget(null)}
+                  className="px-3 py-1.5 rounded-lg border border-white/15 text-zinc-300 hover:bg-white/10 cursor-pointer"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  disabled={deleting}
+                  onClick={handleConfirmDelete}
+                  className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold cursor-pointer disabled:opacity-50"
+                >
+                  {deleting ? "Đang xóa..." : "Xóa"}
+                </button>
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body
+        )}
     </div>
   )
 }

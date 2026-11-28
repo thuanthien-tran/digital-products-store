@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useCallback } from "react"
+import { createPortal } from "react-dom"
 import { MessageCircle, X } from "lucide-react"
 import type { ThemeConfig } from "@/lib/ktv"
 import { KtvChatThread } from "@/components/chat/KtvChatThread"
@@ -57,7 +58,9 @@ export function KtvChatWidget({
     setUnreadCount(0)
   }
 
-  return (
+  if (typeof document === "undefined") return null
+
+  return createPortal(
     <>
       {/* Floating launcher button */}
       {!isOpen && (
@@ -125,6 +128,7 @@ export function KtvChatWidget({
           </div>
         </div>
       )}
-    </>
+    </>,
+    document.body
   )
 }
