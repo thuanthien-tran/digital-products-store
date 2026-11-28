@@ -191,7 +191,7 @@ export function NotificationBell() {
             </div>
 
             <div className="flex items-center gap-1.5">
-              <ChatSoundToggle viewer="admin" />
+              <ChatSoundToggle viewer="admin" channel="order" label="Chuông đơn" />
               <button
                 type="button"
                 onClick={markAllAsRead}

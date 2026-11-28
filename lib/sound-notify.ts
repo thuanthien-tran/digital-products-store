@@ -1,6 +1,7 @@
 "use client"
 
 export type SoundPresetId = "chime" | "ding" | "pop" | "marimba" | "urgent" | "custom"
+export type SoundChannel = "chat" | "order"
 
 export interface SoundPresetMeta {
   id: SoundPresetId
@@ -11,13 +12,13 @@ export interface SoundPresetMeta {
 export const SOUND_PRESETS: SoundPresetMeta[] = [
   {
     id: "chime",
-    label: "Chuông pha lê (Mặc định)",
+    label: "Chuông pha lê",
     description: "2 nốt nhẹ nhàng, êm tai khi làm việc lâu",
   },
   {
     id: "ding",
     label: "Ting Ting (Thu ngân)",
-    description: "Âm thanh sắc gọn giống thông báo nhận tiền",
+    description: "Âm thanh sắc gọn giống thông báo nhận tiền / chốt đơn",
   },
   {
     id: "pop",
@@ -32,16 +33,16 @@ export const SOUND_PRESETS: SoundPresetMeta[] = [
   {
     id: "urgent",
     label: "Chuông dồn nổi bật",
-    description: "Kêu 2 nhịp liên tiếp để không bỏ sót tin quan trọng",
+    description: "Kêu 2 nhịp liên tiếp để không bỏ sót tin/đơn quan trọng",
   },
 ]
 
-const MUTE_KEY = "capygo_notify_sound_muted"
-const PRESET_KEY = "capygo_sound_preset"
-const VOLUME_KEY = "capygo_sound_volume"
-const CUSTOM_URL_KEY = "capygo_sound_custom_url"
-const CUSTOM_NAME_KEY = "capygo_sound_custom_name"
+const CHANNEL_STORAGE_KEYS: Record<SoundChannel, string> = {
+  chat: "capygo_sound_channel_chat_v1",
+  order: "capygo_sound_channel_order_v1",
+}
 
+const VALID_PRESETS: SoundPresetId[] = ["chime", "ding", "pop", "marimba", "urgent", "custom"]
 const SAFE_CUSTOM_SOUND_REGEX = /^\/api\/uploads\/sounds\/sound-[a-f0-9-]+\.(mp3|wav|ogg|m4a|webm)$/i
 
 export interface SoundPreferences {
@@ -50,6 +51,25 @@ export interface SoundPreferences {
   volume: number // 0.1 .. 1.0
   customUrl: string | null
   customName: string | null
+}
+
+function getDefaultPreferencesForChannel(channel: SoundChannel): SoundPreferences {
+  if (channel === "order") {
+    return {
+      muted: false,
+      preset: "ding",
+      volume: 0.85,
+      customUrl: null,
+      customName: null,
+    }
+  }
+  return {
+    muted: false,
+    preset: "chime",
+    volume: 0.75,
+    customUrl: null,
+    customName: null,
+  }
 }
 
 const globalForAudio = globalThis as unknown as {
@@ -86,81 +106,79 @@ export function ensureAudioUnlocked(): void {
   window.addEventListener("keydown", unlock, { passive: true })
 }
 
-export function getSoundPreferences(): SoundPreferences {
-  if (typeof window === "undefined") {
-    return {
-      muted: false,
-      preset: "chime",
-      volume: 0.75,
-      customUrl: null,
-      customName: null,
-    }
-  }
+function normalizeSoundPreferences(raw: Partial<SoundPreferences> | null, channel: SoundChannel): SoundPreferences {
+  const defaults = getDefaultPreferencesForChannel(channel)
+  if (!raw || typeof raw !== "object") return defaults
 
-  try {
-    const muted = localStorage.getItem(MUTE_KEY) === "1"
-    const rawPreset = localStorage.getItem(PRESET_KEY) as SoundPresetId | null
-    const validPresets: SoundPresetId[] = ["chime", "ding", "pop", "marimba", "urgent", "custom"]
-    const preset: SoundPresetId = rawPreset && validPresets.includes(rawPreset) ? rawPreset : "chime"
-    const rawVol = parseFloat(localStorage.getItem(VOLUME_KEY) || "0.75")
-    const volume = Number.isFinite(rawVol) ? Math.min(1, Math.max(0.1, rawVol)) : 0.75
-    const rawCustomUrl = localStorage.getItem(CUSTOM_URL_KEY)
-    const customUrl = rawCustomUrl && SAFE_CUSTOM_SOUND_REGEX.test(rawCustomUrl) ? rawCustomUrl : null
-    const customName = localStorage.getItem(CUSTOM_NAME_KEY) || null
+  const muted = typeof raw.muted === "boolean" ? raw.muted : defaults.muted
+  const rawPreset = raw.preset
+  const preset: SoundPresetId =
+    rawPreset && VALID_PRESETS.includes(rawPreset) ? rawPreset : defaults.preset
+  const rawVol = Number(raw.volume)
+  const volume = Number.isFinite(rawVol) ? Math.min(1, Math.max(0.1, rawVol)) : defaults.volume
+  const customUrl =
+    typeof raw.customUrl === "string" && SAFE_CUSTOM_SOUND_REGEX.test(raw.customUrl)
+      ? raw.customUrl
+      : null
+  const customName = typeof raw.customName === "string" && raw.customName ? raw.customName : null
 
-    return {
-      muted,
-      preset: preset === "custom" && !customUrl ? "chime" : preset,
-      volume,
-      customUrl,
-      customName,
-    }
-  } catch {
-    return {
-      muted: false,
-      preset: "chime",
-      volume: 0.75,
-      customUrl: null,
-      customName: null,
-    }
+  return {
+    muted,
+    preset: preset === "custom" && !customUrl ? defaults.preset : preset,
+    volume,
+    customUrl,
+    customName,
   }
 }
 
-export function saveSoundPreferences(patch: Partial<SoundPreferences>): SoundPreferences {
-  const current = getSoundPreferences()
-  const next: SoundPreferences = {
-    ...current,
-    ...patch,
+export function getChannelSoundPreferences(channel: SoundChannel): SoundPreferences {
+  const defaults = getDefaultPreferencesForChannel(channel)
+  if (typeof window === "undefined") return defaults
+
+  try {
+    const rawJson = localStorage.getItem(CHANNEL_STORAGE_KEYS[channel])
+    if (rawJson) {
+      return normalizeSoundPreferences(JSON.parse(rawJson) as Partial<SoundPreferences>, channel)
+    }
+
+    // One-time legacy migration into the chat channel if user previously saved a sound before separation
+    if (channel === "chat") {
+      const legacyPreset = localStorage.getItem("capygo_sound_preset") as SoundPresetId | null
+      const legacyCustomUrl = localStorage.getItem("capygo_sound_custom_url")
+      if (legacyPreset || legacyCustomUrl) {
+        return normalizeSoundPreferences(
+          {
+            muted: localStorage.getItem("capygo_notify_sound_muted") === "1",
+            preset: legacyPreset || defaults.preset,
+            volume: parseFloat(localStorage.getItem("capygo_sound_volume") || "0.75"),
+            customUrl: legacyCustomUrl,
+            customName: localStorage.getItem("capygo_sound_custom_name"),
+          },
+          channel
+        )
+      }
+    }
+    return defaults
+  } catch {
+    return defaults
   }
+}
+
+export function saveChannelSoundPreferences(
+  channel: SoundChannel,
+  patch: Partial<SoundPreferences>
+): SoundPreferences {
+  const current = getChannelSoundPreferences(channel)
+  const next = normalizeSoundPreferences({ ...current, ...patch }, channel)
 
   if (typeof window !== "undefined") {
     try {
-      localStorage.setItem(MUTE_KEY, next.muted ? "1" : "0")
-      localStorage.setItem(PRESET_KEY, next.preset)
-      localStorage.setItem(VOLUME_KEY, String(Math.min(1, Math.max(0.1, next.volume))))
-      if (next.customUrl && SAFE_CUSTOM_SOUND_REGEX.test(next.customUrl)) {
-        localStorage.setItem(CUSTOM_URL_KEY, next.customUrl)
-      } else {
-        localStorage.removeItem(CUSTOM_URL_KEY)
-      }
-      if (next.customName) {
-        localStorage.setItem(CUSTOM_NAME_KEY, next.customName)
-      } else {
-        localStorage.removeItem(CUSTOM_NAME_KEY)
-      }
+      localStorage.setItem(CHANNEL_STORAGE_KEYS[channel], JSON.stringify(next))
       window.dispatchEvent(new Event("capygo-sound-pref-changed"))
     } catch {}
   }
 
   return next
-}
-
-export function isNotificationSoundMuted(): boolean {
-  return getSoundPreferences().muted
-}
-
-export function setNotificationSoundMuted(muted: boolean): void {
-  saveSoundPreferences({ muted })
 }
 
 function playToneSequence(
@@ -253,21 +271,23 @@ function playSynthPreset(preset: Exclude<SoundPresetId, "custom">, volume: numbe
   }
 }
 
-export function playNotificationSound(
-  role: "admin_chat" | "ktv_chat" | "admin_alert",
+export function playSoundForChannel(
+  channel: SoundChannel,
   override?: {
+    viewer?: "admin" | "ktv"
     preset?: SoundPresetId
     customUrl?: string | null
     volume?: number
     force?: boolean
   }
 ): void {
-  const prefs = getSoundPreferences()
+  const prefs = getChannelSoundPreferences(channel)
   if (!override?.force && prefs.muted) return
 
   const preset = override?.preset || prefs.preset
   const volume = override?.volume ?? prefs.volume
   const customUrl = override?.customUrl !== undefined ? override.customUrl : prefs.customUrl
+  const isKtv = override?.viewer === "ktv"
 
   if (preset === "custom" && customUrl && SAFE_CUSTOM_SOUND_REGEX.test(customUrl)) {
     try {
@@ -279,29 +299,45 @@ export function playNotificationSound(
       audio.volume = Math.min(1, Math.max(0.1, volume))
       globalForAudio.__capygoActiveAudio = audio
       void audio.play().catch(() => {
-        playSynthPreset("chime", volume, role === "ktv_chat")
+        playSynthPreset(channel === "order" ? "ding" : "chime", volume, isKtv)
       })
       return
     } catch {
-      // Fallback to default synth chime
+      // Fallback to built-in synth preset
     }
   }
 
   const synthId: Exclude<SoundPresetId, "custom"> =
-    preset === "custom" ? "chime" : preset
+    preset === "custom" ? (channel === "order" ? "ding" : "chime") : preset
 
-  if (role === "admin_alert" && synthId === "chime") {
-    playSynthPreset("marimba", volume, false)
-    return
-  }
-
-  playSynthPreset(synthId, volume, role === "ktv_chat")
+  playSynthPreset(synthId, volume, isKtv)
 }
 
 export function playChatMessageSound(viewer: "admin" | "ktv", force = false): void {
-  playNotificationSound(viewer === "admin" ? "admin_chat" : "ktv_chat", { force })
+  playSoundForChannel("chat", { viewer, force })
 }
 
-export function playAdminAlertSound(): void {
-  playNotificationSound("admin_alert")
+export function playOrderSound(viewer: "admin" | "ktv" = "admin", force = false): void {
+  playSoundForChannel("order", { viewer, force })
+}
+
+export function playAdminAlertSound(force = false): void {
+  playSoundForChannel("order", { viewer: "admin", force })
+}
+
+export function playNotificationSound(
+  role: "admin_chat" | "ktv_chat" | "admin_alert" | "ktv_order",
+  override?: {
+    preset?: SoundPresetId
+    customUrl?: string | null
+    volume?: number
+    force?: boolean
+  }
+): void {
+  const channel: SoundChannel =
+    role === "admin_alert" || role === "ktv_order" ? "order" : "chat"
+  const viewer: "admin" | "ktv" =
+    role === "ktv_chat" || role === "ktv_order" ? "ktv" : "admin"
+
+  playSoundForChannel(channel, { ...override, viewer })
 }

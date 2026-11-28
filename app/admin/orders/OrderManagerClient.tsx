@@ -6,7 +6,8 @@ import { formatPrice } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/hooks/use-toast"
-import { playAdminAlertSound } from "@/lib/sound-notify"
+import { playOrderSound } from "@/lib/sound-notify"
+import { ChatSoundToggle } from "@/components/chat/SoundControls"
 import {
   Search,
   ExternalLink,
@@ -475,6 +476,7 @@ export function OrderManagerClient({
         throw new Error(data.error || "Ghi nhận thanh toán thất bại")
       }
 
+      playOrderSound("admin")
       toast({ title: "Ghi nhận thành công", description: `Đã cập nhật đơn #${settleModal.order.code}`, variant: "default" })
       setSettleModal((prev) => ({ ...prev, isOpen: false, isSubmitting: false }))
       router.refresh()
@@ -568,7 +570,7 @@ export function OrderManagerClient({
       }
 
       const savedDate = createManualModal.orderDate || selectedDate
-      playAdminAlertSound()
+      playOrderSound("admin")
       toast({
         title: "Tạo đơn thành công",
         description: json.message || "Đã ghi nhận đơn hàng và cộng vào doanh thu!",
@@ -930,6 +932,8 @@ export function OrderManagerClient({
               <span>{cleaningTests ? "Đang xóa..." : "Xóa đơn test"}</span>
             </Button>
           )}
+
+          <ChatSoundToggle viewer="admin" channel="order" label="Chuông đơn" />
         </div>
 
         {activeView === "orders" ? (

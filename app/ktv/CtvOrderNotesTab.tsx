@@ -19,7 +19,8 @@ import {
 } from "lucide-react"
 import type { ThemeConfig } from "@/lib/ktv"
 import type { CtvOrderNoteDto } from "@/lib/ctv-notes"
-import { ensureAudioUnlocked, playNotificationSound } from "@/lib/sound-notify"
+import { ensureAudioUnlocked, playOrderSound } from "@/lib/sound-notify"
+import { ChatSoundToggle } from "@/components/chat/SoundControls"
 
 function getLocalDateKey(d = new Date()): string {
   const y = d.getFullYear()
@@ -125,7 +126,7 @@ export function CtvOrderNotesTab({ activeTheme, onSessionExpired }: CtvOrderNote
         }
       }
       if (newlySettledCustomer) {
-        playNotificationSound("ktv_chat")
+        playOrderSound("ktv")
         setSuccessBanner(`Admin vừa xác nhận đã nhận tiền đơn "${newlySettledCustomer}"`)
         setTimeout(() => setSuccessBanner(null), 5000)
       }
@@ -270,7 +271,7 @@ export function CtvOrderNotesTab({ activeTheme, onSessionExpired }: CtvOrderNote
         statusMapRef.current = nextMap
         return next
       })
-      playNotificationSound("ktv_chat")
+      playOrderSound("ktv")
       changeSelectedDate(json.item.noteDate)
       setCustomerName("")
       setContent("")
@@ -437,15 +438,18 @@ export function CtvOrderNotesTab({ activeTheme, onSessionExpired }: CtvOrderNote
             </button>
           </div>
 
-          <button
-            type="button"
-            onClick={() => void handleRefresh()}
-            disabled={refreshing}
-            className="h-8 px-2.5 rounded-lg border border-white/15 bg-white/5 hover:bg-white/10 text-[11px] font-semibold flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-          >
-            <RotateCw className={`size-3.5 ${refreshing ? "animate-spin" : ""}`} style={{ color: accent }} />
-            <span>Làm mới</span>
-          </button>
+          <div className="flex items-center gap-1.5">
+            <ChatSoundToggle viewer="ktv" channel="order" label="Chuông đơn" />
+            <button
+              type="button"
+              onClick={() => void handleRefresh()}
+              disabled={refreshing}
+              className="h-8 px-2.5 rounded-lg border border-white/15 bg-white/5 hover:bg-white/10 text-[11px] font-semibold flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            >
+              <RotateCw className={`size-3.5 ${refreshing ? "animate-spin" : ""}`} style={{ color: accent }} />
+              <span>Làm mới</span>
+            </button>
+          </div>
         </div>
 
         {/* 3 Summary Stat Boxes */}

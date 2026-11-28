@@ -456,7 +456,7 @@ export function CtvNotesAdminClient({ initialItems }: { initialItems: CtvOrderNo
         </div>
 
         <div className="flex flex-wrap items-center gap-2 shrink-0 self-start sm:self-auto">
-          <ChatSoundToggle viewer="admin" />
+          <ChatSoundToggle viewer="admin" channel="order" label="Chuông đơn" />
 
           <Button
             type="button"
