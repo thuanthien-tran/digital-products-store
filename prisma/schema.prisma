@@ -462,3 +462,19 @@ model TelegramConfig {
   webhookUrl        String?
   updatedAt         DateTime @default(now())
 }
+
+model CtvOrderNote {
+  id           String    @id @default(cuid())
+  noteDate     String    // Normalized YYYY-MM-DD (Vietnam date)
+  customerName String
+  content      String
+  amount       Int       // VND > 0
+  note         String?
+  status       String    @default("pending") // "pending" | "settled"
+  settledAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([noteDate])
+  @@index([status])
+}

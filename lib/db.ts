@@ -306,6 +306,30 @@ export async function ensureDatabaseSchema(): Promise<void> {
           )
         } catch {}
 
+        // Ensure CtvOrderNote table exists for independent CTV order & reconciliation ledger
+        try {
+          await prisma.$executeRawUnsafe(`
+            CREATE TABLE IF NOT EXISTS "CtvOrderNote" (
+              "id" TEXT NOT NULL PRIMARY KEY,
+              "noteDate" TEXT NOT NULL,
+              "customerName" TEXT NOT NULL,
+              "content" TEXT NOT NULL,
+              "amount" INTEGER NOT NULL,
+              "note" TEXT,
+              "status" TEXT NOT NULL DEFAULT 'pending',
+              "settledAt" DATETIME,
+              "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+          `)
+          await prisma.$executeRawUnsafe(
+            `CREATE INDEX IF NOT EXISTS "CtvOrderNote_noteDate_idx" ON "CtvOrderNote"("noteDate");`
+          )
+          await prisma.$executeRawUnsafe(
+            `CREATE INDEX IF NOT EXISTS "CtvOrderNote_status_idx" ON "CtvOrderNote"("status");`
+          )
+        } catch {}
+
         globalForPrisma.schemaEnsured = true
       } catch (err) {
         console.error('[AutoMigration] Failed to verify/migrate schema:', err)

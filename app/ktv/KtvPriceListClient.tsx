@@ -2,24 +2,25 @@
 
 import React, { useState, useEffect, useRef } from "react"
 import { 
-  Lock, 
   KeyRound, 
   RotateCw, 
-  Check, 
   LogOut, 
   ShieldCheck, 
-  Phone, 
-  AlertCircle
+  AlertCircle,
+  ClipboardList,
+  LayoutList,
 } from "lucide-react"
+import { CtvOrderNotesTab } from "./CtvOrderNotesTab"
 import { 
   KtvGroup, 
-  KtvItem, 
   KtvMeta, 
   KtvPriceListPayload, 
   ThemeConfig, 
   resolveTheme, 
   THEMES 
 } from "@/lib/ktv"
+
+const INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000 // 10 minutes
 
 interface KtvPriceListClientProps {
   initialAuth: boolean
@@ -149,6 +150,7 @@ function AmbientBackground({ theme }: { theme: ThemeConfig }) {
 
 export function KtvPriceListClient({ initialAuth, initialData }: KtvPriceListClientProps) {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(initialAuth)
+  const [activePortalTab, setActivePortalTab] = useState<"menu" | "notes">("menu")
   const [pinInput, setPinInput] = useState("")
   const [pinError, setPinError] = useState("")
   const [isSubmittingPin, setIsSubmittingPin] = useState(false)
@@ -160,9 +162,7 @@ export function KtvPriceListClient({ initialAuth, initialData }: KtvPriceListCli
   const [isRefreshing, setIsRefreshing] = useState(false)
 
   const pinInputRef = useRef<HTMLInputElement>(null)
-  const lastActiveRef = useRef<number>(Date.now())
-
-  const INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000 // 10 minutes
+  const lastActiveRef = useRef<number>(0)
 
   // Current active theme resolved dynamically
   const activeTheme: ThemeConfig = meta.theme || resolveTheme(meta.selectedThemeId, meta.customColors)
@@ -205,8 +205,10 @@ export function KtvPriceListClient({ initialAuth, initialData }: KtvPriceListCli
       if (stored) {
         const parsed = parseInt(stored, 10)
         if (!isNaN(parsed) && Date.now() - parsed >= INACTIVITY_TIMEOUT_MS) {
-          void performLogout()
-          return
+          const timerId = setTimeout(() => {
+            void performLogout()
+          }, 0)
+          return () => clearTimeout(timerId)
         }
       }
     } catch {}
@@ -530,7 +532,50 @@ export function KtvPriceListClient({ initialAuth, initialData }: KtvPriceListCli
 
       {/* Main Container */}
       <main className="max-w-xl mx-auto px-4 pt-5 space-y-4 relative z-10">
-        {/* The Live Board Display (Exact Theme Colors & Styling) */}
+        {/* Portal Tab Switcher: Bảng giá | Sổ ghi đơn CTV */}
+        <div
+          className="grid grid-cols-2 gap-2 p-1.5 rounded-2xl border backdrop-blur-xl shadow-lg"
+          style={{
+            backgroundColor: `${activeTheme.containerBg}dd`,
+            borderColor: `${activeTheme.accentColor}30`,
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setActivePortalTab("menu")}
+            style={
+              activePortalTab === "menu"
+                ? { backgroundColor: activeTheme.accentColor, color: "#090A0C" }
+                : { color: activeTheme.textColor }
+            }
+            className="h-10 rounded-xl text-xs sm:text-sm font-black flex items-center justify-center gap-2 transition-all cursor-pointer"
+          >
+            <LayoutList className="size-4" />
+            <span>Bảng giá &amp; Kho</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActivePortalTab("notes")}
+            style={
+              activePortalTab === "notes"
+                ? { backgroundColor: activeTheme.accentColor, color: "#090A0C" }
+                : { color: activeTheme.textColor }
+            }
+            className="h-10 rounded-xl text-xs sm:text-sm font-black flex items-center justify-center gap-2 transition-all cursor-pointer"
+          >
+            <ClipboardList className="size-4" />
+            <span>Sổ ghi đơn CTV</span>
+          </button>
+        </div>
+
+        {activePortalTab === "notes" ? (
+          <CtvOrderNotesTab
+            activeTheme={activeTheme}
+            onSessionExpired={() => setIsAuthenticated(false)}
+          />
+        ) : (
+        /* The Live Board Display (Exact Theme Colors & Styling) */
         <div 
           className="rounded-2xl border backdrop-blur-xl p-6 sm:p-8 shadow-[0_20px_50px_rgba(0,0,0,0.6)] relative select-none transition-all duration-300"
           style={{
@@ -689,6 +734,7 @@ export function KtvPriceListClient({ initialAuth, initialData }: KtvPriceListCli
             )}
           </div>
         </div>
+        )}
       </main>
     </div>
   )

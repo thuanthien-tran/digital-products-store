@@ -18,6 +18,7 @@ import {
   Menu,
   X,
   Zap,
+  ClipboardList,
 } from "lucide-react"
 import { NotificationBell } from "@/components/admin/NotificationBell"
 import { ChangePasswordModal } from "@/components/admin/ChangePasswordModal"
@@ -41,6 +42,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/admin", label: "Tổng quan", icon: LayoutDashboard },
       { href: "/admin/orders", label: "Đơn hàng", icon: ShoppingBag, matchPrefixes: ["/admin/orders"] },
+      { href: "/admin/ctv-notes", label: "Sổ đối chiếu CTV", icon: ClipboardList, matchPrefixes: ["/admin/ctv-notes"] },
       { href: "/admin/buff-muse", label: "Buff Token Muse", icon: Zap, matchPrefixes: ["/admin/buff-muse"] },
       { href: "/admin/products", label: "Sản phẩm", icon: Package, matchPrefixes: ["/admin/products"] },
       { href: "/admin/coupons", label: "Mã giảm giá", icon: Ticket, matchPrefixes: ["/admin/coupons"] },
